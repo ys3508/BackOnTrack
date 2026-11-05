@@ -9,11 +9,18 @@ import { useStore } from "@/components/workspace/store"
 import { formatDateTime } from "@/lib/workspace/dates"
 import { MIN_EVIDENCE, detectPatterns } from "@/lib/workspace/patterns"
 import {
-  HELP_KINDS,
   HELP_LABEL,
   type FrictionEvent,
   type HelpKind,
 } from "@/lib/workspace/schemas"
+
+/** Only choices that change what's offered, so none is silently ignored. */
+const PREFERENCE_KINDS: HelpKind[] = [
+  "prepared",
+  "outline",
+  "draft",
+  "smaller-steps",
+]
 
 function describe(item: FrictionEvent) {
   if (item.kind === "stuck") return "Reported being stuck"
@@ -95,13 +102,18 @@ export function LearningCard() {
           className={fieldClass}
         >
           <option value="">No preference</option>
-          {HELP_KINDS.map((kind) => (
+          {PREFERENCE_KINDS.map((kind) => (
             <option key={kind} value={kind}>
               {HELP_LABEL[kind]}
             </option>
           ))}
         </select>
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        In Demo Mode, the first three all start from the same prepared document.
+        Live AI can tell them apart.
+      </p>
 
       {shown.length > 0 ? (
         <ul className="space-y-2" aria-label="What’s been noticed">

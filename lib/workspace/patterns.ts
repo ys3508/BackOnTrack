@@ -246,7 +246,13 @@ export function guidanceFor(
       ...(stated
         ? [`They said they prefer to start with: ${HELP_LABEL[stated]}.`]
         : []),
-      ...patterns.map((item) => `${item.title}. ${item.evidence}`),
+      // What led to the preference comes first, because plans quote the first note.
+      ...[...patterns]
+        .sort(
+          (a, b) =>
+            Number(b.helpKind === preferred) - Number(a.helpKind === preferred)
+        )
+        .map((item) => `${item.title}. ${item.evidence}`),
     ].slice(0, 6),
   }
 }

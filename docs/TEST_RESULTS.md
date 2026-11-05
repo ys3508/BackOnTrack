@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 385 of 385 (also from a clean clone, and with the system set to Kiritimati time) |
+| Automated tests (`npm test`) | Pass, 415 of 415 (also from a clean clone, and with the system set to Kiritimati time) |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
@@ -24,6 +24,23 @@ No real AI model has been called. The following were verified instead:
 - A manual test ran the production build with the real Anthropic SDK client over HTTP, against a throwaway local server returning canned answers.
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
+
+## Failure-aware learning
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch, in Demo Mode. Records spread over days were written directly into browser storage or created with test dates. **No one has used this over real days.**
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| Hint appears from real clicks | Browser, three real "I'm stuck" flows | Records held only actions, with no text. A hint appeared, but all 3 happened within a minute. | Failed, then fixed |
+| Repeated clicks in one moment | Automated | Three within the hour on one task count once, so no pattern | Pass after fix |
+| Below 3 moments, or older than 60 days | Automated | Nothing claimed, and plans unchanged | Pass |
+| Plan changes from evidence | Browser and automated | With 3 stuck moments on empty documents, the first plan became "Start from a prepared document", and its note gave the reason | Pass |
+| Help followed by progress, or not | Automated | Outline at 3 of 4 was preferred. Smaller steps at 0 of 3 moved aside. Accepted suggestions didn't count as progress. | Pass |
+| Dismissing, deleting, and switching off | Browser (viewing) and automated | The pattern stopped being used. Records deleted one at a time or all together, and dropping below 3 removed the pattern. No new records when off. | Pass |
+| No text in records, and removal with the task | Automated | No title or obstacle text appeared in the log | Pass |
+| Accessibility scan of Settings and the hint | Automated (axe-core in jsdom, with color contrast off) | No violations | Pass |
+| **Whether changing the help actually helps anyone** | **Not measured** | | **Not run** |
+| **Real model following these guesses** | **Not run: no API key was available.** The prompt includes them, but how well it uses them is unknown. | | **Not run** |
 
 ## Easy return and Zero-Start
 

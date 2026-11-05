@@ -210,6 +210,21 @@ All of these were found in a real browser after the automated tests had passed.
 - A new paper's first action was "Find the submission page", from whichever step came first.
 - Text typed over a placeholder kept the "suggested" highlight, so the user's own words looked like a suggestion. Typed text is now never marked, anywhere in suggested text.
 
+## Failure-aware learning
+
+### Decisions
+
+- **Counting, not machine learning.** With a handful of records in one browser, counting is explainable and honest, and a trained model wouldn't have enough data.
+- **A separate log that holds no text.** It stores event type, time, task ID, task kind, whether the document was empty, and outcomes. Deleting a task removes its records.
+- **"Progress" means a finished step, a real focus session, or at least 5 of the user's own words.** Accepted suggestions and code blocks don't count, so accepting help can't count as its own success. Editing code isn't detected, which undercounts coding work.
+- **Task kind comes from wording,** so it can be wrong.
+- **Preference options are limited to ones that change something,** so no choice is silently ignored.
+
+### Problems found by testing
+
+- Clicking "I'm stuck" three times in a minute produced a "pattern", found in a real browser. Events on one task within an hour now count once.
+- A plan's note quoted a different pattern from the one behind its choice.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

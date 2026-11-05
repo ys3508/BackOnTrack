@@ -15,6 +15,7 @@ This content can be sensitive, because people may describe their work, health, o
 - The data stays until the user deletes it or clears the browser's data, and it isn't backed up.
 - It isn't encrypted, so anyone using the same browser profile could read it. Use a private window on a shared computer.
 - API keys are never stored in the browser.
+- To work out which help to offer first, the app keeps a log of moments such as getting stuck, focus sessions, moved work sessions, and accepted help. It holds no task titles or written text. It has its own controls in Settings: view, delete, or switch off. Deleting a task removes its records, and Delete all removes everything.
 - The time the app was last opened is saved too, only in this browser, and is included in backups. It's used to offer an easier return after time away. It isn't sent anywhere, and there's no streak or usage tracking.
 - Browsers usually allow about 5 MB for this. Settings shows the amount used, and the app warns if a save fails.
 - Before moving saved data to a new format, or if it can't be read, a copy is kept under `backontrack.workspace.backup`. Deleting all data removes this too.
@@ -42,6 +43,12 @@ On the server:
 - Logs of AI failures record only the error type, not the user's text.
 - Requests are rate limited. The limiter briefly holds the client's IP address in memory to count requests, and doesn't write it to storage.
 - The hosting platform, such as Vercel, may keep its own request logs under its own terms.
+
+### What's noticed about the user
+
+With Live AI, guesses from that log, such as "Empty documents seem to be a sticking point", are sent along with a task when the user asks for help. They describe behavior, so they could be sensitive. Switching learning off stops this. A preference the user states is still sent. Demo Mode sends nothing.
+
+The app doesn't diagnose anyone or infer health conditions, and its counts shouldn't be read that way.
 
 ## Third-party AI risks
 

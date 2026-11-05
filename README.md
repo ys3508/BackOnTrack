@@ -27,6 +27,7 @@ BackOnTrack isn't a treatment for ADHD or anything else, and its effect hasn't b
 | Area | What you can do |
 | --- | --- |
 | **Workspace** | See "Your next small step", or "Continue where you left off", with one click to the task, its document, or a short focus session. Lists stay short, with an option to expand. |
+| **Learning what helps** | BackOnTrack notices when work stalls, such as getting stuck on empty documents, and whether accepted help was followed by progress. Then it changes which help comes first, and says why. It needs at least 3 separate moments before claiming anything. In Settings, you can see every record, say "This isn't right", delete anything, state a preference, or switch it off. |
 | **Coming back** | After a few days away, home shows one way back in: where you stopped, and a "Continue working" button. It shows no overdue counts, backlog, or streaks. |
 | **Zero-Start** | "Set up my workspace" prepares a document with what's being asked, questions to answer, an outline, and an editable first section. Choose where to begin, and the first [placeholder] is selected so you can type over it. It's structure, not research. |
 | **Help starting** | Each step has "Help me do this", which gives one concrete first action and something to start from: an outline, a draft, a checklist, or code to copy. Code hasn't been run, and BackOnTrack can't run it. A new task can set up its first workspace from your instructions. "Start 5 minutes" opens the document for that step, with a small timer on top. |
@@ -139,6 +140,7 @@ This repository does not yet have its own license for the original BackOnTrack c
 
 ## Known limitations
 
+- Learning what helps is simple counting, and hasn't been tried with real use over time. Progress after some help doesn't prove that the help caused it.
 - BackOnTrack hasn't been tried on a real assignment yet. See the real-case test in [docs/DESIGN_THINKING.md](docs/DESIGN_THINKING.md).
 - The real AI model has not been tested, and the public site doesn't use it. See [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 - No formal user testing has been done, and BackOnTrack's effect on procrastination has not been measured.

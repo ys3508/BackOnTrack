@@ -30,8 +30,8 @@ The loop BackOnTrack targets is: plan → don't do it → feel pressure → avoi
 | --- | --- | --- |
 | **Return Without Catching Up** | Built | One way back in, using only recorded facts |
 | **Zero-Start Mode** | Built | Prepared requirements, questions, outline, and first section |
-| Failure-Aware Engine | Partly built | Plan B adapts within one task. It doesn't yet learn across tasks. |
-| Personal Friction Map | Not built | Needs real records, and must be viewable, editable, and deletable. It shouldn't claim a pattern from too little data. |
+| Failure-Aware Engine | Built, simply | Counts recorded moments across tasks, and changes which help comes first. It isn't machine learning, and hasn't been tried with real use over time. |
+| Personal Friction Map | Partly built | The Settings card lists what's been noticed, with evidence and controls. There's no map or wider analysis. |
 | Avoidance Debt Radar | Not built | Sorting by consequence must rest on verifiable information, not AI guesses |
 | Plan B Simulator | Not built | Paths to switch to, decided before anything fails |
 
@@ -40,6 +40,14 @@ Decisions on the return screen, all aimed at not adding pressure:
 - It shows no overdue count, no time-away figure, and no streak. It's based on when the app was last opened.
 - It doesn't hide consequences entirely. It states the deadline of the task being resumed, and one other deadline if it's due today or tomorrow. Leaving those out could cost someone a real deadline.
 - Nothing about deadlines or tasks changes because someone was away.
+
+Decisions on learning from failed attempts:
+
+- **It learns about the help, not the person.** It records which approach was followed by progress, and it never labels anyone.
+- **It needs 3 separate moments in 60 days.** Events on one task within an hour count once, so one bad afternoon isn't a pattern. These thresholds are judgment calls, and haven't been tested.
+- **Everything is stated as a guess, with its evidence.** "Progress after it" is a correlation, so the app says it doesn't prove the cause.
+- **The user has the last word.** A stated preference beats anything inferred, and "This isn't right" stops a pattern from being used.
+- **It offers, and doesn't impose.** A hint can be ignored, and a plan's note explains any change.
 
 ### What success means, and how to test it
 

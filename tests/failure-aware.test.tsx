@@ -348,6 +348,23 @@ describe("patterns", () => {
     expect(guidance(state).preferred).toBe("outline")
   })
 
+  it("gives the reason behind its choice first", () => {
+    const state = run([
+      create("a"),
+      stuck(),
+      stuck(),
+      stuck(),
+      help("outline"),
+      ...step("1"),
+      help("outline"),
+      ...step("2"),
+      help("outline"),
+      ...step("3"),
+    ])
+    expect(guidance(state).preferred).toBe("outline")
+    expect(guidance(state).notes[0]).toContain("An outline seems to help")
+  })
+
   it("learns which help hasn't helped, and steps away from it", () => {
     const state = run([
       create("a"),
