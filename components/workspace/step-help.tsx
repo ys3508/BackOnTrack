@@ -18,9 +18,15 @@ import {
   buildStepHelpRequest,
   buildWorkspaceSetupRequest,
 } from "@/lib/recovery/context"
+import {
+  entryPoints,
+  preparedDocument,
+  type EntryPoint,
+} from "@/lib/recovery/prepared"
 import { requestStepHelp, requestWorkspaceSetup } from "@/lib/recovery-client"
 import type { StepHelpResult, WorkspaceSetupResult } from "@/lib/schemas"
 import type { Task } from "@/lib/workspace/schemas"
+import { cn } from "@/lib/utils"
 import {
   currentSubtask,
   nextActionFor,
@@ -30,6 +36,17 @@ import {
 type HelpState =
   | { type: "step"; result: StepHelpResult; source: "live" | "demo" }
   | { type: "setup"; result: WorkspaceSetupResult; source: "live" | "demo" }
+
+/** Puts the cursor just after a heading, so work starts in the chosen place. */
+function moveToHeading(editor: Editor, text: string) {
+  let target = -1
+  editor.state.doc.descendants((node, position) => {
+    if (node.type.name === "heading" && node.textContent === text) {
+      target = position + node.nodeSize + 1
+    }
+  })
+  if (target > 0) editor.chain().setTextSelection(target).scrollIntoView().run()
+}
 
 /** Copies only the code from a fenced block, so it can be pasted straight in. */
 function copyableText(content: string) {
@@ -87,7 +104,7 @@ export function useTaskHelp(
       )
       const source = originOf(result.usedFallback)
       setHelp({ type: "setup", result, source })
-      setDraft(result.starter.content)
+      setDraft(preparedDocument(result))
       commitNow({
         type: "log-doc-suggestion",
         id: task.id,
@@ -155,7 +172,7 @@ function HelpPreview({
   const smaller =
     type === "step" ? usefulSmallerSteps(task, help.result.smallerSteps) : []
 
-  function accept() {
+  function accept(entry?: EntryPoint) {
     const at = nowIso()
     if (editor && draft.trim()) {
       commitNow({
@@ -166,12 +183,13 @@ function HelpPreview({
         previous: editor.getHTML(),
       })
       insertSuggestion(editor, draft, "end")
+      if (entry) moveToHeading(editor, entry.heading)
     }
     dispatch({
       type: "edit-task",
       id: task.id,
       at,
-      patch: { nextAction: result.firstAction },
+      patch: { nextAction: entry?.nextAction ?? result.firstAction },
     })
     if (type === "step" && split && current && smaller.length) {
       dispatch({
@@ -240,15 +258,26 @@ function HelpPreview({
 
       <div>
         <label htmlFor="starter-preview" className="text-sm font-medium">
-          {result.starter.title}. Suggested, and not in your document yet.
+          {type === "setup" ? "Your prepared document" : result.starter.title}.
+          Suggested, and not in your document yet.
         </label>
         <Textarea
           id="starter-preview"
           value={draft}
           maxLength={8000}
           onChange={(event) => onDraft(event.target.value)}
-          className="mt-1 min-h-36 font-mono text-sm leading-relaxed"
+          className={cn(
+            "mt-1 font-mono text-sm leading-relaxed",
+            type === "setup" ? "min-h-72" : "min-h-36"
+          )}
         />
+        {type === "setup" && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            This is structure to edit, not research or finished work. Anything
+            in [brackets] is yours to fill in, and nothing here has been checked
+            against your sources.
+          </p>
+        )}
         {result.starter.kind === "code" && (
           <p className="mt-1 text-xs text-muted-foreground">
             This code hasn’t been run. BackOnTrack can’t run it, so copy it into
@@ -274,11 +303,34 @@ function HelpPreview({
         </label>
       )}
 
+      {type === "setup" && (
+        <div role="group" aria-labelledby="entry-heading">
+          <h2 id="entry-heading" className="text-sm font-medium">
+            Where do you want to begin?
+          </h2>
+          <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {entryPoints(help.result).map((entry, index) => (
+              <Button
+                key={entry.label}
+                type="button"
+                size="xl"
+                variant={index === 0 ? "default" : "outline"}
+                onClick={() => accept(entry)}
+              >
+                {entry.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <Button type="button" size="xl" onClick={accept}>
-          <Check aria-hidden />
-          Use this
-        </Button>
+        {type === "step" && (
+          <Button type="button" size="xl" onClick={() => accept()}>
+            <Check aria-hidden />
+            Use this
+          </Button>
+        )}
         <Button
           type="button"
           size="xl"

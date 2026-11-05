@@ -15,6 +15,7 @@ import { isTimerFinished } from "@/lib/focus/timer"
 import { fetchLiveStatus } from "@/lib/recovery-client"
 import type { Source } from "@/lib/session"
 import { localToday } from "@/lib/workspace/dates"
+import { isAway } from "@/lib/workspace/returning"
 import { workspaceReducer } from "@/lib/workspace/reducer"
 import type { WorkspaceAction } from "@/lib/workspace/reducer"
 import type { Workspace } from "@/lib/workspace/schemas"
@@ -86,6 +87,9 @@ type Store = {
   commitNow: (action: WorkspaceAction) => void
   /** True when the browser refused the last save, usually because it's full. */
   storageFailed: boolean
+  /** True after time away, until the user has chosen a way back in. */
+  returning: boolean
+  finishReturn: () => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -122,6 +126,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const [storageFailed, setStorageFailed] = useState(false)
   const latest = useRef(state)
+  const [returning, setReturning] = useState(() =>
+    isAway(state.lastOpenedAt, Date.now())
+  )
+  const finishReturn = useCallback(() => setReturning(false), [])
 
   useEffect(() => {
     latest.current = state
@@ -163,6 +171,18 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener("visibilitychange", check)
     }
   }, [state])
+
+  useEffect(() => {
+    // Also covers a tab left open for days and only now looked at again.
+    const opened = () => {
+      if (document.visibilityState !== "visible") return
+      if (isAway(latest.current.lastOpenedAt, Date.now())) setReturning(true)
+      dispatch({ type: "mark-opened", at: nowIso() })
+    }
+    dispatch({ type: "mark-opened", at: nowIso() })
+    document.addEventListener("visibilitychange", opened)
+    return () => document.removeEventListener("visibilitychange", opened)
+  }, [])
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash(window.location.hash))
@@ -219,6 +239,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       deleteAll,
       commitNow,
       storageFailed,
+      returning,
+      finishReturn,
     }),
     [
       state,
@@ -230,6 +252,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       deleteAll,
       commitNow,
       storageFailed,
+      returning,
+      finishReturn,
     ]
   )
 

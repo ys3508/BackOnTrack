@@ -32,6 +32,73 @@ function findDependencies(text: string) {
     .slice(0, 4)
 }
 
+/** Fixed structures chosen by wording. They hold no facts about the topic. */
+function preparedParts(
+  task: WorkspaceSetupRequest["task"],
+  requirements: string[]
+) {
+  const text = `${task.title} ${task.instructions}`
+  if (
+    /classifier|dataset|\bmodel\b|\bcode\b|python|script|program/i.test(text)
+  ) {
+    return {
+      questions: [
+        "What is this supposed to predict or produce?",
+        "Which file or data does it start from?",
+        "How will you show that it works?",
+      ],
+      outline: ["Data", "Approach", "Results", "What I'd change"],
+      firstSection: {
+        title: "Data",
+        content:
+          "The data I'm using is [name or path]. The part I need to predict or produce is [name].",
+      },
+    }
+  }
+  if (/paper|essay|report|research|thesis|article|writ|draft/i.test(text)) {
+    return {
+      questions: [
+        "What question is this answering?",
+        "What sources or notes do you already have?",
+        "If you had to give your answer today, what would it be?",
+      ],
+      outline: requirements.length
+        ? requirements.slice(0, 6)
+        : [
+            "Introduction",
+            "First main point",
+            "Second main point",
+            "Conclusion",
+          ],
+      firstSection: {
+        title: "Introduction",
+        content:
+          "This is about [topic]. The question I'm answering is [question]. My answer so far is [rough answer], and I'm not sure about [what you're unsure of].",
+      },
+    }
+  }
+  return {
+    questions: [
+      "What has to exist when this is finished?",
+      "Who or what do you need for it?",
+      "What's the smallest version that would still count?",
+    ],
+    outline: requirements.length
+      ? requirements.slice(0, 6)
+      : [
+          "What this is for",
+          "What I need",
+          "First part",
+          "Check before finishing",
+        ],
+    firstSection: {
+      title: "First part",
+      content:
+        "This has to achieve [one line]. The first thing I'll do is [one small action].",
+    },
+  }
+}
+
 export function demoWorkspaceSetup(
   request: WorkspaceSetupRequest
 ): WorkspaceSetupResult {
@@ -66,6 +133,7 @@ export function demoWorkspaceSetup(
     steps,
     firstAction: concrete.firstAction,
     starter: concrete.starter,
+    ...preparedParts(task, deliverables),
     note: "",
   }
 }

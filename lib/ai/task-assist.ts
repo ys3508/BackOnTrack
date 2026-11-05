@@ -273,6 +273,16 @@ export async function generateWorkspaceSetup(
         steps: cleanList(output.steps, 10),
         firstAction: cleanAction(output.firstAction),
         starter: cleanStarter(output.starter),
+        questions: cleanList(output.questions, 4),
+        outline: cleanList(output.outline, 8),
+        firstSection: {
+          title:
+            output.firstSection.title
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 80) || "First section",
+          content: output.firstSection.content.trim().slice(0, 4000),
+        },
         note: output.note.trim().slice(0, 300),
       }
       if (!clean.steps.length) {
@@ -280,7 +290,16 @@ export async function generateWorkspaceSetup(
       }
       const problem =
         breakdownProblem(clean.steps) ??
-        startingProblem(clean.firstAction, clean.starter.content, request.task)
+        startingProblem(
+          clean.firstAction,
+          [
+            clean.starter.content,
+            clean.firstSection.content,
+            ...clean.questions,
+            ...clean.outline,
+          ].join("\n"),
+          request.task
+        )
       if (!problem) return clean
       correction = problem
     } catch (error) {

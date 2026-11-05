@@ -278,6 +278,9 @@ describe("live checks on starting work", () => {
       steps: ["Open the data"],
       firstAction: "Open the data",
       starter,
+      questions: [],
+      outline: [],
+      firstSection: { title: "Data", content: "[name]" },
       note: "",
     })
     const result = await generateWorkspaceSetup(
@@ -336,7 +339,7 @@ describe("in the app", () => {
     expect(saved().tasks[0].subtasks).toEqual([])
     expect(editor.getText()).toBe("")
 
-    await user.click(await button("Use this"))
+    await user.click(await button("Start from the code"))
     expect(editor.getHTML()).toContain("<pre")
     expect(saved().tasks[0].nextAction).toBe(
       "Open the dataset and identify the target column"

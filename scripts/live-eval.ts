@@ -366,6 +366,9 @@ async function main() {
     ["names what has to be handed in", setup.deliverables.length > 0],
     ["gives several steps", setup.steps.length >= 3],
     ["doesn't invent a date", setup.datesMentioned.length === 0],
+    ["prepares questions to answer", setup.questions.length > 0],
+    ["prepares an outline", setup.outline.length > 0],
+    ["prepares a first section", setup.firstSection.content.length > 0],
   ]
   for (const [name, passed] of setupChecks) {
     if (!passed) failures++

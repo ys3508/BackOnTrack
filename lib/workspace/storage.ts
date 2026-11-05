@@ -73,6 +73,8 @@ export function restoreWorkspace(raw: unknown): Workspace {
       ? skipped
       : EMPTY_WORKSPACE.skipped,
     legacyMigrated: saved.legacyMigrated === true,
+    lastOpenedAt:
+      typeof saved.lastOpenedAt === "string" ? saved.lastOpenedAt : null,
   }
 }
 

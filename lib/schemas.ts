@@ -414,6 +414,20 @@ export const WorkspaceSetupOutputSchema = z.object({
   steps: z.array(z.string()).describe("3 to 8 small, concrete steps."),
   firstAction: z.string().describe("One physical action to begin with."),
   starter: StarterSchema,
+  questions: z
+    .array(z.string())
+    .describe("2 to 4 questions the user can answer to get going."),
+  outline: z
+    .array(z.string())
+    .describe("3 to 7 section names or points, as an editable structure."),
+  firstSection: z.object({
+    title: z.string().describe("The name of the first section."),
+    content: z
+      .string()
+      .describe(
+        "An editable start, with [brackets] for anything only the user can supply."
+      ),
+  }),
   note: z.string().describe("A short caveat, or empty."),
 })
 export type WorkspaceSetupOutput = z.infer<typeof WorkspaceSetupOutputSchema>

@@ -254,6 +254,8 @@ export type Workspace = {
   /** Tasks set aside from the home recommendation for one day. */
   skipped: { date: string; taskIds: string[] }
   legacyMigrated: boolean
+  /** When the app was last opened, kept only in this browser. */
+  lastOpenedAt: string | null
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
@@ -266,6 +268,7 @@ export const EMPTY_WORKSPACE: Workspace = {
   settings: DEFAULT_SETTINGS,
   skipped: { date: "", taskIds: [] },
   legacyMigrated: false,
+  lastOpenedAt: null,
 }
 
 export const ACTIVE_STATUSES: TaskStatus[] = [

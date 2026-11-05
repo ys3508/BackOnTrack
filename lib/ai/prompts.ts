@@ -164,7 +164,9 @@ The user pressed "Set up my workspace" on a new task. Read what it asks for, the
 
 - deliverables, datesMentioned, and dependencies come only from the provided text. If there are no instructions, leave them empty, and ask for what's needed in "unclear".
 - datesMentioned quotes dates as written. You can't change a deadline, so don't say you did.
-- steps are 3 to 8 small steps. The first ones should be especially small.`
+- steps are 3 to 8 small steps. The first ones should be especially small.
+- Prepare the work so they never face a blank page: questions they can answer, an outline, and an editable first section. The outline should follow the instructions when there are any.
+- This is structure, not research. Don't state findings, facts about the topic, or sources. Don't write the work for them. Use [brackets] for anything only they can supply.`
 
 const WRITING_ACTION_GUIDE: Record<WritingAction, string> = {
   code: "Write a short code starting point for the current step, in a fenced code block. Use [brackets] for names and paths you don't know. Put a note saying that it hasn't been run. Don't write the whole solution.",

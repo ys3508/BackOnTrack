@@ -22,10 +22,12 @@ import {
   StatusBadge,
 } from "@/components/workspace/parts"
 import { QuickAdd } from "@/components/workspace/quick-add"
+import { ReturnView } from "@/components/workspace/return-view"
 import { ReplanDialog } from "@/components/workspace/schedule"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { SAMPLE_TASKS } from "@/lib/demo/sample-tasks"
 import { deadlineText, formatDateTime } from "@/lib/workspace/dates"
+import { returnSummary } from "@/lib/workspace/returning"
 import type { Task } from "@/lib/workspace/schemas"
 import {
   deadlinePassed,
@@ -110,7 +112,7 @@ function NextStepDetails({ task }: { task: Task }) {
 }
 
 export function WorkspaceView() {
-  const { state, today, navigate, dispatch } = useStore()
+  const { state, today, navigate, dispatch, returning } = useStore()
   const startFocus = useStartFocus()
   const defaultMinutes = state.settings.defaultFocusMinutes
   const limit = state.settings.homeListSize
@@ -125,6 +127,9 @@ export function WorkspaceView() {
   const recent = recentActions(state)
   const hasTasks = state.tasks.length > 0
   const [replanning, setReplanning] = useState<Task | null>(null)
+  const coming = returning ? returnSummary(state, today) : null
+
+  if (coming) return <ReturnView summary={coming} />
 
   return (
     <div className="space-y-6">

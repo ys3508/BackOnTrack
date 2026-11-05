@@ -197,6 +197,7 @@ export type WorkspaceAction =
     }
   | { type: "report-stuck"; id: string; at: string; text: string }
   | { type: "settings"; patch: Partial<Settings> }
+  | { type: "mark-opened"; at: string }
   | { type: "skip-recommendation"; taskId: string; date: string }
   | { type: "replace"; state: Workspace }
 
@@ -1089,6 +1090,9 @@ export function workspaceReducer(
 
     case "timer-acknowledge":
       return { ...state, finishedSessionId: null }
+
+    case "mark-opened":
+      return { ...state, lastOpenedAt: action.at }
 
     case "settings":
       return { ...state, settings: { ...state.settings, ...action.patch } }
