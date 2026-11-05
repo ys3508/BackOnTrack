@@ -151,6 +151,68 @@ describe("what today can hold", () => {
     )
   })
 
+  it("gives what's due now the time, not whatever's left", () => {
+    const state = run([
+      task("due", "ML assignment", {
+        deadline: addDays(TODAY, 1),
+        priority: "high",
+        estimateMinutes: 240,
+      }),
+      task("read", "Read a chapter", {
+        deadline: addDays(TODAY, 5),
+        estimateMinutes: 60,
+      }),
+      task("mail", "Reply to my advisor", { estimateMinutes: 5 }),
+    ])
+    const result = plan(state)
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]).toMatchObject({ taskId: "due", minutes: 50 })
+    expect(result.notToday.map((item) => item.title)).toEqual([
+      "Read a chapter",
+      "Reply to my advisor",
+    ])
+    expect(result.risks[0]).toContain("Today’s plan gives it 50")
+  })
+
+  it("keeps that true even when the urgent work was missed before", () => {
+    const state = run([
+      task("due", "ML assignment", {
+        deadline: addDays(TODAY, 1),
+        estimateMinutes: 240,
+      }),
+      {
+        type: "add-subtask",
+        id: "due",
+        at: AT,
+        subId: "1",
+        title: "Train a classifier",
+      },
+      {
+        type: "add-planned",
+        at: AT,
+        session: {
+          id: "p",
+          taskId: "due",
+          date: addDays(TODAY, -1),
+          time: null,
+          minutes: 25,
+          label: "",
+          done: false,
+        },
+      },
+    ])
+    const [item] = plan(state).items
+    expect(item.minutes).toBe(50)
+    expect(item.action).toBe("Open the dataset and identify the target column")
+    expect(item.reason).toContain("it gets most of today")
+  })
+
+  it("names a task with no steps plainly, without asking to break it down", () => {
+    const { items } = plan(mixed())
+    const email = items.find((item) => item.taskId === "email")!
+    expect(email.action).toBe("Reply to my advisor")
+  })
+
   it("never plans more than the time available", () => {
     for (const minutes of [15, 30, 60, 120, 180]) {
       const { items, usableMinutes } = plan(mixed(), minutes)

@@ -307,7 +307,8 @@ function PlanItemText({ item, index }: { item: DailyPlanItem; index: number }) {
         {index + 1}. {item.action}
       </p>
       <p className="text-sm break-words text-muted-foreground">
-        {item.title} · {item.minutes} min
+        {item.action === item.title ? "" : `${item.title} · `}
+        {item.minutes} min
       </p>
       <p className="mt-0.5 text-sm break-words">Why: {item.reason}.</p>
     </>
