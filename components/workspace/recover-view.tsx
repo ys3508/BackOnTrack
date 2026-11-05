@@ -34,6 +34,7 @@ import type { StoredRecovery, Task } from "@/lib/workspace/schemas"
 import {
   currentSubtask,
   tasksNeedingAttention,
+  usefulSmallerSteps,
 } from "@/lib/workspace/selectors"
 
 export function RecoverView({ taskId }: { taskId?: string }) {
@@ -291,6 +292,7 @@ function PlanPreview({
   const [useNextAction, setUseNextAction] = useState(true)
   const [splitStep, setSplitStep] = useState(true)
   const current = currentSubtask(task)
+  const smaller = usefulSmallerSteps(task, plan.smallerSteps)
   const [useDraft, setUseDraft] = useState(true)
   const [draftTitle, setDraftTitle] = useState(plan.artifact.title)
   const [draft, setDraft] = useState(plan.artifact.body)
@@ -321,13 +323,13 @@ function PlanPreview({
       ),
       release: chosen === "RELEASE" && markReleased,
     })
-    if (splitStep && current && plan.smallerSteps.length) {
+    if (splitStep && current && smaller.length) {
       dispatch({
         type: "split-subtask",
         id: task.id,
         at: nowIso(),
         subId: current.id,
-        steps: plan.smallerSteps.map((title) => ({ id: newId(), title })),
+        steps: smaller.map((title) => ({ id: newId(), title })),
       })
     }
     navigate({ view: "task", id: task.id })
@@ -455,7 +457,7 @@ function PlanPreview({
         )}
       </Card>
 
-      {plan.smallerSteps.length > 0 && current && (
+      {smaller.length > 0 && current && (
         <Card>
           <h2 className="font-sans text-[15px] font-semibold tracking-normal">
             Make this step smaller
@@ -463,7 +465,7 @@ function PlanPreview({
           <CheckRow
             checked={splitStep}
             onChange={setSplitStep}
-            label={`Replace “${current.title}” with: ${plan.smallerSteps.join(" → ")}`}
+            label={`Replace “${current.title}” with: ${smaller.join(" → ")}`}
           />
           <p className="text-xs text-muted-foreground">
             Finished steps aren’t touched.

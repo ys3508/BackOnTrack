@@ -21,7 +21,11 @@ import {
 import { requestStepHelp, requestWorkspaceSetup } from "@/lib/recovery-client"
 import type { StepHelpResult, WorkspaceSetupResult } from "@/lib/schemas"
 import type { Task } from "@/lib/workspace/schemas"
-import { currentSubtask, nextActionFor } from "@/lib/workspace/selectors"
+import {
+  currentSubtask,
+  nextActionFor,
+  usefulSmallerSteps,
+} from "@/lib/workspace/selectors"
 
 type HelpState =
   | { type: "step"; result: StepHelpResult; source: "live" | "demo" }
@@ -148,7 +152,8 @@ function HelpPreview({
   const [split, setSplit] = useState(true)
   const [copied, setCopied] = useState(false)
   const current = currentSubtask(task)
-  const smaller = type === "step" ? help.result.smallerSteps : []
+  const smaller =
+    type === "step" ? usefulSmallerSteps(task, help.result.smallerSteps) : []
 
   function accept() {
     const at = nowIso()

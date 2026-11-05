@@ -1,4 +1,5 @@
 import { applySafetyGuards } from "@/lib/guards"
+import { similarity } from "@/lib/guards"
 import { categorize } from "@/lib/recovery/categorize"
 import { concreteStep } from "@/lib/recovery/concrete"
 import type { Category } from "@/lib/recovery/categorize"
@@ -71,7 +72,11 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
   // A coding step, or one that's already resisted a plan, gets made smaller.
   if (task.currentStep) {
     const concrete = concreteStep(task.currentStep)
-    if (concrete.starter.kind === "code" || task.stuckOnStep > 0) {
+    const different = similarity(concrete.firstAction, task.currentStep) < 0.8
+    if (
+      different &&
+      (concrete.starter.kind === "code" || task.stuckOnStep > 0)
+    ) {
       list.push({
         headline: `Make “${task.currentStep}” smaller`,
         instruction: concrete.firstAction,
@@ -81,7 +86,7 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
         kind: concrete.starter.kind === "code" ? "code" : "checklist",
         artifactTitle: concrete.starter.title,
         body: concrete.starter.content,
-        steps: [],
+        steps: concrete.smallerSteps.slice(0, 3),
         smallerSteps: concrete.smallerSteps,
       })
     }

@@ -496,8 +496,13 @@ export function workspaceReducer(
         return { ...task, subtasks }
       })
 
-    case "split-subtask":
-      return mapTask(state, action.id, (task) => {
+    case "split-subtask": {
+      // A running timer follows the work to the first of the smaller steps.
+      const timer =
+        state.timer?.subtaskId === action.subId && action.steps.length
+          ? { ...state.timer, subtaskId: action.steps[0].id }
+          : state.timer
+      return mapTask({ ...state, timer }, action.id, (task) => {
         const index = task.subtasks.findIndex((sub) => sub.id === action.subId)
         if (index < 0 || !action.steps.length) return task
         const original = task.subtasks[index]
@@ -527,6 +532,7 @@ export function workspaceReducer(
           `Accepted smaller steps in place of: ${original.title}`
         )
       })
+    }
 
     case "set-current-subtask":
       return mapTask(state, action.id, (task) => ({

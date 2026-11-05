@@ -33,6 +33,7 @@ import {
   progressSummary,
   recentActions,
   recommendTask,
+  usefulSmallerSteps,
 } from "@/lib/workspace/selectors"
 import { restoreWorkspace } from "@/lib/workspace/storage"
 
@@ -882,5 +883,73 @@ describe("small details", () => {
     expect(
       await screen.findByText(/Interrupted attempt, not counted as focus time/)
     ).toBeInTheDocument()
+  })
+})
+
+describe("what the browser check found", () => {
+  const split = () =>
+    workspaceReducer(withSteps(), {
+      type: "split-subtask",
+      id: "a",
+      at: AT,
+      subId: "1",
+      steps: [
+        { id: "n1", title: "Open the dataset and identify the target column" },
+        { id: "n2", title: "Fit one simple classifier" },
+      ],
+    })
+
+  it("goes smaller, not in circles, when the step is already the small version", () => {
+    const { plan } = demoTaskRecovery(
+      buildRecoveryRequest(split().tasks[0], split(), TODAY, { rejected: [] })
+    )
+    expect(plan.nextStep.instruction).toMatch(/^Find where the dataset file/)
+    expect(plan.smallerSteps).not.toContain(
+      "Open the dataset and identify the target column"
+    )
+    expect(JSON.stringify(plan.schedule)).not.toContain("undefined")
+  })
+
+  it("never offers smaller steps that repeat ones already on the list", () => {
+    const task = split().tasks[0]
+    expect(
+      usefulSmallerSteps(task, [
+        "Open the dataset and identify the target column",
+        "Fit one simple classifier",
+      ])
+    ).toEqual([])
+    expect(
+      usefulSmallerSteps(task, [
+        "Find the file",
+        "Fit one simple classifier",
+        "Read its columns",
+      ])
+    ).toEqual(["Find the file", "Read its columns"])
+  })
+
+  it("keeps a running timer on the work when its step is split", () => {
+    const running = run(
+      [
+        {
+          type: "timer-start",
+          id: "s",
+          kind: "focus",
+          taskId: "a",
+          subtaskId: "1",
+          minutes: 5,
+          now: 0,
+          at: AT,
+        },
+      ],
+      withSteps()
+    )
+    const after = workspaceReducer(running, {
+      type: "split-subtask",
+      id: "a",
+      at: AT,
+      subId: "1",
+      steps: [{ id: "n1", title: "Smaller" }],
+    })
+    expect(after.timer?.subtaskId).toBe("n1")
   })
 })

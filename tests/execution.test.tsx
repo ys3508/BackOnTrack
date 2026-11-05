@@ -180,7 +180,7 @@ describe("definition of done", () => {
     unmount()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Continue where you left off" })
-    expect(screen.getByText(/You completed 1 of \d steps/)).toBeInTheDocument()
+    expect(screen.getByText(/You completed 1 of \d+ steps/)).toBeInTheDocument()
     await user.click(await button("Open my document"))
     const restored = await getEditor()
     await waitFor(() => expect(restored.getText()).toContain("My own sentence"))

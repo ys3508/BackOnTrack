@@ -1,4 +1,4 @@
-import { concreteStep } from "@/lib/recovery/concrete"
+import { concreteStep, prepStepFor } from "@/lib/recovery/concrete"
 import {
   demoBreakdown,
   extractRequirements,
@@ -48,7 +48,10 @@ export function demoWorkspaceSetup(
     steps.find((step) => !/^read through|^paste the assignment/i.test(step)) ??
     steps[0] ??
     task.title
-  const concrete = concreteStep(target)
+  // A prep step is the start of the big step it came from, so use that one's help.
+  const concrete = concreteStep(
+    steps.find((step) => prepStepFor(step) === target) ?? target
+  )
 
   return {
     summary: task.instructions

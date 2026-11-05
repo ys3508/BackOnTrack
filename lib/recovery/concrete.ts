@@ -21,6 +21,30 @@ const fence = (code: string) => "```python\n" + code + "\n```"
 
 const RULES: { match: RegExp; build: (step: string) => ConcreteStep }[] = [
   {
+    // Already the small version of "train a classifier", so this goes smaller.
+    match: /open the dataset|identify the target column/i,
+    build: () => ({
+      firstAction: "Find where the dataset file is saved, and paste its path",
+      why: "This only asks you to find one file. You don’t have to understand the data yet.",
+      smallerSteps: [
+        "Find where the dataset file is saved",
+        "Open it in any program, and read the column names",
+        "Write down which column holds the answer",
+      ],
+      starter: {
+        kind: "code",
+        title: "Code starting point: only the column names",
+        content: fence(
+          [
+            "import pandas as pd",
+            "",
+            'print(pd.read_csv("[path to your file].csv").columns)',
+          ].join("\n")
+        ),
+      },
+    }),
+  },
+  {
     match:
       /classifier|target column|train\b.*\bmodel|\bmodel\b.*\btrain|fit\b.*\bmodel/i,
     build: () => ({

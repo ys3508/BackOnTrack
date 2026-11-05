@@ -8,6 +8,26 @@ export function deadlinePassed(task: Task, today: string) {
 }
 
 /** The step being worked on: the one chosen by the user, or else the first open. */
+/**
+ * Keeps only smaller steps that really change the list: none that repeat another
+ * step, and at least two, since swapping one step for one more isn't a split.
+ */
+export function usefulSmallerSteps(task: Task, steps: string[]) {
+  const key = (text: string) => text.trim().toLowerCase()
+  const current = currentSubtask(task)
+  if (!current) return []
+  const others = new Set(
+    task.subtasks
+      .filter((sub) => sub.id !== current.id)
+      .map((sub) => key(sub.title))
+  )
+  const kept = steps.filter((step) => step.trim() && !others.has(key(step)))
+  return kept.length >= 2 &&
+    kept.some((step) => key(step) !== key(current.title))
+    ? kept
+    : []
+}
+
 export function currentSubtask(task: Task) {
   const chosen = task.subtasks.find(
     (sub) => sub.id === task.currentSubtaskId && !sub.done
