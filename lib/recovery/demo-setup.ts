@@ -120,6 +120,8 @@ export function demoWorkspaceSetup(
     steps.find((step) => prepStepFor(step) === target) ?? target
   )
 
+  const parts = preparedParts(task, deliverables)
+
   return {
     summary: task.instructions
       ? "Pulled from your instructions with simple text rules, so check that nothing is missing."
@@ -131,9 +133,14 @@ export function demoWorkspaceSetup(
       ? []
       : ["What exactly has to be handed in, and in what format?"],
     steps,
-    firstAction: concrete.firstAction,
+    // Code has its own first move. Otherwise it's the part of the document that's
+    // ready to edit, not whichever step happened to come first.
+    firstAction:
+      concrete.starter.kind === "code"
+        ? concrete.firstAction
+        : `Fill in the first [bracket] under “${parts.firstSection.title}”`,
     starter: concrete.starter,
-    ...preparedParts(task, deliverables),
+    ...parts,
     note: "",
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Check, Copy, X } from "lucide-react"
+import { Selection } from "@tiptap/pm/state"
 import type { Editor } from "@tiptap/react"
 
 import {
@@ -37,15 +38,27 @@ type HelpState =
   | { type: "step"; result: StepHelpResult; source: "live" | "demo" }
   | { type: "setup"; result: WorkspaceSetupResult; source: "live" | "demo" }
 
-/** Puts the cursor just after a heading, so work starts in the chosen place. */
+/**
+ * Starts work in the chosen section. The first [placeholder] there is selected,
+ * so typing replaces it. Without one, the cursor goes to the end of the line.
+ */
 function moveToHeading(editor: Editor, text: string) {
-  let target = -1
-  editor.state.doc.descendants((node, position) => {
+  const { doc } = editor.state
+  let after = -1
+  doc.descendants((node, position) => {
     if (node.type.name === "heading" && node.textContent === text) {
-      target = position + node.nodeSize + 1
+      after = position + node.nodeSize
     }
   })
-  if (target > 0) editor.chain().setTextSelection(target).scrollIntoView().run()
+  if (after < 0) return
+  const { $from } = Selection.near(doc.resolve(after), 1)
+  const start = $from.start()
+  const placeholder = $from.parent.textContent.match(/\[[^\]]*\]/)
+  const from = placeholder
+    ? start + (placeholder.index ?? 0)
+    : start + $from.parent.content.size
+  const to = placeholder ? from + placeholder[0].length : from
+  editor.chain().setTextSelection({ from, to }).scrollIntoView().run()
 }
 
 /** Copies only the code from a fenced block, so it can be pasted straight in. */

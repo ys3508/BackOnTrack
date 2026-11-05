@@ -302,6 +302,13 @@ describe("Zero-Start: the work is prepared before the user begins", () => {
     expect(doc).not.toMatch(/\(\w+,? (19|20)\d\d\)|et al\.|studies show/i)
   })
 
+  it("starts with the prepared document, not an unrelated step", () => {
+    const { result } = setup("I haven't started my research paper")
+    expect(result.firstAction).toBe(
+      "Fill in the first [bracket] under “Introduction”"
+    )
+  })
+
   it("offers several ways in, each saying where it leads", () => {
     const { result } = setup("Write my essay")
     expect(entryPoints(result).map((item) => item.label)).toEqual([
@@ -335,6 +342,10 @@ describe("Zero-Start: the work is prepared before the user begins", () => {
     expect(
       editor.state.doc.resolve($from.before(1)).nodeBefore?.textContent
     ).toBe("Questions to answer")
+    // Typing replaces the first placeholder, so there's nothing to delete first.
+    const { from, to } = editor.state.selection
+    expect(editor.state.doc.textBetween(from, to)).toBe("[your answer]")
+    expect(editor.state.selection.$from.parent.isTextblock).toBe(true)
     expect(saved().tasks[0].nextAction).toBe(
       "Answer: What question is this answering?"
     )
