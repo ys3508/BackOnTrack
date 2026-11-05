@@ -233,7 +233,7 @@ function StopChoice({
       outcome: "stuck",
       note: note.trim(),
     })
-    if (task) navigate({ view: "task", id: task.id })
+    if (task) navigate({ view: "recover", taskId: task.id })
   }
 
   if (askingWhy) {

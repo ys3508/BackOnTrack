@@ -91,6 +91,8 @@ export function taskFromSession(
       createdAt: at,
       updatedAt: at,
       completedAt: null,
+      recovery: null,
+      rejectedPlans: [],
     },
     at,
     "created",

@@ -1,6 +1,12 @@
 import { z } from "zod"
 
-import { isCalendarDate } from "@/lib/schemas"
+import {
+  AnalysisSchema,
+  RecoveryPlanSchema,
+  RejectedPlanSchema,
+  StrategySchema,
+  isCalendarDate,
+} from "@/lib/schemas"
 
 const DateString = z.string().refine(isCalendarDate)
 
@@ -69,6 +75,18 @@ export const TaskDocumentSchema = z.object({
 })
 export type TaskDocument = z.infer<typeof TaskDocumentSchema>
 
+/** A recovery plan waiting for the user's decision. Nothing is applied yet. */
+export const StoredRecoverySchema = z.object({
+  analysis: AnalysisSchema,
+  plan: RecoveryPlanSchema,
+  strategy: StrategySchema.nullable(),
+  source: z.enum(["live", "demo"]),
+  usedFallback: z.boolean().default(false),
+  exhausted: z.boolean().default(false),
+  createdAt: z.string(),
+})
+export type StoredRecovery = z.infer<typeof StoredRecoverySchema>
+
 export const TaskSchema = z.object({
   id: z.string(),
   title: z.string().min(1),
@@ -86,6 +104,8 @@ export const TaskSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   completedAt: z.string().nullable().default(null),
+  recovery: StoredRecoverySchema.nullable().catch(null).default(null),
+  rejectedPlans: z.array(RejectedPlanSchema).catch([]).default([]),
 })
 export type Task = z.infer<typeof TaskSchema>
 

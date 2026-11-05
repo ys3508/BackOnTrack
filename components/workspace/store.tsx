@@ -27,6 +27,8 @@ export type Route =
   | { view: "workspace" }
   | { view: "tasks" }
   | { view: "task"; id: string }
+  | { view: "calendar" }
+  | { view: "recover"; taskId?: string }
   | { view: "focus"; taskId?: string }
   | { view: "guided" }
   | { view: "settings" }
@@ -35,7 +37,13 @@ export function parseHash(hash: string): Route {
   const [view, id] = hash.replace(/^#\/?/, "").split("/")
   if (view === "tasks" && id) return { view: "task", id }
   if (view === "focus") return { view: "focus", taskId: id }
-  if (view === "tasks" || view === "guided" || view === "settings") {
+  if (view === "recover") return { view: "recover", taskId: id }
+  if (
+    view === "tasks" ||
+    view === "calendar" ||
+    view === "guided" ||
+    view === "settings"
+  ) {
     return { view }
   }
   return { view: "workspace" }
@@ -44,6 +52,9 @@ export function parseHash(hash: string): Route {
 export function routeHash(route: Route) {
   if (route.view === "task") return `#/tasks/${route.id}`
   if (route.view === "workspace") return "#/"
+  if (route.view === "recover") {
+    return route.taskId ? `#/recover/${route.taskId}` : "#/recover"
+  }
   if (route.view === "focus") {
     return route.taskId ? `#/focus/${route.taskId}` : "#/focus"
   }

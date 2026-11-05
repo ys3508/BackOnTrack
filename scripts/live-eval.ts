@@ -1,6 +1,6 @@
 /**
  * Runs required Tests A, B and C against the REAL configured AI model.
- * It makes about nine model calls and spends a small amount of API credit.
+ * It makes about 15 model calls and spends a small amount of API credit.
  *
  *   npm run test:live
  *
@@ -12,8 +12,14 @@ import { dirname } from "node:path"
 
 import { getLiveConfig, getLiveModel } from "../lib/ai/provider"
 import { generateAnalysis, generateNextStep } from "../lib/ai/recovery"
+import { generateTaskRecovery } from "../lib/ai/task-recovery"
 import { IntakeSchema } from "../lib/schemas"
-import type { Analysis, NextStepRequest, NextStepResult } from "../lib/schemas"
+import type {
+  Analysis,
+  NextStepRequest,
+  NextStepResult,
+  TaskRecoveryRequest,
+} from "../lib/schemas"
 
 const OUTPUT = process.env.LIVE_EVAL_OUT ?? "docs/live-eval-output.json"
 const SHAMING = /\b(lazy|no excuses?|just do it|should have|you failed)\b/i
@@ -147,6 +153,92 @@ async function main() {
       planB,
       checks,
     })
+  }
+
+  // The workspace's recovery engine, using real task data.
+  const taskTests = [
+    {
+      id: "D: homework with no details",
+      task: { title: "Do my biology homework", deadline: null },
+    },
+    {
+      id: "E: missed deadline",
+      task: { title: "Biology essay", deadline: "2020-01-15" },
+    },
+    {
+      id: "F: stopped focus session",
+      task: { title: "Update my resume", deadline: null },
+      stuck: "I couldn't find my old file",
+    },
+  ]
+  const today = new Date().toISOString().slice(0, 10)
+  for (const test of taskTests) {
+    console.log(`=== Test ${test.id}`)
+    const request: TaskRecoveryRequest = {
+      stage: "task-recovery",
+      today,
+      strategy: null,
+      obstacle: test.stuck ?? "",
+      rejected: [],
+      task: {
+        ...test.task,
+        description: "",
+        originalDeadline: test.task.deadline,
+        status: "Needs Recovery",
+        priority: "Medium",
+        progress: 0,
+        completedActions: [],
+        attempts: [],
+        obstacles: test.stuck ? [test.stuck] : [],
+        openSteps: [],
+        focusSessions: test.stuck
+          ? [
+              {
+                date: today,
+                plannedMinutes: 25,
+                actualMinutes: 3,
+                outcome: "stuck",
+                note: test.stuck,
+              },
+            ]
+          : [],
+      },
+    }
+    const first = await generateTaskRecovery(model, request)
+    const second = await generateTaskRecovery(model, {
+      ...request,
+      rejected: [
+        {
+          nextStep: first.plan.nextStep.instruction.slice(0, 400),
+          artifactTitle: first.plan.artifact.title.slice(0, 400),
+        },
+      ],
+    })
+    const checks: Check[] = [
+      ["plan has a draft", first.plan.artifact.body.length > 40],
+      ["no built-in fallback was needed", !first.usedFallback],
+      [
+        "next step isn't reflective",
+        !/why (this|it) matters|priorities|motivation|reflect/i.test(
+          first.plan.nextStep.instruction
+        ),
+      ],
+      [
+        "schedule is today or later",
+        first.plan.schedule.every((item) => item.date >= today),
+      ],
+      [
+        "second plan differs",
+        second.plan.nextStep.instruction !== first.plan.nextStep.instruction,
+      ],
+    ]
+    for (const [name, passed] of checks) {
+      if (!passed) failures++
+      console.log(`  ${passed ? "PASS" : "FAIL"}  ${name}`)
+    }
+    console.log(`  Next step: ${first.plan.nextStep.instruction}`)
+    console.log(`  Draft:     ${first.plan.artifact.title}\n`)
+    results.push({ test: test.id, request, first, second, checks })
   }
 
   mkdirSync(dirname(OUTPUT), { recursive: true })

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import {
   ArrowLeft,
+  LifeBuoy,
   Check,
   Copy,
   Pause,
@@ -28,9 +29,15 @@ import {
   StatusBadge,
   fieldClass,
 } from "@/components/workspace/parts"
+import {
+  PlanSessionForm,
+  PlannedSessionRow,
+  ReplanDialog,
+} from "@/components/workspace/schedule"
 import { ReleaseDialog, useStatusChange } from "@/components/workspace/status"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { formatDateTime, shortDate } from "@/lib/workspace/dates"
+import { deadlinePassed } from "@/lib/workspace/selectors"
 import {
   PRIORITIES,
   PRIORITY_LABEL,
@@ -134,12 +141,26 @@ function TaskBody({ task }: { task: Task }) {
         )}
       </div>
 
+      {isActive(task) && (
+        <Button
+          type="button"
+          size="xl"
+          variant={task.status === "needs-recovery" ? "default" : "outline"}
+          className="w-full sm:w-auto"
+          onClick={() => navigate({ view: "recover", taskId: task.id })}
+        >
+          <LifeBuoy aria-hidden />
+          {task.recovery ? "See your recovery plan" : "I’m stuck on this"}
+        </Button>
+      )}
+
       <NextActionCard task={task} />
       {isActive(task) && <FocusCard task={task} />}
       <ProgressCard task={task} />
       <DetailsCard task={task} onStatus={setStatus} />
       <StepsCard task={task} />
       <DocumentsCard task={task} />
+      <ScheduleCard task={task} />
       <FocusHistoryCard task={task} />
       <HistoryCard task={task} />
 
@@ -264,6 +285,45 @@ function FocusCard({ task }: { task: Task }) {
           ))}
         </div>
       )}
+    </Card>
+  )
+}
+
+function ScheduleCard({ task }: { task: Task }) {
+  const { state, today } = useStore()
+  const [replanning, setReplanning] = useState(false)
+  const planned = state.planned.filter((item) => item.taskId === task.id)
+  return (
+    <Card className="space-y-3">
+      <SectionTitle>Planned work</SectionTitle>
+      {deadlinePassed(task, today) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sand-soft p-3 text-sm text-sand">
+          <span>
+            The deadline was {task.deadline && shortDate(task.deadline)}. What
+            now is up to you.
+          </span>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            onClick={() => setReplanning(true)}
+          >
+            Replan
+          </Button>
+        </div>
+      )}
+      {planned.length > 0 && (
+        <ul className="space-y-2">
+          {planned.map((session) => (
+            <PlannedSessionRow key={session.id} session={session} />
+          ))}
+        </ul>
+      )}
+      <PlanSessionForm taskId={task.id} idPrefix="task-plan" />
+      <ReplanDialog
+        task={replanning ? task : null}
+        onClose={() => setReplanning(false)}
+      />
     </Card>
   )
 }

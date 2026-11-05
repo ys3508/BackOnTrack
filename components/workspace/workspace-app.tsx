@@ -4,7 +4,9 @@ import { useEffect } from "react"
 import { Settings as SettingsIcon, Timer } from "lucide-react"
 
 import { RecoveryApp } from "@/components/recovery-app"
+import { CalendarView } from "@/components/workspace/calendar-view"
 import { FocusView, useNow } from "@/components/workspace/focus-view"
+import { RecoverView } from "@/components/workspace/recover-view"
 import { SettingsView } from "@/components/workspace/settings-view"
 import {
   WorkspaceProvider,
@@ -33,16 +35,22 @@ const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
   {
     label: "Workspace",
     route: { view: "workspace" },
-    match: ["workspace", "guided"],
+    match: ["workspace", "guided", "recover"],
   },
   { label: "Tasks", route: { view: "tasks" }, match: ["tasks", "task"] },
+  { label: "Calendar", route: { view: "calendar" }, match: ["calendar"] },
   { label: "Focus", route: { view: "focus" }, match: ["focus"] },
 ]
 
 function Shell() {
   const { route, navigate, mode, liveAvailable, statusChecked, dispatch } =
     useStore()
-  const routeKey = route.view === "task" ? `task-${route.id}` : route.view
+  const routeKey =
+    route.view === "task"
+      ? `task-${route.id}`
+      : route.view === "recover"
+        ? `recover-${route.taskId ?? ""}`
+        : route.view
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -110,7 +118,9 @@ function Shell() {
           {route.view === "workspace" && <WorkspaceView />}
           {route.view === "tasks" && <TasksView />}
           {route.view === "task" && <TaskDetail id={route.id} />}
+          {route.view === "calendar" && <CalendarView />}
           {route.view === "focus" && <FocusView />}
+          {route.view === "recover" && <RecoverView taskId={route.taskId} />}
           {route.view === "settings" && <SettingsView />}
           {route.view === "guided" && <GuidedView />}
         </div>

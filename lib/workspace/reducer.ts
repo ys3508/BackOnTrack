@@ -5,6 +5,7 @@ import type {
   FocusSession,
   PlannedSession,
   Priority,
+  StoredRecovery,
   Settings,
   Task,
   TaskEvent,
@@ -74,6 +75,18 @@ export type WorkspaceAction =
     }
   | { type: "remove-planned"; at: string; id: string }
   | { type: "toggle-planned"; id: string }
+  | { type: "set-recovery"; id: string; recovery: StoredRecovery | null }
+  | { type: "decline-recovery"; id: string; at: string }
+  | {
+      type: "apply-recovery"
+      id: string
+      at: string
+      nextAction: string | null
+      document: { id: string; title: string; body: string } | null
+      steps: { id: string; title: string }[]
+      schedule: { id: string; date: string; minutes: number; label: string }[]
+      release: boolean
+    }
   | {
       type: "timer-start"
       id: string
@@ -176,6 +189,8 @@ export function workspaceReducer(
           createdAt: action.at,
           updatedAt: action.at,
           completedAt: null,
+          recovery: null,
+          rejectedPlans: [],
         },
         action.at,
         "created",
@@ -422,6 +437,105 @@ export function workspaceReducer(
           item.id === action.id ? { ...item, done: !item.done } : item
         ),
       }
+
+    case "set-recovery":
+      return mapTask(state, action.id, (task) => ({
+        ...task,
+        recovery: action.recovery,
+      }))
+
+    case "decline-recovery":
+      return mapTask(state, action.id, (task) => {
+        if (!task.recovery) return task
+        const { plan } = task.recovery
+        return withEvent(
+          {
+            ...task,
+            recovery: null,
+            rejectedPlans: [
+              ...task.rejectedPlans,
+              {
+                nextStep: plan.nextStep.instruction.slice(0, 400),
+                artifactTitle: plan.artifact.title.slice(0, 400),
+              },
+            ].slice(-10),
+          },
+          action.at,
+          "recovery",
+          `Declined a suggested plan: ${plan.headline}`
+        )
+      })
+
+    case "apply-recovery": {
+      const pending = state.tasks.find(
+        (task) => task.id === action.id
+      )?.recovery
+      if (!pending) return state
+      const source = pending.source
+      const planned: PlannedSession[] = action.schedule.map((item) => ({
+        id: item.id,
+        taskId: action.id,
+        date: item.date,
+        time: null,
+        minutes: item.minutes,
+        label: item.label,
+        done: false,
+      }))
+      const next = mapTask(state, action.id, (task) => {
+        let updated: Task = {
+          ...task,
+          recovery: null,
+          nextAction: action.nextAction ?? task.nextAction,
+          subtasks: [
+            ...task.subtasks,
+            ...action.steps.map((step) => ({ ...step, done: false })),
+          ],
+          documents: action.document
+            ? [
+                ...task.documents,
+                {
+                  ...action.document,
+                  source,
+                  updatedAt: action.at,
+                },
+              ]
+            : task.documents,
+        }
+        const added = [
+          action.nextAction && "next action",
+          action.document && "draft",
+          action.steps.length && `${action.steps.length} steps`,
+          planned.length && `${planned.length} work sessions`,
+        ].filter(Boolean)
+        const origin = source === "live" ? "Live AI" : "Demo Mode template"
+        updated = withEvent(
+          updated,
+          action.at,
+          "recovery",
+          `Accepted a recovery plan from ${origin}: ${pending.plan.headline}${
+            added.length ? ` (added ${added.join(", ")})` : ""
+          }`
+        )
+        for (const item of planned) {
+          updated = withEvent(
+            updated,
+            action.at,
+            "schedule",
+            `Work session planned for ${shortDate(item.date)} (${item.minutes} min)`
+          )
+        }
+        return setTaskStatus(
+          updated,
+          action.release
+            ? "released"
+            : updated.status === "needs-recovery"
+              ? "in-progress"
+              : updated.status,
+          action.at
+        )
+      })
+      return { ...next, planned: [...next.planned, ...planned] }
+    }
 
     case "timer-start": {
       if (state.timer) return state

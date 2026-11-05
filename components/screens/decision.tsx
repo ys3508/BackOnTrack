@@ -17,6 +17,128 @@ const STRATEGY_MEANING: Record<Strategy, string> = {
   RELEASE: "Consciously stop pursuing it.",
 }
 
+type DecisionData = Analysis["decision"]
+
+export function StrategyCards({
+  decision,
+  choice,
+  onChange,
+}: {
+  decision: DecisionData
+  choice: Strategy
+  onChange: (strategy: Strategy) => void
+}) {
+  return (
+    <fieldset className="mt-6">
+      <legend className="sr-only">Choose a recovery strategy</legend>
+      <div className="grid gap-3 md:grid-cols-3">
+        {STRATEGIES.map((strategy) => {
+          const selected = choice === strategy
+          return (
+            <label
+              key={strategy}
+              className={cn(
+                "relative flex cursor-pointer flex-col rounded-2xl border bg-card p-5 transition-all duration-200 has-focus-visible:ring-3 has-focus-visible:ring-ring/30",
+                selected
+                  ? "border-primary shadow-[inset_0_0_0_1px_var(--primary)]"
+                  : "border-border hover:border-primary/40"
+              )}
+            >
+              <input
+                type="radio"
+                name="strategy"
+                value={strategy}
+                checked={selected}
+                onChange={() => onChange(strategy)}
+                className="sr-only"
+              />
+              <span className="flex min-h-6 flex-wrap items-center justify-between gap-2">
+                <span className="font-heading text-2xl">
+                  {STRATEGY_LABEL[strategy]}
+                </span>
+                {strategy === decision.recommended && (
+                  <span className="rounded-full bg-sage-soft px-2 py-0.5 text-xs font-medium text-sage">
+                    Suggested
+                  </span>
+                )}
+              </span>
+              <span className="mt-1 text-sm text-muted-foreground">
+                {STRATEGY_MEANING[strategy]}
+              </span>
+              <span className="mt-3 text-[15px] leading-snug">
+                {decision.options[strategy]}
+              </span>
+            </label>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
+
+export function DecisionWhy({ decision }: { decision: DecisionData }) {
+  return (
+    <Card className="mt-4 grid gap-4 md:grid-cols-2">
+      <div>
+        <h2 className="font-sans text-sm font-semibold tracking-normal">
+          Why {STRATEGY_LABEL[decision.recommended].toLowerCase()} is suggested
+        </h2>
+        <p className="mt-1.5 text-[15px] leading-relaxed">
+          {decision.reasoning}
+        </p>
+      </div>
+      <div>
+        <h2 className="font-sans text-sm font-semibold tracking-normal">
+          What could change this
+        </h2>
+        <p className="mt-1.5 text-[15px] leading-relaxed">
+          {decision.uncertainty}
+        </p>
+      </div>
+    </Card>
+  )
+}
+
+export function ReleaseCaution({
+  decision,
+  choice,
+  acknowledged,
+  onAcknowledge,
+}: {
+  decision: DecisionData
+  choice: Strategy
+  acknowledged: boolean
+  onAcknowledge: (value: boolean) => void
+}) {
+  return (
+    <>
+      {decision.highStakes && decision.caution && (
+        <div
+          role="note"
+          className="mt-4 flex gap-3 rounded-xl bg-sand-soft p-4 text-sm leading-relaxed text-sand"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div>
+            <p>{decision.caution}</p>
+            {choice === "RELEASE" && (
+              <label className="mt-3 flex cursor-pointer items-start gap-2 font-medium">
+                <input
+                  type="checkbox"
+                  checked={acknowledged}
+                  onChange={(event) => onAcknowledge(event.target.checked)}
+                  className="mt-0.5 size-4 accent-[var(--sand)]"
+                />
+                I understand this may have consequences, and I still want to
+                look at releasing it.
+              </label>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function DecisionScreen({
   analysis,
   source,
@@ -48,97 +170,21 @@ export function DecisionScreen({
         any of these.
       </p>
 
-      <fieldset className="mt-6">
-        <legend className="sr-only">Choose a recovery strategy</legend>
-        <div className="grid gap-3 md:grid-cols-3">
-          {STRATEGIES.map((strategy) => {
-            const selected = choice === strategy
-            return (
-              <label
-                key={strategy}
-                className={cn(
-                  "relative flex cursor-pointer flex-col rounded-2xl border bg-card p-5 transition-all duration-200 has-focus-visible:ring-3 has-focus-visible:ring-ring/30",
-                  selected
-                    ? "border-primary shadow-[inset_0_0_0_1px_var(--primary)]"
-                    : "border-border hover:border-primary/40"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="strategy"
-                  value={strategy}
-                  checked={selected}
-                  onChange={() => {
-                    setChoice(strategy)
-                    setAcknowledged(false)
-                  }}
-                  className="sr-only"
-                />
-                <span className="flex min-h-6 flex-wrap items-center justify-between gap-2">
-                  <span className="font-heading text-2xl">
-                    {STRATEGY_LABEL[strategy]}
-                  </span>
-                  {strategy === decision.recommended && (
-                    <span className="rounded-full bg-sage-soft px-2 py-0.5 text-xs font-medium text-sage">
-                      Suggested
-                    </span>
-                  )}
-                </span>
-                <span className="mt-1 text-sm text-muted-foreground">
-                  {STRATEGY_MEANING[strategy]}
-                </span>
-                <span className="mt-3 text-[15px] leading-snug">
-                  {decision.options[strategy]}
-                </span>
-              </label>
-            )
-          })}
-        </div>
-      </fieldset>
-
-      <Card className="mt-4 grid gap-4 md:grid-cols-2">
-        <div>
-          <h2 className="font-sans text-sm font-semibold tracking-normal">
-            Why {STRATEGY_LABEL[decision.recommended].toLowerCase()} is
-            suggested
-          </h2>
-          <p className="mt-1.5 text-[15px] leading-relaxed">
-            {decision.reasoning}
-          </p>
-        </div>
-        <div>
-          <h2 className="font-sans text-sm font-semibold tracking-normal">
-            What could change this
-          </h2>
-          <p className="mt-1.5 text-[15px] leading-relaxed">
-            {decision.uncertainty}
-          </p>
-        </div>
-      </Card>
-
-      {decision.highStakes && decision.caution && (
-        <div
-          role="note"
-          className="mt-4 flex gap-3 rounded-xl bg-sand-soft p-4 text-sm leading-relaxed text-sand"
-        >
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <div>
-            <p>{decision.caution}</p>
-            {needsAcknowledgement && (
-              <label className="mt-3 flex cursor-pointer items-start gap-2 font-medium">
-                <input
-                  type="checkbox"
-                  checked={acknowledged}
-                  onChange={(event) => setAcknowledged(event.target.checked)}
-                  className="mt-0.5 size-4 accent-[var(--sand)]"
-                />
-                I understand this may have consequences, and I still want to
-                look at releasing it.
-              </label>
-            )}
-          </div>
-        </div>
-      )}
+      <StrategyCards
+        decision={decision}
+        choice={choice}
+        onChange={(strategy) => {
+          setChoice(strategy)
+          setAcknowledged(false)
+        }}
+      />
+      <DecisionWhy decision={decision} />
+      <ReleaseCaution
+        decision={decision}
+        choice={choice}
+        acknowledged={acknowledged}
+        onAcknowledge={setAcknowledged}
+      />
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <Button

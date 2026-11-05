@@ -60,28 +60,12 @@ function Items({ items, empty }: { items: string[]; empty: string }) {
   )
 }
 
-export function RealityCheckScreen({
-  analysis,
-  source,
-  onBack,
-  onContinue,
-}: {
-  analysis: Analysis
-  source: Source | null
-  onBack: () => void
-  onContinue: () => void
-}) {
+export function RealityCheckContent({ analysis }: { analysis: Analysis }) {
   const { knownFacts, assumptions, unknowns, consequences } =
     analysis.realityCheck
 
   return (
-    <div>
-      <SourceBadge source={source} className="mb-4" />
-      <ScreenHeading>Let&rsquo;s see what&rsquo;s actually true.</ScreenHeading>
-      <p className="mt-3 max-w-2xl text-muted-foreground">
-        {analysis.acknowledgement}
-      </p>
-
+    <>
       {analysis.supportConcern && (
         <div
           role="note"
@@ -151,6 +135,30 @@ export function RealityCheckScreen({
           )}
         </Section>
       </div>
+    </>
+  )
+}
+
+export function RealityCheckScreen({
+  analysis,
+  source,
+  onBack,
+  onContinue,
+}: {
+  analysis: Analysis
+  source: Source | null
+  onBack: () => void
+  onContinue: () => void
+}) {
+  return (
+    <div>
+      <SourceBadge source={source} className="mb-4" />
+      <ScreenHeading>Let&rsquo;s see what&rsquo;s actually true.</ScreenHeading>
+      <p className="mt-3 max-w-2xl text-muted-foreground">
+        {analysis.acknowledgement}
+      </p>
+
+      <RealityCheckContent analysis={analysis} />
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <Button type="button" size="xl" onClick={onContinue}>

@@ -1,6 +1,7 @@
 import { getLiveConfig, getLiveModel } from "@/lib/ai/provider"
 import { checkRateLimit } from "@/lib/ai/rate-limit"
 import { generateAnalysis, generateNextStep } from "@/lib/ai/recovery"
+import { generateTaskRecovery } from "@/lib/ai/task-recovery"
 import { RecoveryRequestSchema } from "@/lib/schemas"
 
 export const maxDuration = 60
@@ -68,6 +69,10 @@ export async function POST(request: Request) {
     if (data.stage === "analyze") {
       const analysis = await generateAnalysis(model, data.intake)
       return Response.json({ analysis, model: config.modelId })
+    }
+    if (data.stage === "task-recovery") {
+      const result = await generateTaskRecovery(model, data)
+      return Response.json({ ...result, model: config.modelId })
     }
     const result = await generateNextStep(model, data)
     return Response.json({ ...result, model: config.modelId })

@@ -201,11 +201,6 @@ export const NextStepRequestSchema = z.object({
 })
 export type NextStepRequest = z.infer<typeof NextStepRequestSchema>
 
-export const RecoveryRequestSchema = z.discriminatedUnion("stage", [
-  AnalyzeRequestSchema,
-  NextStepRequestSchema,
-])
-
 /* ---------- API responses ---------- */
 
 /** `action: null` means there is nothing further to suggest right now. */
@@ -216,3 +211,111 @@ export type NextStepResult = {
   /** True when the server replaced a repeated suggestion with a built-in step. */
   usedFallback?: boolean
 }
+
+/* ---------- Task recovery ---------- */
+
+export const ARTIFACT_KINDS = [
+  "email",
+  "plan",
+  "outline",
+  "schedule",
+  "checklist",
+  "note",
+] as const
+
+/** No length or size limits here, for the same reason as the schemas above. */
+export const RecoveryPlanSchema = z.object({
+  headline: z.string().describe("A short, concrete title for this plan."),
+  adaptationNote: z
+    .string()
+    .describe("One sentence on what changed from earlier attempts, or empty."),
+  nextStep: z.object({
+    instruction: z
+      .string()
+      .describe("One concrete action that produces something tangible."),
+    why: z.string(),
+    minutes: z.number(),
+    approach: ApproachSchema,
+  }),
+  artifact: z.object({
+    kind: z.enum(ARTIFACT_KINDS),
+    title: z.string(),
+    body: z
+      .string()
+      .describe("A usable draft. Use [brackets] for details you don't have."),
+  }),
+  steps: z.array(z.string()).describe("Up to 6 small, concrete steps."),
+  schedule: z
+    .array(
+      z.object({
+        date: z.string().describe("YYYY-MM-DD, today or later."),
+        minutes: z.number(),
+        label: z.string(),
+      })
+    )
+    .describe("Up to 4 optional work sessions."),
+})
+export type RecoveryPlan = z.infer<typeof RecoveryPlanSchema>
+
+export const TaskRecoveryOutputSchema = AnalysisSchema.extend({
+  plan: RecoveryPlanSchema,
+})
+
+const shortText = z.string().max(LIMITS.listItem)
+
+export const TaskContextSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(LIMITS.responsibility),
+  deadline: z.string().refine(isCalendarDate).nullable(),
+  originalDeadline: z.string().refine(isCalendarDate).nullable(),
+  status: z.string().max(40),
+  priority: z.string().max(20),
+  progress: z.number().min(0).max(100),
+  completedActions: z.array(shortText).max(15),
+  attempts: z.array(shortText).max(15),
+  obstacles: z.array(shortText).max(10),
+  openSteps: z.array(shortText).max(15),
+  focusSessions: z
+    .array(
+      z.object({
+        date: z.string().max(10),
+        plannedMinutes: z.number(),
+        actualMinutes: z.number(),
+        outcome: z.enum(["completed", "continue-later", "stuck"]),
+        note: shortText,
+      })
+    )
+    .max(10),
+})
+export type TaskContext = z.infer<typeof TaskContextSchema>
+
+export const RejectedPlanSchema = z.object({
+  nextStep: shortText,
+  artifactTitle: shortText,
+})
+export type RejectedPlan = z.infer<typeof RejectedPlanSchema>
+
+export const TaskRecoveryRequestSchema = z.object({
+  stage: z.literal("task-recovery"),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+  strategy: StrategySchema.nullable(),
+  obstacle: z.string().trim().max(LIMITS.note).default(""),
+  rejected: z.array(RejectedPlanSchema).max(10),
+})
+export type TaskRecoveryRequest = z.infer<typeof TaskRecoveryRequestSchema>
+
+export type TaskRecoveryResult = {
+  analysis: Analysis
+  plan: RecoveryPlan
+  /** The AI kept repeating itself, so a built-in template was used instead. */
+  usedFallback?: boolean
+  /** Demo Mode has no further templates to offer for this task. */
+  exhausted?: boolean
+}
+
+export const RecoveryRequestSchema = z.discriminatedUnion("stage", [
+  AnalyzeRequestSchema,
+  NextStepRequestSchema,
+  TaskRecoveryRequestSchema,
+])

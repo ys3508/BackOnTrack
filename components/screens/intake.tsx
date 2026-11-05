@@ -33,7 +33,7 @@ const toOptions = <T extends string>(labels: Record<T, string>) =>
  * readers work as expected. Nothing starts selected, and choosing the selected
  * option again clears it, because every one of these questions is optional.
  */
-function ChoiceGroup<T extends string>({
+export function ChoiceGroup<T extends string>({
   legend,
   name,
   options,

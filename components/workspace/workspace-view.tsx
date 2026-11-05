@@ -1,6 +1,15 @@
 "use client"
 
-import { Check, ChevronRight, Play, Shuffle, Timer } from "lucide-react"
+import { useState } from "react"
+import {
+  CalendarDays,
+  Check,
+  ChevronRight,
+  LifeBuoy,
+  Play,
+  Shuffle,
+  Timer,
+} from "lucide-react"
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
@@ -11,10 +20,12 @@ import {
   StatusBadge,
 } from "@/components/workspace/parts"
 import { QuickAdd } from "@/components/workspace/quick-add"
+import { ReplanDialog } from "@/components/workspace/schedule"
 import { nowIso, useStore } from "@/components/workspace/store"
 import { deadlineText, formatDateTime } from "@/lib/workspace/dates"
 import type { Task } from "@/lib/workspace/schemas"
 import {
+  deadlinePassed,
   nextActionFor,
   recentActions,
   recommendTask,
@@ -25,17 +36,19 @@ import {
 export function TaskRow({
   task,
   detail,
+  action,
 }: {
   task: Task
   detail?: React.ReactNode
+  action?: React.ReactNode
 }) {
   const { navigate } = useStore()
   return (
-    <li>
+    <li className="flex items-stretch gap-2">
       <button
         type="button"
         onClick={() => navigate({ view: "task", id: task.id })}
-        className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left transition-colors outline-none hover:border-primary/40 focus-visible:ring-3 focus-visible:ring-ring/30"
+        className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left transition-colors outline-none hover:border-primary/40 focus-visible:ring-3 focus-visible:ring-ring/30"
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-medium">
@@ -50,6 +63,7 @@ export function TaskRow({
           aria-hidden
         />
       </button>
+      {action}
     </li>
   )
 }
@@ -66,6 +80,7 @@ export function WorkspaceView() {
   )
   const recent = recentActions(state)
   const hasTasks = state.tasks.length > 0
+  const [replanning, setReplanning] = useState<Task | null>(null)
 
   return (
     <div className="space-y-6">
@@ -136,6 +151,17 @@ export function WorkspaceView() {
               <Shuffle aria-hidden />
               Something else
             </Button>
+            <Button
+              type="button"
+              size="xl"
+              variant="ghost"
+              onClick={() =>
+                navigate({ view: "recover", taskId: recommended.id })
+              }
+            >
+              <LifeBuoy aria-hidden />
+              I’m stuck
+            </Button>
           </div>
         </Card>
       )}
@@ -154,6 +180,24 @@ export function WorkspaceView() {
           >
             <Timer aria-hidden />
             Start Focus
+          </Button>
+          <Button
+            type="button"
+            size="xl"
+            variant="outline"
+            onClick={() => navigate({ view: "recover" })}
+          >
+            <LifeBuoy aria-hidden />
+            Recover a Task
+          </Button>
+          <Button
+            type="button"
+            size="xl"
+            variant="ghost"
+            onClick={() => navigate({ view: "calendar" })}
+          >
+            <CalendarDays aria-hidden />
+            Calendar
           </Button>
         </div>
       </Card>
@@ -180,6 +224,20 @@ export function WorkspaceView() {
                       <StatusBadge status={task.status} />
                       <DeadlineChip task={task} />
                     </>
+                  }
+                  action={
+                    deadlinePassed(task, today) ? (
+                      <Button
+                        type="button"
+                        size="xl"
+                        variant="outline"
+                        className="h-auto"
+                        aria-label={`Replan ${task.title}`}
+                        onClick={() => setReplanning(task)}
+                      >
+                        Replan
+                      </Button>
+                    ) : undefined
                   }
                 />
               )}
@@ -241,6 +299,7 @@ export function WorkspaceView() {
           </section>
         )}
       </div>
+      <ReplanDialog task={replanning} onClose={() => setReplanning(null)} />
     </div>
   )
 }

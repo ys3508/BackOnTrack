@@ -1,9 +1,12 @@
 import { demoAnalysis, demoNextStep } from "@/lib/demo/engine"
+import { demoTaskRecovery } from "@/lib/recovery/demo-plan"
 import type {
   Analysis,
   Intake,
   NextStepRequest,
   NextStepResult,
+  TaskRecoveryRequest,
+  TaskRecoveryResult,
 } from "@/lib/schemas"
 import type { Source } from "@/lib/session"
 
@@ -51,6 +54,14 @@ export async function requestNextStep(
 ): Promise<NextStepResult> {
   if (mode === "demo") return demoNextStep(request)
   return postRecovery<NextStepResult>(request)
+}
+
+export async function requestTaskRecovery(
+  mode: Source,
+  request: TaskRecoveryRequest
+): Promise<TaskRecoveryResult> {
+  if (mode === "demo") return demoTaskRecovery(request)
+  return postRecovery<TaskRecoveryResult>(request)
 }
 
 export async function fetchLiveStatus(): Promise<{
