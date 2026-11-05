@@ -145,7 +145,7 @@ The `feat/task-execution` branch started from `main` at `4d58986`.
 | 2. Working editor | `e486af5` | Tiptap document, autosave, export, two-panel layout, backup import, and storage warnings | 260 passed |
 | 3. Intake and AI help | `60f67e4` | Paste and file intake, PDF extraction, consent before sending, and six writing actions | 293 passed |
 | 4. History and recovery | `9e50c9e` | History kinds, recovery attempts, and plans based on real progress | 306 passed |
-| 5. Focus and documentation | Later commits on the branch | Timer in the task, progress check-in, demo examples, and tests | 315 passed |
+| 5. Focus and documentation | `d4b706b` and later | Timer in the task, progress check-in, demo examples, and tests | 315 passed |
 
 ### Decisions
 
@@ -160,7 +160,7 @@ The `feat/task-execution` branch started from `main` at `4d58986`.
 - PDF cleanup called a method on the wrong object, which would have broken every PDF upload. A test with a real PDF caught this.
 - "Replace selected text" split the paragraph in two. It now stays inline when replacing within a sentence.
 - A reload just after typing could lose the last edit, because saving went through React. Saves are now synchronous.
-- Space didn't apply here, but a duplicate "Pause" label did: the task and the timer had the same name, so the timer's is now "Pause timer".
+- The task and the timer both had a "Pause" button, so the timer's is now "Pause timer".
 - The text rules glued a whole list into one long step, and joined a heading to the next sentence. They now work line by line.
 - Stuck-specific plans were being skipped by a rule that started later in the list. Plans tailored to the task now come first.
 - Icons squeezed the step text, so they moved behind an "Edit steps" toggle.
@@ -173,9 +173,13 @@ See [TEST_RESULTS.md](TEST_RESULTS.md).
 ## Known limitations
 
 - **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.
-- The public site runs in Demo Mode, with no API key, so its suggestions are templates.
+- The public site runs in Demo Mode, with no API key, so its suggestions are templates. Version 3 isn't on it until the `feat/task-execution` branch is merged.
+- Browser storage is limited to about 5 MB per site, and a long document uses more of it. The app warns when a save fails, and backups can be exported and imported.
+- If two tabs edit the same task, the last save wins.
+- Documents have one earlier version kept, from before the last accepted suggestion. There's no full version history.
+- Requirement extraction in Demo Mode uses text rules, so it can miss or misread requirements. The interface says to check.
+- Citation checks look for common citation and link patterns, so unusual formats can get through.
 - The timer can't alert the user when it ends, beyond the screen and tab title.
-- Importing an exported file isn't supported.
 - On a phone-width month view, calendar titles are cut off, although tapping a day lists them in full.
 - A person dragging Kanban cards by hand hasn't been tested. Keyboard dragging and simulated pointer dragging worked.
 - The Vercel AI Gateway option has not been exercised at all, and its default model ID is unconfirmed.
