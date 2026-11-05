@@ -225,6 +225,22 @@ All of these were found in a real browser after the automated tests had passed.
 - Clicking "I'm stuck" three times in a minute produced a "pattern", found in a real browser. Events on one task within an hour now count once.
 - A plan's note quoted a different pattern from the one behind its choice.
 
+## Suggested order and Daily Rescue Plan
+
+### Decisions
+
+- **One scoring function** for the home page's suggestion, the Tasks order, and the daily plan, so they don't disagree.
+- **Time estimates are optional.** Without one, a task's open steps count as 25 minutes each, and any risk warning says it's a rough guess.
+- **Marking an item done for today doesn't complete the task.** A day's plan and a task's status are separate.
+- **The plan is only offered with two or more tasks,** since there's nothing to arrange otherwise.
+
+### Problems found by testing
+
+Both were found by trying a realistic scenario in a real browser, after all automated tests had passed.
+
+- A high-priority task due tomorrow, needing 4 hours, got 10 minutes because it had been missed before, while 40 minutes went to tasks that could wait. Urgent work now gets the time.
+- A 5-minute email was described as "Break it into small steps". Tasks with no steps are now named plainly.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

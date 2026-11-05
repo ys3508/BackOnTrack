@@ -49,6 +49,27 @@ Decisions on learning from failed attempts:
 - **The user has the last word.** A stated preference beats anything inferred, and "This isn't right" stops a pattern from being used.
 - **It offers, and doesn't impose.** A hint can be ignored, and a plan's note explains any change.
 
+### From workspace to task manager
+
+A third review narrowed the product: BackOnTrack shouldn't try to be a chatbot or do the work. Its value is in deciding what to do now, arranging tasks, and adjusting when a plan fails. This moves the emphasis away from the first review, which made the Task Workspace the core page. It's a change of direction, not a contradiction, and the real-case test still hasn't shown which emphasis helps more.
+
+| Idea from the review | Status | Note |
+| --- | --- | --- |
+| Intelligent Prioritization | Built, with rules | Uses deadline, priority, progress, and plans, and shows the reasons. |
+| Daily Rescue Plan | Built, with rules | Time is the only required input. Energy can be skipped. |
+| Adaptive Planning | Partly built | The daily plan rethinks unfinished work and states risks. It doesn't yet re-plan the whole calendar or detect conflicts. |
+| Failure-Aware Recovery | Built | See above. Asking whether to shrink a repeatedly moved task is there. Asking about late submission isn't. |
+| New roles for the four pages | Partly done | Home gained the daily plan and Tasks the suggested order. Calendar and Focus are unchanged, and the document hasn't been moved to a secondary place. |
+
+**Why it's rules and not AI.** The review calls this an "AI" task manager. Ordering and planning use fixed rules for now, because they have to be explainable, instant, free, and able to work with no API key. The interface says so. AI is used for recovery plans, breakdowns, and writing help with Live AI. Calling the whole product "AI-powered" would overstate what orders the tasks.
+
+Decisions on the plan:
+
+- **What's due within a day gets the time it needs, up to all that's available.** A quick task goes first only if that still leaves enough time for it.
+- **Plans cover only part of the time available:** about 80%, or 60% on a low-energy day. These figures are judgment calls.
+- **Unfinished work is rethought rather than moved.** It restarts with something smaller, and nothing is marked overdue.
+- **Risks are stated, and deadlines are never changed.**
+
 ### What success means, and how to test it
 
 Completed tasks, focus minutes, and streaks measure activity, not whether someone got unstuck. These measures come from the review. **None has been measured yet**, and the app doesn't collect them.

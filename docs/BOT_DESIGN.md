@@ -65,6 +65,8 @@ When **setting up a new task**, it lists the deliverables, dependencies, and unc
 
 **What the bot may use from the user's records:** guesses such as "Empty documents seem to be a sticking point", with their evidence, what help seems to work, and what hasn't. It treats them as hypotheses that decide which help comes first. It may not diagnose, label the user, mention ADHD, or present them as a failing.
 
+**Ordering tasks and planning the day don't use the bot.** Fixed rules do this in the browser, and the interface labels it as calculated.
+
 When the user is **stuck**:
 
 1. **Read the task's data.** The app assembles what's recorded, within fixed size limits.

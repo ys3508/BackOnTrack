@@ -15,6 +15,7 @@ This content can be sensitive, because people may describe their work, health, o
 - The data stays until the user deletes it or clears the browser's data, and it isn't backed up.
 - It isn't encrypted, so anyone using the same browser profile could read it. Use a private window on a shared computer.
 - API keys are never stored in the browser.
+- The latest daily plan is saved here too, including the energy level if one was chosen. It isn't sent to the AI service.
 - To work out which help to offer first, the app keeps a log of moments such as getting stuck, focus sessions, moved work sessions, and accepted help. It holds no task titles or written text. It has its own controls in Settings: view, delete, or switch off. Deleting a task removes its records, and Delete all removes everything.
 - The time the app was last opened is saved too, only in this browser, and is included in backups. It's used to offer an easier return after time away. It isn't sent anywhere, and there's no streak or usage tracking.
 - Browsers usually allow about 5 MB for this. Settings shows the amount used, and the app warns if a save fails.

@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 415 of 415 (also from a clean clone, and with the system set to Kiritimati time) |
+| Automated tests (`npm test`) | Pass, 441 of 441 (also from a clean clone, and with the system set to Kiritimati time) |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
@@ -24,6 +24,24 @@ No real AI model has been called. The following were verified instead:
 - A manual test ran the production build with the real Anthropic SDK client over HTTP, against a throwaway local server returning canned answers.
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
+
+## Suggested order and Daily Rescue Plan
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch. This feature uses rules, so it needs no AI model. "Yesterday's" plan was simulated with test data.
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| Urgent task, a missed plan, and others | Browser, realistic scenario | At first, the task due tomorrow got 10 of 50 minutes. After the fix, it got all 50, and the others were listed under "Not today". | Failed, then fixed |
+| Quick email before a longer task | Automated | The email went first, with its reason, when nothing was due now. It stayed out when it would squeeze out what's due. | Pass |
+| Never exceeds the time available | Automated, 5 time options | Always under what the user gave | Pass |
+| Low energy, and no energy given | Browser and automated | With low energy, 35 of 60 minutes were planned. It works without an answer. | Pass |
+| Deadline at risk | Browser and automated | Stated, marked as a guess if there's no estimate. All deadlines and statuses were unchanged afterward. | Pass |
+| Reorder, remove, and add before using | Automated | The saved plan matched the user's changes. Nothing was saved before "Use this plan". | Pass |
+| Suggested order with reasons on Tasks | Browser and automated | Ordered and explained, and can be turned off | Pass |
+| Phone width | Browser, 375 px | No sideways scrolling | Pass |
+| Accessibility scan | Automated (axe-core in jsdom, with color contrast off) | No violations | Pass |
+| **Whether these plans are realistic for real people** | **Not run.** The weights and percentages haven't been tested. | | **Not run** |
+| **Real-case test on a real assignment** | **Not run** | | **Not run** |
 
 ## Failure-aware learning
 
