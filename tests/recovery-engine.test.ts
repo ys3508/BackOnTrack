@@ -57,6 +57,7 @@ function requestFor(
       instructions: "",
       document: "",
       currentStep: "",
+      stuckOnStep: 0,
       focusSessions: [],
       ...extra,
     },
@@ -298,6 +299,7 @@ describe("plan checks", () => {
     artifact: { kind: "note", title: "Note", body: "Body" },
     steps: Array.from({ length: 9 }, (_, i) => `Step ${i}`),
     choices: ["a", "b", "c", "d"],
+    smallerSteps: [],
     schedule: [
       { date: "2020-01-01", minutes: 10, label: "Past" },
       { date: "not a date", minutes: 10, label: "Bad" },
@@ -371,6 +373,7 @@ describe("POST /api/recovery task-recovery", () => {
     artifact: { kind: "email", title: "Draft", body: "Hello [name]" },
     steps: ["One"],
     choices: [],
+    smallerSteps: [],
     schedule: [{ date: TODAY, minutes: 10, label: "Start" }],
     ...extra,
   })

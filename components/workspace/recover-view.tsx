@@ -31,7 +31,10 @@ import type { ObstacleChoice, RejectedPlan, Strategy } from "@/lib/schemas"
 import { shortDate } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
 import type { StoredRecovery, Task } from "@/lib/workspace/schemas"
-import { tasksNeedingAttention } from "@/lib/workspace/selectors"
+import {
+  currentSubtask,
+  tasksNeedingAttention,
+} from "@/lib/workspace/selectors"
 
 export function RecoverView({ taskId }: { taskId?: string }) {
   const { state, navigate } = useStore()
@@ -286,6 +289,8 @@ function PlanPreview({
   const { decision } = analysis
 
   const [useNextAction, setUseNextAction] = useState(true)
+  const [splitStep, setSplitStep] = useState(true)
+  const current = currentSubtask(task)
   const [useDraft, setUseDraft] = useState(true)
   const [draftTitle, setDraftTitle] = useState(plan.artifact.title)
   const [draft, setDraft] = useState(plan.artifact.body)
@@ -316,6 +321,15 @@ function PlanPreview({
       ),
       release: chosen === "RELEASE" && markReleased,
     })
+    if (splitStep && current && plan.smallerSteps.length) {
+      dispatch({
+        type: "split-subtask",
+        id: task.id,
+        at: nowIso(),
+        subId: current.id,
+        steps: plan.smallerSteps.map((title) => ({ id: newId(), title })),
+      })
+    }
     navigate({ view: "task", id: task.id })
   }
 
@@ -428,12 +442,34 @@ function PlanPreview({
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
+        {plan.artifact.kind === "code" && (
+          <p className="text-xs text-muted-foreground">
+            This code hasn’t been run, and BackOnTrack can’t run it. Copy it
+            into your own environment, and fill in the brackets.
+          </p>
+        )}
         {plan.artifact.kind === "email" && (
           <p className="text-xs text-muted-foreground">
             BackOnTrack never sends anything. Sending this is up to you.
           </p>
         )}
       </Card>
+
+      {plan.smallerSteps.length > 0 && current && (
+        <Card>
+          <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+            Make this step smaller
+          </h2>
+          <CheckRow
+            checked={splitStep}
+            onChange={setSplitStep}
+            label={`Replace “${current.title}” with: ${plan.smallerSteps.join(" → ")}`}
+          />
+          <p className="text-xs text-muted-foreground">
+            Finished steps aren’t touched.
+          </p>
+        </Card>
+      )}
 
       {plan.choices.length > 0 && (
         <Card className="space-y-2">

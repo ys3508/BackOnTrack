@@ -25,7 +25,7 @@ export function QuickAdd({
   const { dispatch } = useStore()
   const [title, setTitle] = useState("")
   const [deadline, setDeadline] = useState(initialDeadline ?? "")
-  const [priority, setPriority] = useState<Priority>("medium")
+  const [priority, setPriority] = useState<Priority>("none")
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -41,7 +41,7 @@ export function QuickAdd({
     })
     setTitle("")
     setDeadline(initialDeadline ?? "")
-    setPriority("medium")
+    setPriority("none")
     onAdded?.(id)
   }
 
@@ -88,7 +88,7 @@ export function QuickAdd({
               htmlFor="quick-add-priority"
               className="mb-1 block text-sm font-medium"
             >
-              Priority
+              Priority (optional)
             </label>
             <select
               id="quick-add-priority"

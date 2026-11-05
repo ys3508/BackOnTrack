@@ -223,6 +223,7 @@ export const ARTIFACT_KINDS = [
   "schedule",
   "checklist",
   "note",
+  "code",
 ] as const
 
 /** No length or size limits here, for the same reason as the schemas above. */
@@ -247,6 +248,11 @@ export const RecoveryPlanSchema = z.object({
       .describe("A usable draft. Use [brackets] for details you don't have."),
   }),
   steps: z.array(z.string()).describe("Up to 6 small, concrete steps."),
+  smallerSteps: z
+    .array(z.string())
+    .describe(
+      "If the current step is too big, 2 to 5 smaller steps to replace it. Otherwise empty."
+    ),
   choices: z
     .array(z.string())
     .describe(
@@ -287,6 +293,8 @@ export const TaskContextSchema = z.object({
   /** Plain text from the working document, shortened to a safe length. */
   document: z.string().max(LIMITS.contextDocument).default(""),
   currentStep: shortText.default(""),
+  /** How many recovery plans have already been tried on the current step. */
+  stuckOnStep: z.number().min(0).default(0),
   focusSessions: z
     .array(
       z.object({
@@ -424,6 +432,7 @@ export type WorkspaceSetupRequest = z.infer<typeof WorkspaceSetupRequestSchema>
 
 export const WRITING_ACTIONS = [
   "outline",
+  "code",
   "explain",
   "starter",
   "split",

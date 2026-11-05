@@ -17,6 +17,7 @@ import {
 import { useAiConsent } from "@/components/workspace/ai-consent"
 import { BreakdownPanel } from "@/components/workspace/breakdown-panel"
 import { InstructionsPanel } from "@/components/workspace/instructions-panel"
+import { PlanRemaining } from "@/components/workspace/plan-remaining"
 import { WritingAssist } from "@/components/workspace/writing-assist"
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
@@ -475,6 +476,7 @@ function ScheduleCard({ task }: { task: Task }) {
           ))}
         </ul>
       )}
+      {isActive(task) && <PlanRemaining taskId={task.id} />}
       <PlanSessionForm taskId={task.id} idPrefix="task-plan" />
       <ReplanDialog
         task={replanning ? task : null}

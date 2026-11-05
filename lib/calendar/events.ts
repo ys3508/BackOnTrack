@@ -1,5 +1,5 @@
 import { addDays, localToday } from "@/lib/workspace/dates"
-import { isActive } from "@/lib/workspace/schemas"
+import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type { PlannedSession, Workspace } from "@/lib/workspace/schemas"
 
 export type CalendarItemKind = "deadline" | "planned" | "focused"
@@ -70,7 +70,7 @@ export function buildCalendarItems(
     return [
       {
         id: `planned:${session.id}`,
-        title: `Work: ${title} (${session.minutes} min)`,
+        title: `Work: ${title}${session.label ? `: ${session.label}` : ""} (${session.minutes} min)`,
         start: session.time ? `${session.date}T${session.time}` : session.date,
         end: session.time ? plannedEnd(session) : undefined,
         allDay: !session.time,
@@ -88,21 +88,23 @@ export function buildCalendarItems(
     ]
   })
 
-  const focused = state.focusSessions.map((session): CalendarItem => ({
-    id: `focused:${session.id}`,
-    title: `Focused: ${session.taskTitle}`,
-    start: session.startedAt,
-    end: session.endedAt,
-    allDay: false,
-    editable: false,
-    durationEditable: false,
-    classNames: ["bot-focused"],
-    extendedProps: {
-      kind: "focused",
-      taskId: session.taskId,
-      refId: session.id,
-    },
-  }))
+  const focused = state.focusSessions
+    .filter(isFocusTime)
+    .map((session): CalendarItem => ({
+      id: `focused:${session.id}`,
+      title: `Focused: ${session.taskTitle}`,
+      start: session.startedAt,
+      end: session.endedAt,
+      allDay: false,
+      editable: false,
+      durationEditable: false,
+      classNames: ["bot-focused"],
+      extendedProps: {
+        kind: "focused",
+        taskId: session.taskId,
+        refId: session.id,
+      },
+    }))
 
   return [...deadlines, ...planned, ...focused]
 }

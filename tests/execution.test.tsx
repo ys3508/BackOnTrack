@@ -162,7 +162,7 @@ describe("definition of done", () => {
       /Accepted a breakdown/,
       /Started a focus session/,
       /Completed: /,
-      /Stopped focus/,
+      /Stopped focus|Interrupted attempt/,
       /Reported being stuck/,
       /Suggested a recovery plan/,
       /Declined a suggested plan/,

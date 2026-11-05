@@ -1,5 +1,6 @@
 import { applySafetyGuards } from "@/lib/guards"
 import { categorize } from "@/lib/recovery/categorize"
+import { concreteStep } from "@/lib/recovery/concrete"
 import type { Category } from "@/lib/recovery/categorize"
 import { extractRequirements } from "@/lib/recovery/demo-breakdown"
 import { contextIntake, taskFacts } from "@/lib/recovery/context"
@@ -19,6 +20,7 @@ import { addDays, shortDate } from "@/lib/workspace/dates"
  */
 
 type Template = {
+  smallerSteps?: string[]
   choices?: string[]
   headline: string
   instruction: string
@@ -64,6 +66,25 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
         "Choose the checklist item you understand best",
       ],
     })
+  }
+
+  // A coding step, or one that's already resisted a plan, gets made smaller.
+  if (task.currentStep) {
+    const concrete = concreteStep(task.currentStep)
+    if (concrete.starter.kind === "code" || task.stuckOnStep > 0) {
+      list.push({
+        headline: `Make “${task.currentStep}” smaller`,
+        instruction: concrete.firstAction,
+        why: concrete.why,
+        minutes: 5,
+        approach: "shrink-scope",
+        kind: concrete.starter.kind === "code" ? "code" : "checklist",
+        artifactTitle: concrete.starter.title,
+        body: concrete.starter.content,
+        steps: [],
+        smallerSteps: concrete.smallerSteps,
+      })
+    }
   }
 
   const writing = /writ|draft|introduc|paragraph|outline|section/i.test(
@@ -515,6 +536,7 @@ export function demoTaskRecovery(
         body: template.body,
       },
       steps,
+      smallerSteps: template.smallerSteps ?? [],
       choices: template.choices ?? [],
       schedule: [
         { date: today, minutes: 10, label: template.steps[0] },

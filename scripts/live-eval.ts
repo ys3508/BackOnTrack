@@ -199,6 +199,7 @@ async function main() {
         instructions: "",
         document: "",
         currentStep: "",
+        stuckOnStep: 0,
         focusSessions: test.stuck
           ? [
               {
@@ -267,6 +268,7 @@ async function main() {
     instructions,
     document: "",
     currentStep: "Write the introduction",
+    stuckOnStep: 0,
     focusSessions: [],
   }
 

@@ -59,7 +59,7 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
       (event) =>
         event.type === "recovery" ||
         event.type === "stuck" ||
-        (event.type === "focus" && event.text.startsWith("Stopped"))
+        (event.type === "focus" && /^(Stopped|Interrupted)/.test(event.text))
     ),
     obstacles: texts((event) => event.type === "obstacle").slice(-10),
     openSteps: task.subtasks
@@ -75,6 +75,10 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
       LIMITS.contextDocument
     ),
     currentStep: clip(currentSubtask(task)?.title ?? ""),
+    stuckOnStep: task.recoveryAttempts.filter(
+      (attempt) =>
+        attempt.subtaskId && attempt.subtaskId === currentSubtask(task)?.id
+    ).length,
     focusSessions: state.focusSessions
       .filter((session) => session.taskId === task.id)
       .slice(-10)

@@ -52,6 +52,10 @@ export function normalizePlan(plan: RecoveryPlan, today: string): RecoveryPlan {
       .map((step) => step.trim().slice(0, 200))
       .filter(Boolean)
       .slice(0, 6),
+    smallerSteps: plan.smallerSteps
+      .map((step) => step.trim().slice(0, 200))
+      .filter(Boolean)
+      .slice(0, 5),
     choices: plan.choices
       .map((choice) => choice.trim().slice(0, 500))
       .filter(Boolean)

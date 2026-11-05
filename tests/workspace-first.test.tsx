@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { Editor } from "@tiptap/react"
 import { MockLanguageModelV4 } from "ai/test"
@@ -7,9 +7,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import { generateStepHelp, generateWorkspaceSetup } from "@/lib/ai/task-assist"
+import { buildCalendarItems } from "@/lib/calendar/events"
+import { planRemaining } from "@/lib/calendar/plan-remaining"
 import { concreteStep } from "@/lib/recovery/concrete"
+import { demoTaskRecovery } from "@/lib/recovery/demo-plan"
 import {
   buildBreakdownRequest,
+  buildRecoveryRequest,
   buildStepHelpRequest,
   buildWorkspaceSetupRequest,
 } from "@/lib/recovery/context"
@@ -22,8 +26,15 @@ import {
 import { markAsSuggested } from "@/lib/editor/suggestion-mark"
 import { workspaceReducer } from "@/lib/workspace/reducer"
 import type { WorkspaceAction } from "@/lib/workspace/reducer"
-import { EMPTY_WORKSPACE } from "@/lib/workspace/schemas"
-import type { Workspace } from "@/lib/workspace/schemas"
+import { addDays, localToday } from "@/lib/workspace/dates"
+import { EMPTY_WORKSPACE, isInterrupted } from "@/lib/workspace/schemas"
+import type { PlannedSession, Workspace } from "@/lib/workspace/schemas"
+import {
+  progressSummary,
+  recentActions,
+  recommendTask,
+} from "@/lib/workspace/selectors"
+import { restoreWorkspace } from "@/lib/workspace/storage"
 
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
@@ -487,5 +498,389 @@ describe("suggestion marks and code", () => {
       content: [{ type: "text", text: "Hi" }],
     })
     expect(paragraph.content?.[0].marks).toEqual([{ type: "suggestion" }])
+  })
+})
+
+describe("adaptive Plan B", () => {
+  const request = (
+    state: Workspace,
+    rejected: { nextStep: string; artifactTitle: string }[] = []
+  ) => buildRecoveryRequest(state.tasks[0], state, TODAY, { rejected })
+
+  it("gives a code starting point, and shrinks the step, when stuck on a big coding step", () => {
+    const { plan } = demoTaskRecovery(request(withSteps()))
+    expect(plan.nextStep.instruction).toBe(
+      "Open the dataset and identify the target column"
+    )
+    expect(plan.artifact.kind).toBe("code")
+    expect(plan.artifact.body).toContain("[your_dataset].csv")
+    expect(plan.smallerSteps[0]).toBe(
+      "Open the dataset and identify the target column"
+    )
+  })
+
+  it("stays different, and never says to think, across repeated I'm stuck", () => {
+    const seen = new Set<string>()
+    const rejected: { nextStep: string; artifactTitle: string }[] = []
+    for (let i = 0; i < 4; i++) {
+      const { plan } = demoTaskRecovery(request(withSteps(), rejected))
+      expect(seen.has(plan.nextStep.instruction)).toBe(false)
+      expect(plan.nextStep.instruction).not.toMatch(
+        /^\s*(think|consider|reflect)/i
+      )
+      seen.add(plan.nextStep.instruction)
+      rejected.push({
+        nextStep: plan.nextStep.instruction,
+        artifactTitle: plan.artifact.title,
+      })
+    }
+  })
+
+  it("knows how many plans have been tried on this step, and what's been finished", () => {
+    const recovery = {
+      analysis: demoTaskRecovery(request(withSteps())).analysis,
+      plan: demoTaskRecovery(request(withSteps())).plan,
+      strategy: null,
+      source: "demo" as const,
+      usedFallback: false,
+      exhausted: false,
+      createdAt: AT,
+    }
+    let state = workspaceReducer(withSteps(), {
+      type: "set-recovery",
+      id: "a",
+      recovery,
+    })
+    state = workspaceReducer(state, {
+      type: "decline-recovery",
+      id: "a",
+      at: AT,
+    })
+    state = workspaceReducer(state, { type: "set-recovery", id: "a", recovery })
+    state = workspaceReducer(state, {
+      type: "decline-recovery",
+      id: "a",
+      at: AT,
+    })
+    expect(request(state).task.stuckOnStep).toBe(2)
+    expect(request(state).task.attempts.join(" ")).toContain("Declined")
+
+    const done = workspaceReducer(state, {
+      type: "toggle-subtask",
+      id: "a",
+      at: AT,
+      subId: "1",
+    })
+    expect(request(done).task.stuckOnStep).toBe(0)
+    expect(request(done).task.completedActions.join(" ")).toContain(
+      "Train a classifier"
+    )
+  })
+
+  it("applies smaller steps from a recovery plan, keeping finished work", async () => {
+    const state = run(
+      [
+        {
+          type: "add-subtask",
+          id: "a",
+          at: AT,
+          subId: "0",
+          title: "Read the brief",
+        },
+        { type: "toggle-subtask", id: "a", at: AT, subId: "0" },
+        {
+          type: "add-subtask",
+          id: "a",
+          at: AT,
+          subId: "1",
+          title: "Train a classifier on the provided dataset",
+        },
+      ],
+      mlTask()
+    )
+    seed(state)
+    window.location.hash = "#/recover/a"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Get a recovery plan"))
+    await screen.findByRole("heading", { name: "Make this step smaller" })
+    expect(screen.getByText(/This code hasn’t been run/)).toBeInTheDocument()
+    await user.click(await button("Add selected to my task"))
+    await waitFor(() => expect(saved().tasks[0].recovery).toBeNull())
+    const subs = saved().tasks[0].subtasks
+    expect(subs[0]).toMatchObject({ title: "Read the brief", done: true })
+    expect(subs[1].title).toBe(
+      "Open the dataset and identify the target column"
+    )
+    expect(subs.map((sub: { title: string }) => sub.title)).not.toContain(
+      "Train a classifier on the provided dataset"
+    )
+  })
+})
+
+describe("code help in the editor", () => {
+  it("previews a code starting point, and inserts it as a code block", async () => {
+    seed(withSteps())
+    window.location.hash = "#/tasks/a"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    const editor = await getEditor()
+    await user.click(await button("Give me a code starting point"))
+    expect(
+      ((await screen.findByLabelText(/Suggested text/)) as HTMLTextAreaElement)
+        .value
+    ).toContain("import pandas")
+    expect(screen.getByText(/hasn’t been run/)).toBeInTheDocument()
+    expect(editor.getText()).toBe("")
+    await user.click(await button("Add to my document"))
+    expect(editor.getHTML()).toContain("<pre")
+  })
+})
+
+describe("planning remaining work", () => {
+  const base = {
+    today: "2026-11-02", // A Monday.
+    deadline: "2026-11-06" as string | null,
+    minutesPerDay: 30,
+    skipWeekends: false,
+    existing: [] as PlannedSession[],
+  }
+
+  it("spreads steps over the days before the deadline", () => {
+    const { sessions, unscheduled } = planRemaining({
+      ...base,
+      steps: ["A", "B", "C"],
+    })
+    expect(unscheduled).toEqual([])
+    expect(
+      sessions.every(
+        (item) => item.date >= base.today && item.date <= "2026-11-06"
+      )
+    ).toBe(true)
+    const perDay: Record<string, number> = {}
+    sessions.forEach((item) => {
+      perDay[item.date] = (perDay[item.date] ?? 0) + item.minutes
+    })
+    expect(Math.max(...Object.values(perDay))).toBeLessThanOrEqual(30)
+    expect(sessions.reduce((sum, item) => sum + item.minutes, 0)).toBe(75)
+  })
+
+  it("says what doesn't fit, instead of pretending", () => {
+    const { unscheduled, sessions } = planRemaining({
+      ...base,
+      deadline: "2026-11-02",
+      minutesPerDay: 30,
+      steps: ["A", "B"],
+    })
+    expect(sessions.map((item) => item.label)).toEqual(["A"])
+    expect(unscheduled).toEqual(["B"])
+  })
+
+  it("respects weekends, and work already planned", () => {
+    const weekend = planRemaining({
+      ...base,
+      today: "2026-11-07", // A Saturday.
+      deadline: "2026-11-09",
+      skipWeekends: true,
+      steps: ["A"],
+    })
+    expect(weekend.sessions[0].date).toBe("2026-11-09")
+
+    const planned: PlannedSession = {
+      id: "p",
+      taskId: "a",
+      date: "2026-11-02",
+      time: null,
+      minutes: 30,
+      label: "Other",
+      done: false,
+    }
+    const busy = planRemaining({ ...base, steps: ["A"], existing: [planned] })
+    expect(busy.sessions[0].date).toBe("2026-11-03")
+
+    const already = planRemaining({
+      ...base,
+      steps: ["Other", "A"],
+      existing: [planned],
+    })
+    expect(already.sessions.map((item) => item.label)).toEqual(["A"])
+  })
+
+  it("plans ahead, from today, when a deadline has passed or doesn't exist", () => {
+    const passed = planRemaining({
+      ...base,
+      deadline: "2026-10-01",
+      steps: ["A"],
+    })
+    expect(passed.deadlinePassed).toBe(true)
+    expect(passed.sessions[0].date).toBe(base.today)
+    // Without a deadline, the plan looks two weeks ahead.
+    const steps = Array.from({ length: 20 }, (_, index) => `Step ${index}`)
+    const open = planRemaining({ ...base, deadline: null, steps })
+    expect(open.sessions.at(-1)?.date).toBe("2026-11-15")
+    expect(open.unscheduled.length).toBeGreaterThan(0)
+  })
+
+  it("adds nothing until confirmed, and never changes the deadline", async () => {
+    const today = localToday()
+    const deadline = addDays(today, 5)
+    seed(
+      run([
+        { type: "create-task", id: "a", at: AT, title: "Essay", deadline },
+        {
+          type: "add-subtask",
+          id: "a",
+          at: AT,
+          subId: "1",
+          title: "Write the intro",
+        },
+        {
+          type: "add-subtask",
+          id: "a",
+          at: AT,
+          subId: "2",
+          title: "Write the end",
+        },
+      ])
+    )
+    window.location.hash = "#/calendar"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Plan remaining work"))
+    const list = await screen.findByRole("list", {
+      name: "Suggested work sessions",
+    })
+    expect(saved().planned).toEqual([])
+    expect(
+      screen.getByText(/Calculated from your open steps/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/this won’t change it/)).toBeInTheDocument()
+
+    const boxes = within(list).getAllByRole("checkbox")
+    await user.click(boxes[0])
+    await user.click(
+      await button(new RegExp(`^Add ${boxes.length - 1} to my calendar`))
+    )
+    expect(saved().planned).toHaveLength(boxes.length - 1)
+    expect(saved().tasks[0].deadline).toBe(deadline)
+    expect(await screen.findByText(/to your calendar/)).toBeInTheDocument()
+  })
+
+  it("is available from the task too", async () => {
+    seed(withSteps())
+    window.location.hash = "#/tasks/a"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Plan remaining work"))
+    expect(
+      await screen.findByRole("list", { name: "Suggested work sessions" })
+    ).toBeInTheDocument()
+  })
+})
+
+describe("small details", () => {
+  it("doesn't ask for a priority, and scores a task without one lowest", () => {
+    const state = run([
+      { type: "create-task", id: "a", at: AT, title: "No priority" },
+      {
+        type: "create-task",
+        id: "b",
+        at: AT,
+        title: "Medium",
+        priority: "medium",
+      },
+    ])
+    expect(state.tasks[0].priority).toBe("none")
+    expect(recommendTask(state, TODAY)?.id).toBe("b")
+  })
+
+  it("shows No priority as the default when creating a task", async () => {
+    seed(EMPTY_WORKSPACE)
+    window.location.hash = "#/tasks"
+    render(<WorkspaceApp />)
+    expect(await screen.findByLabelText("Priority (optional)")).toHaveValue(
+      "none"
+    )
+  })
+
+  it("keeps saved priorities, and defaults old data with none to none", () => {
+    expect(
+      restoreWorkspace({
+        version: 2,
+        tasks: [
+          {
+            id: "a",
+            title: "T",
+            status: "not-started",
+            createdAt: AT,
+            updatedAt: AT,
+            priority: "high",
+          },
+          {
+            id: "b",
+            title: "U",
+            status: "not-started",
+            createdAt: AT,
+            updatedAt: AT,
+          },
+        ],
+      }).tasks.map((task) => task.priority)
+    ).toEqual(["high", "none"])
+  })
+
+  const stopAfter = (
+    seconds: number,
+    outcome: "continue-later" | "stuck" = "continue-later"
+  ) =>
+    run(
+      [
+        {
+          type: "timer-start",
+          id: "s",
+          kind: "focus",
+          taskId: "a",
+          minutes: 5,
+          now: 0,
+          at: AT,
+        },
+        { type: "timer-stop", now: seconds * 1000, at: AT, outcome, note: "" },
+      ],
+      withSteps()
+    )
+
+  it("marks a 2-second session as an interrupted attempt, not focus time", () => {
+    const state = stopAfter(2)
+    const task = state.tasks[0]
+    expect(isInterrupted(state.focusSessions[0])).toBe(true)
+    expect(task.history.at(-1)?.text).toBe("Interrupted attempt (2 sec)")
+    expect(recentActions(state)).toEqual([])
+    const summary = progressSummary(task, state)
+    expect(summary).toContain("1 interrupted attempt")
+    expect(summary).not.toContain("on the timer")
+    expect(
+      buildCalendarItems(state, TODAY).filter(
+        (item) => item.extendedProps.kind === "focused"
+      )
+    ).toEqual([])
+  })
+
+  it("counts a real session, including a finished one", () => {
+    const state = stopAfter(120)
+    expect(isInterrupted(state.focusSessions[0])).toBe(false)
+    expect(progressSummary(state.tasks[0], state)).toContain(
+      "2 min on the timer"
+    )
+    expect(state.tasks[0].history.at(-1)?.text).toContain(
+      "Stopped focus after 2 min"
+    )
+  })
+
+  it("labels it in the session history", async () => {
+    seed(stopAfter(2))
+    window.location.hash = "#/focus"
+    render(<WorkspaceApp />)
+    expect(
+      await screen.findByText(/Interrupted attempt, not counted as focus time/)
+    ).toBeInTheDocument()
   })
 })

@@ -98,7 +98,7 @@ export function taskFromSession(
       title: text.length > 80 ? `${text.slice(0, 77)}...` : text,
       description: text,
       status: completed.length ? "in-progress" : "needs-recovery",
-      priority: "medium",
+      priority: "none",
       deadline,
       originalDeadline: deadline,
       progress: 0,

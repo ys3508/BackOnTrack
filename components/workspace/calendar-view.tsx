@@ -11,6 +11,7 @@ import type { EventClickArg, EventDropArg } from "@fullcalendar/core"
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog, DeadlineChip } from "@/components/workspace/parts"
+import { PlanRemaining } from "@/components/workspace/plan-remaining"
 import { QuickAdd } from "@/components/workspace/quick-add"
 import {
   PlanSessionForm,
@@ -187,6 +188,13 @@ export function CalendarView() {
         </Card>
 
         <div className="space-y-4">
+          <Card>
+            <h2 className="mb-2 font-sans text-[15px] font-semibold tracking-normal">
+              Plan the rest of a task
+            </h2>
+            <PlanRemaining />
+          </Card>
+
           <Card>
             <h2 className="mb-2 font-sans text-[15px] font-semibold tracking-normal">
               Plan work on {shortDate(selected)}

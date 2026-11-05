@@ -1,5 +1,5 @@
 import { addDays, daysBetween } from "@/lib/workspace/dates"
-import { isActive } from "@/lib/workspace/schemas"
+import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type { Task, TaskEvent, Workspace } from "@/lib/workspace/schemas"
 
 /** A task whose deadline has passed. Interface text stays calm about this. */
@@ -128,9 +128,11 @@ export function recentActions(state: Workspace, limit = 5) {
 /** A plain summary from recorded facts. Time on a timer is reported as time only. */
 export function progressSummary(task: Task, state: Workspace) {
   const { done, total } = stepCounts(task)
-  const sessions = state.focusSessions.filter(
+  const all = state.focusSessions.filter(
     (session) => session.taskId === task.id
   )
+  const sessions = all.filter(isFocusTime)
+  const interrupted = all.length - sessions.length
   const minutes = Math.round(
     sessions.reduce((sum, session) => sum + session.actualSeconds, 0) / 60
   )
@@ -139,6 +141,11 @@ export function progressSummary(task: Task, state: Workspace) {
   if (sessions.length) {
     parts.push(
       `${minutes} min on the timer over ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`
+    )
+  }
+  if (interrupted) {
+    parts.push(
+      `${interrupted} interrupted ${interrupted === 1 ? "attempt" : "attempts"}`
     )
   }
   if (task.recoveryAttempts.length) {

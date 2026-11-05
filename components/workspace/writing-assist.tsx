@@ -25,6 +25,7 @@ const ACTIONS: {
   needsSelection?: boolean
 }[] = [
   { action: "outline", label: "Generate an outline" },
+  { action: "code", label: "Give me a code starting point" },
   { action: "starter", label: "Suggest a starting paragraph" },
   {
     action: "explain",

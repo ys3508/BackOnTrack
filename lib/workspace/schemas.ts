@@ -29,10 +29,11 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   released: "Released",
 }
 
-export const PRIORITIES = ["low", "medium", "high"] as const
+export const PRIORITIES = ["none", "low", "medium", "high"] as const
 export type Priority = (typeof PRIORITIES)[number]
 
 export const PRIORITY_LABEL: Record<Priority, string> = {
+  none: "No priority",
   low: "Low",
   medium: "Medium",
   high: "High",
@@ -143,7 +144,7 @@ export const TaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(""),
   status: z.enum(TASK_STATUSES),
-  priority: z.enum(PRIORITIES).default("medium"),
+  priority: z.enum(PRIORITIES).default("none"),
   deadline: DateString.nullable().default(null),
   /** The first deadline ever set. Rescheduling work never changes it. */
   originalDeadline: DateString.nullable().default(null),
@@ -223,6 +224,20 @@ export const DEFAULT_SETTINGS: Settings = {
   modePreference: null,
   defaultFocusMinutes: 5,
   homeListSize: 3,
+}
+
+/** Under a minute and stopped early: an interrupted attempt, not focus time. */
+export const INTERRUPTED_UNDER_SECONDS = 60
+
+export function isInterrupted(session: FocusSession) {
+  return (
+    session.outcome !== "completed" &&
+    session.actualSeconds < INTERRUPTED_UNDER_SECONDS
+  )
+}
+
+export function isFocusTime(session: FocusSession) {
+  return !isInterrupted(session)
 }
 
 export const WORKSPACE_VERSION = 2

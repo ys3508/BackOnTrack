@@ -10,7 +10,7 @@ import { ExpandableList, fieldClass } from "@/components/workspace/parts"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { formatClock, formatMinutes, remainingSeconds } from "@/lib/focus/timer"
 import { formatDateTime } from "@/lib/workspace/dates"
-import { isActive } from "@/lib/workspace/schemas"
+import { isActive, isInterrupted } from "@/lib/workspace/schemas"
 import type { FocusSession, Task, TimerState } from "@/lib/workspace/schemas"
 import { currentSubtask, recommendTask } from "@/lib/workspace/selectors"
 
@@ -583,7 +583,9 @@ export function SessionList({ sessions }: { sessions: FocusSession[] }) {
             {formatMinutes(session.actualSeconds)}
           </span>{" "}
           of {session.plannedMinutes} min on {session.taskTitle} ·{" "}
-          {OUTCOME_LABEL[session.outcome]}
+          {isInterrupted(session)
+            ? "Interrupted attempt, not counted as focus time"
+            : OUTCOME_LABEL[session.outcome]}
           {session.note && `: ${session.note}`}
           <span className="block text-xs text-muted-foreground">
             {formatDateTime(session.endedAt)}

@@ -1,6 +1,10 @@
 import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
 import { shortDate } from "@/lib/workspace/dates"
-import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
+import {
+  STATUS_LABEL,
+  PRIORITY_LABEL,
+  isInterrupted,
+} from "@/lib/workspace/schemas"
 import { currentSubtask } from "@/lib/workspace/selectors"
 import type {
   FocusSession,
@@ -284,7 +288,7 @@ export function workspaceReducer(
           title: action.title.trim(),
           description: action.description?.trim() ?? "",
           status: "not-started",
-          priority: action.priority ?? "medium",
+          priority: action.priority ?? "none",
           deadline,
           originalDeadline: deadline,
           progress: 0,
@@ -1117,8 +1121,10 @@ function recordSession(
     ...result,
   }
   const length = formatMinutes(result.actualSeconds)
-  const text =
-    result.outcome === "completed"
+  const interrupted = isInterrupted(session)
+  const text = interrupted
+    ? `Interrupted attempt (${length})${result.outcome === "stuck" ? ": got stuck" : ""}`
+    : result.outcome === "completed"
       ? `Focus session finished (${length})`
       : result.outcome === "stuck"
         ? `Stopped focus after ${length}: got stuck`

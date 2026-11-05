@@ -86,6 +86,8 @@ The plan must produce something tangible. Do not ask the user to reflect. Never 
 - nextStep: one concrete action that leaves something behind: text written, a question sent, a file opened and a line pasted. Use the task's specifics.
 - artifact: something genuinely useful that you drafted for them: an email to the right person, a simplified task plan, a recovery schedule, a document outline, or a checklist. Make it complete enough to use, with [square brackets] for anything you don't know, such as names, policies, or course details. Never fill those in by guessing.
 - steps: up to 6 small steps, using the same specifics. Don't repeat steps that are already open or completed.
+- smallerSteps: if the current step is too big to start, give 2 to 5 smaller steps that could replace it, such as "Open the dataset and identify the target column" for "Train a classifier". Leave it empty otherwise. Don't rewrite finished steps.
+- If the work involves code, the artifact can be a short code starting point, with kind "code", in a fenced block, using [brackets] for what you don't know. Say that it hasn't been run.
 - choices: when the user is stuck on writing or starting, give up to 3 specific options they can pick and insert into their document, such as possible opening sentences based on their instructions. Otherwise, leave it empty.
 - schedule: up to 4 optional work sessions, dated today or later. These are planned work only. You can't change a deadline, and shouldn't claim to.
 - headline: a short, concrete title for the plan.
@@ -95,6 +97,7 @@ Use the data:
 - If they don't understand what's being asked and there are instructions, make the artifact a checklist of the deliverables, and mark anything ambiguous as a question to ask.
 - Use the time left until the deadline, if known, to size the plan. Don't create urgency.
 - If focus sessions stopped early or the user reported an obstacle, respond to that directly, and make the step smaller or different.
+- The more plans that have been tried on this step, the smaller and more different the next one must be. Change the method, not the wording. Rewording the same action, or asking them to think about it, doesn't count.
 - Never repeat anything listed under earlier attempts or rejected plans. In adaptationNote, say in one sentence what's different and why, without blame. Leave it empty if nothing has been tried.
 - If a strategy is given, the user chose it. Write the plan for that strategy, even if you would have recommended another. Otherwise, recommend one and write the plan for that.
 - For RELEASE, help them close it out cleanly, with a closing note and telling anyone who needs to know.
@@ -164,6 +167,7 @@ The user pressed "Set up my workspace" on a new task. Read what it asks for, the
 - steps are 3 to 8 small steps. The first ones should be especially small.`
 
 const WRITING_ACTION_GUIDE: Record<WritingAction, string> = {
+  code: "Write a short code starting point for the current step, in a fenced code block. Use [brackets] for names and paths you don't know. Put a note saying that it hasn't been run. Don't write the whole solution.",
   outline:
     "Write an outline for the working document, using headings and short bullet points. Follow the instructions if there are any.",
   explain:
@@ -196,6 +200,7 @@ Status: ${task.status}
 Priority: ${task.priority}
 Progress: ${task.progress}%
 Current step: ${task.currentStep || "None."}
+Recovery plans already tried on this step: ${task.stuckOnStep}
 
 Completed actions:
 ${list(task.completedActions)}

@@ -310,6 +310,7 @@ describe("with Live AI", () => {
     artifact: { kind: "email", title: "AI draft", body: "AI body" },
     steps: ["AI step one"],
     choices: [],
+    smallerSteps: [],
     schedule: [],
   }
 

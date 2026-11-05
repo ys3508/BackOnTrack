@@ -1,4 +1,5 @@
 import { categorize } from "@/lib/recovery/categorize"
+import { concreteStep } from "@/lib/recovery/concrete"
 import { extractRequirements } from "@/lib/recovery/demo-breakdown"
 import type {
   WritingAction,
@@ -144,10 +145,33 @@ function improve(request: WritingAssistRequest): WritingAssistResult {
   }
 }
 
+function code(request: WritingAssistRequest): WritingAssistResult {
+  const { task } = request
+  const target = request.selection.trim() || task.currentStep || task.title
+  const { starter } = concreteStep(target)
+  const content =
+    starter.kind === "code"
+      ? starter.content
+      : [
+          "```python",
+          `# ${target}`,
+          "# Replace the [brackets] with your own details.",
+          "",
+          'data = open("[your_file]").read()',
+          "print(data[:200])",
+          "```",
+        ].join("\n")
+  return {
+    title: "A code starting point",
+    note: `${DEMO_NOTE} This code hasn’t been run, and BackOnTrack can’t run it. Copy it into your own environment.`,
+    content,
+  }
+}
+
 const HANDLERS: Record<
   WritingAction,
   (request: WritingAssistRequest) => WritingAssistResult
-> = { outline, explain, starter, split, summarize, improve }
+> = { outline, code, explain, starter, split, summarize, improve }
 
 export function demoWritingAssist(
   request: WritingAssistRequest
