@@ -1,5 +1,6 @@
 import { similarity } from "@/lib/guards"
 import { categorize } from "@/lib/recovery/categorize"
+import { prepStepFor } from "@/lib/recovery/concrete"
 import type {
   TaskBreakdownRequest,
   TaskBreakdownResult,
@@ -134,6 +135,13 @@ export function demoBreakdown(
     ]
   }
 
+  // A big first task gets a smaller step in front of it.
+  const firstBig = steps.findIndex((step) => prepStepFor(step))
+  if (firstBig >= 0) {
+    const prep = prepStepFor(steps[firstBig])!
+    if (!steps.includes(prep)) steps.splice(firstBig, 0, prep)
+  }
+
   const finished = task.completedActions.map((item) =>
     item.replace(/^Completed:\s*/, "")
   )
@@ -152,7 +160,7 @@ export function demoBreakdown(
 
   return {
     note: notes.filter(Boolean).join(" "),
-    steps: steps.slice(0, 8),
+    steps: steps.slice(0, 9),
     ambiguities: [],
   }
 }

@@ -10,6 +10,7 @@ import StarterKit from "@tiptap/starter-kit"
 import {
   Bold,
   Check,
+  Code,
   Copy,
   Download,
   Heading2,
@@ -316,6 +317,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       bullet: current.isActive("bulletList"),
       ordered: current.isActive("orderedList"),
       tasks: current.isActive("taskList"),
+      code: current.isActive("codeBlock"),
       canUndo: current.can().undo(),
       canRedo: current.can().redo(),
     }),
@@ -364,6 +366,12 @@ function Toolbar({ editor }: { editor: Editor }) {
       Icon: ListChecks,
       pressed: active.tasks,
       run: () => chain().toggleTaskList().run(),
+    },
+    {
+      label: "Code block",
+      Icon: Code,
+      pressed: active.code,
+      run: () => chain().toggleCodeBlock().run(),
     },
   ]
 

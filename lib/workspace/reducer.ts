@@ -68,6 +68,13 @@ export type WorkspaceAction =
       title: string
     }
   | { type: "move-subtask"; id: string; subId: string; direction: -1 | 1 }
+  | {
+      type: "split-subtask"
+      id: string
+      at: string
+      subId: string
+      steps: { id: string; title: string }[]
+    }
   | { type: "set-current-subtask"; id: string; at: string; subId: string }
   | {
       type: "set-breakdown"
@@ -483,6 +490,38 @@ export function workspaceReducer(
         const [moved] = subtasks.splice(index, 1)
         subtasks.splice(target, 0, moved)
         return { ...task, subtasks }
+      })
+
+    case "split-subtask":
+      return mapTask(state, action.id, (task) => {
+        const index = task.subtasks.findIndex((sub) => sub.id === action.subId)
+        if (index < 0 || !action.steps.length) return task
+        const original = task.subtasks[index]
+        // A finished step is real work, so it's never replaced.
+        if (original.done) return task
+        const subtasks = [...task.subtasks]
+        subtasks.splice(
+          index,
+          1,
+          ...action.steps.map((step) => ({
+            id: step.id,
+            title: step.title.trim(),
+            done: false,
+            source: original.source,
+            completedAt: null,
+          }))
+        )
+        return withEvent(
+          {
+            ...task,
+            subtasks,
+            currentSubtaskId: null,
+            progress: stepProgress(subtasks, task.progress),
+          },
+          action.at,
+          "subtask",
+          `Accepted smaller steps in place of: ${original.title}`
+        )
       })
 
     case "set-current-subtask":

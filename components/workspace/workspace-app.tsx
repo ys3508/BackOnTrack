@@ -141,7 +141,7 @@ function Shell() {
           {route.view === "workspace" && <WorkspaceView />}
           {route.view === "tasks" && <TasksView />}
           {route.view === "task" && (
-            <TaskDetail id={route.id} focusDocument={route.section === "doc"} />
+            <TaskDetail id={route.id} section={route.section} />
           )}
           {route.view === "calendar" && <CalendarView />}
           {route.view === "focus" && <FocusView />}
@@ -180,7 +180,13 @@ function TimerPill() {
     <button
       type="button"
       aria-label={`Open focus timer, ${clock} remaining`}
-      onClick={() => navigate({ view: "focus" })}
+      onClick={() =>
+        navigate(
+          timer.taskId
+            ? { view: "task", id: timer.taskId, section: "doc" }
+            : { view: "focus" }
+        )
+      }
       className="flex min-h-10 items-center gap-1.5 rounded-lg bg-sage-soft px-2.5 text-sm font-medium text-sage tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
     >
       <Timer className="size-4" aria-hidden />

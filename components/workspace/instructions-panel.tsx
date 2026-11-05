@@ -14,10 +14,16 @@ import {
 } from "@/lib/documents/extract"
 import type { Task } from "@/lib/workspace/schemas"
 
-export function InstructionsPanel({ task }: { task: Task }) {
+export function InstructionsPanel({
+  task,
+  startOpen = false,
+}: {
+  task: Task
+  startOpen?: boolean
+}) {
   const { dispatch } = useStore()
   const { instructions } = task
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(startOpen)
   const [text, setText] = useState("")
   const [reading, setReading] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -4,10 +4,12 @@ import { daysBetween } from "@/lib/workspace/dates"
 import type {
   Intake,
   RejectedPlan,
+  StepHelpRequest,
   Strategy,
   TaskBreakdownRequest,
   TaskContext,
   TaskRecoveryRequest,
+  WorkspaceSetupRequest,
   WritingAction,
   WritingAssistRequest,
 } from "@/lib/schemas"
@@ -97,6 +99,32 @@ export function buildBreakdownRequest(
     task: buildTaskContext(task, state),
     today,
     rejected: rejected.slice(-3).map((steps) => steps.slice(0, 10).map(clip)),
+  }
+}
+
+export function buildStepHelpRequest(
+  task: Task,
+  state: Workspace,
+  today: string,
+  step: string
+): StepHelpRequest {
+  return {
+    stage: "step-help",
+    task: buildTaskContext(task, state),
+    today,
+    step: clip(step),
+  }
+}
+
+export function buildWorkspaceSetupRequest(
+  task: Task,
+  state: Workspace,
+  today: string
+): WorkspaceSetupRequest {
+  return {
+    stage: "workspace-setup",
+    task: buildTaskContext(task, state),
+    today,
   }
 }
 

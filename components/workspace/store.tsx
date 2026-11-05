@@ -24,10 +24,13 @@ import {
   saveWorkspace,
 } from "@/lib/workspace/storage"
 
+/** Where a task opens: its document, or straight into getting help. */
+export type TaskSection = "doc" | "help" | "setup"
+
 export type Route =
   | { view: "workspace" }
   | { view: "tasks" }
-  | { view: "task"; id: string; section?: "doc" }
+  | { view: "task"; id: string; section?: TaskSection }
   | { view: "calendar" }
   | { view: "recover"; taskId?: string }
   | { view: "focus"; taskId?: string }
@@ -37,8 +40,8 @@ export type Route =
 export function parseHash(hash: string): Route {
   const [view, id, section] = hash.replace(/^#\/?/, "").split("/")
   if (view === "tasks" && id) {
-    return section === "doc"
-      ? { view: "task", id, section: "doc" }
+    return section === "doc" || section === "help" || section === "setup"
+      ? { view: "task", id, section }
       : { view: "task", id }
   }
   if (view === "focus") return { view: "focus", taskId: id }

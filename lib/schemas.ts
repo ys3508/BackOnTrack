@@ -351,6 +351,75 @@ export type TaskBreakdownResult = TaskBreakdownOutput & {
   usedFallback?: boolean
 }
 
+/* ---------- Starting work ---------- */
+
+const StarterSchema = z.object({
+  kind: z.enum(["outline", "draft", "code", "checklist"]),
+  title: z.string(),
+  content: z
+    .string()
+    .describe(
+      "Markdown to start from. Use fenced code for code, and [brackets] for anything unknown."
+    ),
+})
+
+export const StepHelpOutputSchema = z.object({
+  firstAction: z
+    .string()
+    .describe(
+      "One physical action for the next few minutes, like 'Open the dataset and identify the target column'."
+    ),
+  why: z.string(),
+  starter: StarterSchema,
+  smallerSteps: z
+    .array(z.string())
+    .describe("2 to 5 smaller steps that could replace this step."),
+  note: z.string().describe("A short caveat, or empty."),
+})
+export type StepHelpOutput = z.infer<typeof StepHelpOutputSchema>
+export type StepHelpResult = StepHelpOutput & { usedFallback?: boolean }
+
+export const StepHelpRequestSchema = z.object({
+  stage: z.literal("step-help"),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+  step: shortText,
+})
+export type StepHelpRequest = z.infer<typeof StepHelpRequestSchema>
+
+export const WorkspaceSetupOutputSchema = z.object({
+  summary: z.string().describe("One short sentence on what this task is."),
+  deliverables: z
+    .array(z.string())
+    .describe("What has to be handed in, from the instructions only."),
+  datesMentioned: z
+    .array(z.string())
+    .describe(
+      "Dates exactly as written in the instructions. Never invent one."
+    ),
+  dependencies: z
+    .array(z.string())
+    .describe("What the work relies on, such as a provided dataset."),
+  unclear: z
+    .array(z.string())
+    .describe("Questions worth asking. Can be empty."),
+  steps: z.array(z.string()).describe("3 to 8 small, concrete steps."),
+  firstAction: z.string().describe("One physical action to begin with."),
+  starter: StarterSchema,
+  note: z.string().describe("A short caveat, or empty."),
+})
+export type WorkspaceSetupOutput = z.infer<typeof WorkspaceSetupOutputSchema>
+export type WorkspaceSetupResult = WorkspaceSetupOutput & {
+  usedFallback?: boolean
+}
+
+export const WorkspaceSetupRequestSchema = z.object({
+  stage: z.literal("workspace-setup"),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+})
+export type WorkspaceSetupRequest = z.infer<typeof WorkspaceSetupRequestSchema>
+
 /* ---------- Writing assistance ---------- */
 
 export const WRITING_ACTIONS = [
@@ -392,4 +461,6 @@ export const RecoveryRequestSchema = z.discriminatedUnion("stage", [
   TaskRecoveryRequestSchema,
   TaskBreakdownRequestSchema,
   WritingAssistRequestSchema,
+  StepHelpRequestSchema,
+  WorkspaceSetupRequestSchema,
 ])

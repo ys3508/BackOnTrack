@@ -9,6 +9,7 @@ import {
   LifeBuoy,
   Play,
   Shuffle,
+  Sparkles,
   Timer,
 } from "lucide-react"
 
@@ -164,6 +165,26 @@ export function WorkspaceView() {
             <Button
               type="button"
               size="xl"
+              onClick={() =>
+                navigate({
+                  view: "task",
+                  id: recommended.id,
+                  section:
+                    recommended.subtasks.length || recommended.workDoc
+                      ? "help"
+                      : "setup",
+                })
+              }
+            >
+              <Sparkles aria-hidden />
+              {recommended.subtasks.length || recommended.workDoc
+                ? "Help me do this"
+                : "Set up my workspace"}
+            </Button>
+            <Button
+              type="button"
+              size="xl"
+              variant="outline"
               onClick={() => startFocus(recommended.id, defaultMinutes)}
             >
               <Play aria-hidden />

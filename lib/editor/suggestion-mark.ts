@@ -22,6 +22,8 @@ export const SuggestionMark = Mark.create({
 
 /** Adds the mark to every piece of text in a block of content. */
 export function markAsSuggested(content: JSONContent): JSONContent {
+  // Code blocks can't hold marks, and their monospace already sets them apart.
+  if (content.type === "codeBlock") return content
   if (content.type === "text") {
     return {
       ...content,

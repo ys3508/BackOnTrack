@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   ArrowLeft,
   LifeBuoy,
@@ -11,6 +11,7 @@ import {
   Plus,
   Timer,
   Trash2,
+  Sparkles,
 } from "lucide-react"
 
 import { useAiConsent } from "@/components/workspace/ai-consent"
@@ -45,7 +46,10 @@ import {
   WorkingEditor,
   useWorkingEditor,
 } from "@/components/workspace/working-editor"
+import { useTaskHelp } from "@/components/workspace/step-help"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
+import type { TaskSection } from "@/components/workspace/store"
+import { cn } from "@/lib/utils"
 import { formatDateTime, shortDate } from "@/lib/workspace/dates"
 import {
   currentSubtask,
@@ -78,10 +82,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function TaskDetail({
   id,
-  focusDocument = false,
+  section,
 }: {
   id: string
-  focusDocument?: boolean
+  section?: TaskSection
 }) {
   const { state, navigate } = useStore()
   const task = state.tasks.find((item) => item.id === id)
@@ -101,21 +105,39 @@ export function TaskDetail({
       </div>
     )
   }
-  return <TaskBody key={task.id} task={task} focusDocument={focusDocument} />
+  return <TaskBody key={task.id} task={task} section={section} />
 }
 
-function TaskBody({
-  task,
-  focusDocument,
-}: {
-  task: Task
-  focusDocument: boolean
-}) {
-  const { dispatch, navigate } = useStore()
+function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
+  const { state, dispatch, navigate, mode } = useStore()
   const statusChange = useStatusChange()
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const { editor, dirty } = useWorkingEditor(task, focusDocument)
+  const { editor, dirty } = useWorkingEditor(task, section === "doc")
   const consent = useAiConsent(task)
+  const help = useTaskHelp(task, editor, consent.guard)
+  const timerHere = state.timer?.taskId === task.id ? state.timer : null
+  // Opened to work, or already working: the document comes first on a phone.
+  const working = Boolean(section) || Boolean(timerHere)
+  const brandNew =
+    isActive(task) &&
+    !task.subtasks.length &&
+    !task.workDoc?.content &&
+    !task.pendingBreakdown
+
+  // Help asked for on the home page starts as soon as the editor is ready.
+  const started = useRef(false)
+  useEffect(() => {
+    if (!editor || started.current) return
+    if (section !== "help" && section !== "setup") return
+    started.current = true
+    const timer = window.setTimeout(() => {
+      if (section === "help") help.requestStep()
+      else help.requestSetup()
+    }, 0)
+    return () => window.clearTimeout(timer)
+    // Runs once, for the section this page was opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, section])
 
   const setStatus = (status: TaskStatus) => statusChange.request(task, status)
 
@@ -175,14 +197,43 @@ function TaskBody({
         </div>
       </div>
 
+      {timerHere && <ActiveTimer timer={timerHere} compact />}
+
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div className="space-y-4">
-          {isActive(task) && <CurrentStepCard task={task} />}
-          <InstructionsPanel task={task} />
+        <div
+          className={cn(
+            "space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:overflow-y-auto lg:pr-1",
+            working && "order-2 lg:order-none"
+          )}
+        >
+          {isActive(task) && (
+            <CurrentStepCard task={task} onHelp={help.requestStep} />
+          )}
+          <InstructionsPanel
+            task={task}
+            startOpen={working && Boolean(task.instructions)}
+          />
+          {brandNew && (
+            <Card className="space-y-2">
+              <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+                Set this up for me
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {mode === "live"
+                  ? "AI reads what this asks for, and prepares steps and a place to start. You check everything first."
+                  : "Demo Mode uses templates and your instructions, not AI, to prepare steps and a place to start. You check everything first."}
+              </p>
+              <Button type="button" size="xl" onClick={help.requestSetup}>
+                <Sparkles aria-hidden />
+                Set up my workspace
+              </Button>
+            </Card>
+          )}
           <BreakdownPanel task={task} guard={consent.guard} />
         </div>
-        <div className="space-y-4">
-          {isActive(task) && <FocusCard task={task} />}
+        <div className="min-w-0 space-y-4">
+          {help.panel}
+          {isActive(task) && !timerHere && <FocusCard task={task} />}
           <WorkingEditor task={task} editor={editor} dirty={dirty} />
           <WritingAssist task={task} editor={editor} guard={consent.guard} />
         </div>
@@ -232,7 +283,7 @@ function TaskBody({
   )
 }
 
-function CurrentStepCard({ task }: { task: Task }) {
+function CurrentStepCard({ task, onHelp }: { task: Task; onHelp: () => void }) {
   const { dispatch, navigate } = useStore()
   const hasStep = Boolean(task.nextAction || currentSubtask(task))
   return (
@@ -248,10 +299,15 @@ function CurrentStepCard({ task }: { task: Task }) {
         <ProgressBar value={task.progress} label="Task progress" />
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button type="button" size="xl" onClick={onHelp}>
+          <Sparkles aria-hidden />
+          Help me do this
+        </Button>
         {hasStep && (
           <Button
             type="button"
             size="xl"
+            variant="outline"
             onClick={() =>
               dispatch({
                 type: "complete-next-action",
@@ -346,8 +402,7 @@ function FocusCard({ task }: { task: Task }) {
       session.id === state.finishedSessionId && session.taskId === task.id
   )
 
-  // Keeps the timer beside the document, without taking over the page.
-  if (timer?.taskId === task.id) return <ActiveTimer timer={timer} compact />
+  if (timer?.kind === "break") return <ActiveTimer timer={timer} compact />
   if (finished) return <FinishedPanel session={finished} onTask />
   if (timer) {
     return (

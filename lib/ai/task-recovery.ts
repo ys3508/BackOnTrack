@@ -23,7 +23,7 @@ const REPEAT_THRESHOLD = 0.6
 
 /** Advice that doesn't produce anything. The product exists to avoid these. */
 const VAGUE =
-  /why (this|it) matters|your priorities|your motivation|reflect on|think about (why|your)|what matters most/i
+  /why (this|it) matters|your priorities|your motivation|reflect on|think about (why|your)|what matters most|^\s*(think about|consider|reflect|try to think)\b/i
 
 export function normalizePlan(plan: RecoveryPlan, today: string): RecoveryPlan {
   const instruction = plan.nextStep.instruction.trim()

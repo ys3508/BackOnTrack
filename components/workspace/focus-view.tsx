@@ -64,12 +64,19 @@ export function useStartFocus({ stay = false } = {}) {
         at: nowIso(),
       })
     }
-    if (!stay) navigate({ view: "focus" })
+    if (stay) return
+    // Focus opens the work itself. Only a session with no task stays on Focus.
+    const running = state.timer?.taskId ?? (state.timer ? null : taskId)
+    navigate(
+      running
+        ? { view: "task", id: running, section: "doc" }
+        : { view: "focus" }
+    )
   }
 }
 
 export function FocusView() {
-  const { state, route } = useStore()
+  const { state, route, navigate } = useStore()
   const preselected = route.view === "focus" ? route.taskId : undefined
   const finished = state.focusSessions.find(
     (session) => session.id === state.finishedSessionId
@@ -79,7 +86,25 @@ export function FocusView() {
     <div className="mx-auto max-w-2xl space-y-5">
       <ScreenHeading>Focus</ScreenHeading>
       {state.timer ? (
-        <ActiveTimer timer={state.timer} />
+        <>
+          <ActiveTimer timer={state.timer} />
+          {state.timer.taskId && (
+            <Button
+              type="button"
+              size="xl"
+              className="w-full sm:w-auto"
+              onClick={() =>
+                navigate({
+                  view: "task",
+                  id: state.timer!.taskId!,
+                  section: "doc",
+                })
+              }
+            >
+              Open my work
+            </Button>
+          )}
+        </>
       ) : finished ? (
         <FinishedPanel session={finished} />
       ) : (

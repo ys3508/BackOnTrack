@@ -2,7 +2,9 @@ import { getLiveConfig, getLiveModel } from "@/lib/ai/provider"
 import { checkRateLimit } from "@/lib/ai/rate-limit"
 import { generateAnalysis, generateNextStep } from "@/lib/ai/recovery"
 import {
+  generateStepHelp,
   generateTaskBreakdown,
+  generateWorkspaceSetup,
   generateWritingAssist,
 } from "@/lib/ai/task-assist"
 import { generateTaskRecovery } from "@/lib/ai/task-recovery"
@@ -73,6 +75,14 @@ export async function POST(request: Request) {
     if (data.stage === "analyze") {
       const analysis = await generateAnalysis(model, data.intake)
       return Response.json({ analysis, model: config.modelId })
+    }
+    if (data.stage === "step-help") {
+      const result = await generateStepHelp(model, data)
+      return Response.json({ ...result, model: config.modelId })
+    }
+    if (data.stage === "workspace-setup") {
+      const result = await generateWorkspaceSetup(model, data)
+      return Response.json({ ...result, model: config.modelId })
     }
     if (data.stage === "writing-assist") {
       const result = await generateWritingAssist(model, data)

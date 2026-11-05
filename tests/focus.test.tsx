@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
@@ -229,10 +229,10 @@ describe("focus screen", () => {
     render(<WorkspaceApp />)
     click("5-minute Quick Start")
     await advance(MIN)
-    click("Pause")
+    click("Pause timer")
     await advance(10 * MIN)
     expect(screen.getByRole("timer")).toHaveTextContent("04:00")
-    click("Resume")
+    click("Resume timer")
     await advance(MIN)
     expect(screen.getByRole("timer")).toHaveTextContent("03:00")
   })
@@ -255,7 +255,7 @@ describe("focus screen", () => {
     ).toBeInTheDocument()
 
     click(/5-minute break/)
-    expect(screen.getByText(/^Break/)).toBeInTheDocument()
+    expect(screen.getByText("Break")).toBeInTheDocument()
     expect(saved().focusSessions).toHaveLength(1)
   })
 
@@ -299,12 +299,7 @@ describe("focus screen", () => {
       actualSeconds: 120,
     })
     expect(saved().tasks[0].status).toBe("in-progress")
-    expect(
-      within(
-        screen.getByRole("region", { hidden: true, name: /Session history/ }) ??
-          document.body
-      ).getByText(/Will continue later/)
-    ).toBeInTheDocument()
+    expect(screen.getByText(/Will continue later/)).toBeInTheDocument()
   })
 
   it("resets without saving a session", async () => {
