@@ -25,7 +25,6 @@ import {
 } from "@/components/workspace/focus-view"
 import {
   ConfirmDialog,
-  ProgressBar,
   StatusBadge,
   fieldClass,
 } from "@/components/workspace/parts"
@@ -366,7 +365,6 @@ function ProgressCard({ task }: { task: Task }) {
         onChange={(event) => setProgress(Number(event.target.value))}
         className="mt-3 h-6 w-full accent-[var(--primary)]"
       />
-      <ProgressBar value={task.progress} label="Progress" className="sr-only" />
     </Card>
   )
 }

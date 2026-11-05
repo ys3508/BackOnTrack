@@ -30,5 +30,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Components added for the recovery workspace
+
+| Project | Use | License |
+| --- | --- | --- |
+| [FullCalendar](https://github.com/fullcalendar/fullcalendar) standard packages (`@fullcalendar/core`, `react`, `daygrid`, `timegrid`, `interaction`) | Calendar, as an npm dependency. No premium packages. | MIT, Copyright (c) 2021 Adam Shaw |
+| [dnd-kit](https://github.com/clauderic/dnd-kit) (`@dnd-kit/core`) | Kanban drag and drop, as an npm dependency | MIT, Copyright (c) 2021, Claudéric Demers |
+| [axe-core](https://github.com/dequelabs/axe-core) | Accessibility tests only. Not shipped in the app. | MPL-2.0 |
+
+## Projects reviewed, with no code copied
+
+| Project | License found on 2026-11-05 | Outcome |
+| --- | --- | --- |
+| [Georgegriff/react-dnd-kit-tailwind-shadcn-ui](https://github.com/Georgegriff/react-dnd-kit-tailwind-shadcn-ui) | MIT, Copyright (c) 2023 George Griffiths | Its approach to keyboard sensors and screen-reader announcements informed the board, which was written separately for this app's data. |
+| [natuomi/pomodoro](https://github.com/natuomi/pomodoro) | MIT | Not used. It counts `setInterval` ticks, and this project needs wall-clock timing. |
+| [ZainnQureshii/flowtask](https://github.com/ZainnQureshii/flowtask) | No LICENSE file, and none detected by GitHub, although its README says "MIT" | Not used. Without an explicit license file, no code was taken from it. |
+| [albertkupperdev/sapling](https://github.com/albertkupperdev/sapling) | None | Not used. |
+
 npm dependencies keep their own licenses, which are listed in their packages
 under `node_modules/` after installation.

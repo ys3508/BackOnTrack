@@ -410,7 +410,9 @@ export function demoTaskRecovery(
   const strategy = request.strategy ?? analysis.decision.recommended
 
   // After a stopped session or low energy, start with something smaller.
-  const justStuck = task.focusSessions.at(-1)?.outcome === "stuck"
+  const lastSession = task.focusSessions.at(-1)
+  const justStuck = lastSession?.outcome === "stuck"
+  const lastNote = lastSession?.note
   const lowEnergy = /energy|overwhelm|too big/i.test(obstacle)
   const offset = justStuck || lowEnergy ? 1 : 0
 
@@ -432,7 +434,7 @@ export function demoTaskRecovery(
       ? "That last suggestion didn't fit, so this is a different approach."
       : "",
     justStuck
-      ? "Your last focus session stopped early, so this is smaller."
+      ? `Your last focus session stopped early${lastNote ? ` (“${lastNote}”)` : ""}, so this is smaller.`
       : "",
     obstacle ? `You said: “${obstacle}”.` : "",
   ]

@@ -59,7 +59,7 @@ function Shell() {
           <button
             type="button"
             onClick={() => navigate({ view: "workspace" })}
-            className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+            className="flex min-h-11 items-center gap-2.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
           >
             <Logo />
             <span className="font-heading text-xl">BackOnTrack</span>

@@ -80,13 +80,59 @@ Problems found while testing:
 - The "Add details" toggle (28 px) and example buttons (38 px) were too small to tap easily, and are now 44 px.
 - "Delete my data" cleared storage but left the old text visible when pressed on the intake screen. The form now resets.
 
+## Functional recovery workspace
+
+The `feat/recovery-workspace` branch started from `feat/low-friction-intake`, so it includes that intake work. The project's author had noticed that the wizard advised people without helping them do the task, as described in [DESIGN_THINKING.md](DESIGN_THINKING.md).
+
+### Repositories reviewed
+
+| Repository | License check on 2026-11-05 | Decision |
+| --- | --- | --- |
+| `fullcalendar/fullcalendar` | MIT | Used its standard npm packages at version 6.1.22. |
+| `Georgegriff/react-dnd-kit-tailwind-shadcn-ui` | MIT | Read for its keyboard and announcement pattern. The board was written separately, using `@dnd-kit/core` (MIT). |
+| `natuomi/pomodoro` | MIT | Not used. It counts `setInterval` ticks, which the brief ruled out. |
+| `ZainnQureshii/flowtask` | No license file, or license detected by GitHub. Its README says MIT. | Not used, because the brief asks for explicit permission. |
+
+### Phases
+
+| Phase | Commit | What was added | Results when completed |
+| --- | --- | --- | --- |
+| 1. Workspace and tasks | `3f9c86b` | Local-first store, migration, home view, task list and board, task details, settings, export, and deletion | 142 tests passed. Typecheck, lint, and build passed. |
+| 2. Focus timer | `e290c7f` | Wall-clock timer, focus view, header timer, session history, and early-stop choices | 160 tests passed. Typecheck, lint, and build passed. |
+| 3. Calendar | `38e6f0d` (shared with phase 4) | FullCalendar month and week views, planned sessions, deadline confirmation, and Replan | 174 tests passed. Build passed. Dragging was checked in a real browser. |
+| 4. AI recovery | `38e6f0d` (shared with phase 3) | Task context, Live AI and Demo Mode plans, plan checks, preview and acceptance | See below. |
+| 5. Testing and docs | Later commits on the branch | Accessibility scan, fixes, and documentation | 226 tests passed. See [TEST_RESULTS.md](TEST_RESULTS.md). |
+
+Phases 3 and 4 share a commit, because the calendar was finished while its browser check was running, and the files overlapped by the time it passed. That commit also went in with one test failing, because of a mistake in my command, which committed regardless of the result. The failure was a duplicate "Progress" label for screen readers. It was fixed in the next commit, and tests were confirmed passing before work continued.
+
+### Decisions
+
+- **Reused existing logic.** Reality Check, the decision cards, safety guards, repeat detection, and the option groups were reused. The wizard stays available at `#/guided`.
+- **Local-first, with hash-based views.** There's no database or account. Views use the URL hash, so the browser's back button works, while the timer and data stay in one provider.
+- **Preview before change.** A plan is stored as pending on the task. Only "Add selected to my task" applies it, which also lets a pending plan survive a reload.
+- **Plans have no way to change a deadline.** The plan schema has no such field.
+
+### Problems found while testing
+
+- Quick add seemed to lose text during a browser test. This was a test mistake: it clicked a visually hidden label, so the field never got focus.
+- A timed calendar item showed a stray dot, and was changed to block display.
+- The shared high-stakes check missed words such as "essay" and "homework", and now includes them.
+- A screen reader would have heard "Progress" twice. The hidden duplicate was removed.
+- The guided check-in nested one `main` landmark inside another, which the axe scan found.
+- The complete button in the task list was 28 px tall, and now has a 44 px target.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).
 
 ## Known limitations
 
-- **The real AI model has not been tested.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.
+- **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.
+- The workspace isn't on the public site until this branch is merged.
+- The timer can't alert the user when it ends, beyond the screen and tab title.
+- Importing an exported file isn't supported.
+- On a phone-width month view, calendar titles are cut off, although tapping a day lists them in full.
+- A person dragging Kanban cards by hand hasn't been tested. Keyboard dragging and simulated pointer dragging worked.
 - The Vercel AI Gateway option has not been exercised at all, and its default model ID is unconfirmed.
 - The public deployment runs in Demo Mode only. Live AI has not been run on it.
 - Copy and Download have not been confirmed on the public site in a normal browser.

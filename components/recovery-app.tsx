@@ -189,6 +189,7 @@ export function RecoveryApp({
     setError(null)
   }
 
+  const Main = embedded ? "div" : "main"
   const stageIndex = STAGES.findIndex(
     (stage) => stage.screen === session.screen
   )
@@ -263,7 +264,7 @@ export function RecoveryApp({
         </p>
       </nav>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-5 pt-8 pb-16 sm:px-6 sm:pt-10">
+      <Main className="mx-auto w-full max-w-4xl flex-1 px-5 pt-8 pb-16 sm:px-6 sm:pt-10">
         <div
           key={session.screen}
           className="animate-in duration-300 fade-in slide-in-from-bottom-1"
@@ -335,7 +336,7 @@ export function RecoveryApp({
             />
           )}
         </div>
-      </main>
+      </Main>
 
       {!embedded && (
         <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">

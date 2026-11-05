@@ -148,14 +148,19 @@ function TaskListItem({
           }
           aria-pressed={done}
           onClick={() => onStatus(task, done ? "in-progress" : "completed")}
-          className={cn(
-            "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
-            done
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-input"
-          )}
+          className="group -my-1 -ml-2 grid size-11 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         >
-          {done && <Check className="size-4" aria-hidden />}
+          <span
+            aria-hidden
+            className={cn(
+              "grid size-7 place-items-center rounded-full border",
+              done
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-input group-hover:border-primary/60"
+            )}
+          >
+            {done && <Check className="size-4" />}
+          </span>
         </button>
         <button
           type="button"

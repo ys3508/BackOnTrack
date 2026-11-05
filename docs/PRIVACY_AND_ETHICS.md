@@ -4,23 +4,27 @@ This is a description of how the prototype works, not legal advice or a formal p
 
 ## User data handling
 
-The app collects what the user types: a description of the avoided responsibility, optional details, text entered in steps, and explanations of obstacles. It has no accounts, and it doesn't ask for a name or email. It has no analytics.
+The app stores what the user enters: tasks, descriptions, deadlines, steps, notes and drafts, planned work, focus sessions, reported obstacles, and each task's history. It has no accounts, and it doesn't ask for a name or email. It has no analytics.
 
-The content can still be sensitive, because people may describe their work, health, or finances. The intake screen reminds Live AI users to avoid sensitive personal details.
+This content can be sensitive, because people may describe their work, health, or finances. Tasks and drafts may also include other people's names.
 
 ## Data storage
 
-- The session is stored in the browser's `localStorage`, under `backontrack.session.v1`.
-- There is no application database, and the app doesn't save sessions on the server.
-- The data stays until the user deletes it or clears the browser's data.
+- Everything is stored in the browser's `localStorage`, under `backontrack.workspace.v1`. The guided check-in also uses `backontrack.session.v1`.
+- There is no application database, and the app doesn't save this data on a server.
+- The data stays until the user deletes it or clears the browser's data, and it isn't backed up.
 - It isn't encrypted, so anyone using the same browser profile could read it. Use a private window on a shared computer.
+- API keys are never stored in the browser.
 
 ## API data transmission
 
 | Mode | Where the text goes |
 | --- | --- |
 | Demo Mode | Nowhere. It runs in the browser. |
-| Live AI | Browser → this app's server (`/api/recovery`) → the AI provider |
+| Live AI | Browser → this app's server (`/api/recovery`) → the AI provider, only when the user asks for a suggestion |
+| Tasks, focus, and calendar | Nowhere, in any mode |
+
+When someone asks for a recovery plan in Live AI mode, the selected task's details are sent: its title, description, deadline, status, progress, recent history, focus sessions, and reported obstacles. Other tasks aren't sent. The screen says this before they ask.
 
 On the server:
 
@@ -47,7 +51,10 @@ On the server:
 
 ## Ethical safeguards built in
 
-- High-stakes guard: RELEASE isn't recommended for detected legal, financial, medical, or academic obligations, and choosing it requires an explicit acknowledgement.
+- High-stakes guard: RELEASE isn't recommended for detected legal, financial, medical, or academic obligations, and choosing it requires an explicit acknowledgement. This also applies when changing a task's status by hand.
+- Deadlines never change as a side effect of planning, because someone else may control them.
+- Drafts are never sent by the app.
+- The interface avoids alarm words and shame. A passed deadline reads "Deadline was Tue, Nov 3".
 - The AI recommends, and the user decides. Overrides are recorded honestly.
 - The system prompt prohibits diagnoses, shaming, and invented facts.
 - Demo content is labeled as prewritten, and AI failure isn't hidden by substituting it.
@@ -55,8 +62,10 @@ On the server:
 
 ## User control and deletion
 
-- "Delete my data" in the header removes the saved session from the browser immediately. So does "Start over and delete this session" on the summary screen.
-- The user can copy or download the summary.
+- Settings has "Export my data", which downloads everything as JSON, and "Delete all my data", which removes it from the browser after a confirmation.
+- Each task can be deleted separately.
+- AI suggestions change nothing until accepted, and each part can be left out or edited first.
+- In the guided check-in, the user can also copy or download a summary.
 - Data already sent to an AI provider in Live AI mode can't be deleted from within this app. It is governed by the provider's retention policy.
 
 ## Privacy-policy and terms-of-use considerations

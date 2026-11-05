@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 114 of 114 |
+| Automated tests (`npm test`) | Pass, 226 of 226 |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
@@ -24,6 +24,68 @@ No real AI model has been called. The following were verified instead:
 - A manual test ran the production build with the real Anthropic SDK client over HTTP, against a throwaway local server returning canned answers.
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
+
+## Functional recovery workspace
+
+These tests were run on 2026-11-05 on the `feat/recovery-workspace` branch. "Automated" means the Vitest suites in `tests/`. "Browser" means a production build run locally in Chromium with no API key. No real AI model was involved, so these results don't show the quality of real AI suggestions.
+
+### Definition of Done
+
+`tests/recovery-workspace.test.tsx` runs these steps as one continuous test in Demo Mode:
+
+| Step | Actual observed behavior | Pass/Fail |
+| --- | --- | --- |
+| 1. Add a real task | Added with quick add. | Pass |
+| 2. See it in the workspace | Appeared as the one next thing. | Pass |
+| 3. View or modify its deadline | Changed in the task, and saved. | Pass |
+| 4. Start a focus session for it | Timer started, and the task moved to In Progress. | Pass |
+| 5. Pause and resume work | Pause stopped the clock, and Resume restarted it. | Pass |
+| 6. Mark progress | Set to 40%, and recorded in the history. | Pass |
+| 7. Request a recovery plan after getting stuck | A plan appeared, with no change to the task yet. | Pass |
+| 8. Accept or reject suggestions | Accepting applied the edited draft, steps, next action, and sessions. Other tests cover partial acceptance and declining. | Pass |
+| 9. View updated task and session history | Showed the session, the obstacle, and the accepted plan with its source. | Pass |
+| 10. Return later and continue | After a remount, the progress and draft were still there. | Pass |
+
+### Features
+
+| Scenario | Input | Expected behavior | Actual observed behavior | Pass/Fail | Fixes or iterations |
+| --- | --- | --- | --- | --- | --- |
+| Task management (automated) | Create, edit, pause, resume, complete, delete | All work with no AI | All worked. Demo Mode made no POST requests in the end-to-end test. | Pass | None |
+| Six task states (automated) | Move through each state | All supported | All supported, with history entries. | Pass | None |
+| Kanban by keyboard (browser) | Space, 10 × Right arrow, Space | Card moves and is announced | Moved to In Progress. "Moved Apply for two jobs to In Progress." was announced. | Pass | None |
+| Kanban by pointer (browser) | Simulated multi-step pointer drag | Card moves | Moved to Paused. A single-jump tool drag didn't register, and a person dragging by hand wasn't tested. | Pass, simulated | See note |
+| Short home lists (automated) | 6 stuck tasks | Shows 3, with Show more | Showed 3, and expanded to 5 besides the recommended task. | Pass | None |
+| Wall-clock timer (browser) | Real 8-second wait | Clock matches real time | The clock dropped 8 seconds in 8 real seconds. | Pass | None |
+| Throttled background tab (automated) | Clock jumps 7 minutes with no ticks | Shows the right time | 10:00 became 03:00. | Pass | None |
+| Reload during a session (automated) | Remount after 10 of 25 minutes | Resumes correctly | Showed 15:00. | Pass | None |
+| Timer ends while closed (automated) | Reopen an hour later | Session saved with its real end time | Saved as completed, ending 5 minutes after it started. | Pass | None |
+| Finishing doesn't complete the task (automated) | Timer reaches zero | Task stays open | Stayed In Progress. | Pass | None |
+| Stopping early (automated and browser) | Stop | Continue later or I got stuck | Both offered. Getting stuck recorded the note, set Needs Recovery, and opened Recovery. | Pass | None |
+| Calendar rendering (browser) | Real FullCalendar | Month and week; distinct items | Rendered. Deadlines and planned work looked clearly different. | Pass | Stray dot removed from timed items |
+| Moving planned work (browser) | Real drag to Nov 18 | Moves; deadline unchanged | Moved, and the deadline stayed Nov 12. | Pass | None |
+| Moving a deadline (browser) | Real drag to Nov 14 | Snaps back and asks | Stayed on Nov 12, and asked for a decision. | Pass | None |
+| Replan (automated) | Pick a day | Plans work; keeps the deadline unless asked | Deadline unchanged, unless the box was ticked. The original deadline was kept either way. | Pass | None |
+| Calendar actions (automated, with a mock calendar) | Create on a date; schedule; open a task | All work with no AI | All worked. FullCalendar's callbacks were called directly, because it needs real layout. | Pass | None |
+| Homework plan (automated and Demo Mode) | "I have avoided my homework" | Tangible worksheet, not advice | Gave a worksheet with the task's title and "Parts to finish". | Pass | The complaint behind this work |
+| Missed deadline plan (automated and browser) | Biology task with a passed deadline | Editable message; no invented policy | Gave a draft with [Professor's name], asking whether late work is accepted. The policy was listed as unknown. | Pass | None |
+| Stopped session (automated and browser) | Stuck focus session, with a note | Shorter or different; uses the report | Gave a smaller step, which said the session stopped early and quoted the note. | Pass | Quote added after the browser check |
+| Plan B (automated) | "Still stuck" on six kinds of task | Never repeats; says when out of ideas | No repeats. Each ended by saying no more suggestions were available. | Pass | Fixed: it reported this one template too early |
+| Preview (automated) | Accept part; decline | Only chosen parts apply; declining changes nothing else | As expected. Declining only added a history entry and remembered the plan to avoid. | Pass | None |
+| Live checks (mock model) | Vague advice; repeats; RELEASE on a high-stakes task; past dates | Rejected, retried, or removed | All handled. A persistent problem fell back to a template, labeled as not AI. | Pass | None |
+| Live path (real SDK, local fake server) | One request | Task data sent; vague plan rejected | Task data reached the server. A vague first answer was retried, and a past-dated session was removed. | Pass, wiring only | None |
+| AI unavailable (automated) | Server returns 502 | Safe error; no changes; Demo Mode offered | As expected. | Pass | None |
+| Migration (automated) | Old guided session; damaged data | Becomes a task; no crash | Old session became one task, only once, with finished steps kept. Damaged items were dropped individually. | Pass | None |
+| Export and delete (automated) | Press both | File created; data removed | Export created a file, with browser APIs stubbed. Delete removed the data. | Pass | Not tried as a real file download |
+| Accessibility scan (automated, axe-core) | Each view, the board, a running timer, and a plan preview | No violations | None, after one fix. Color contrast can't be checked this way. | Pass | Nested `main` fixed |
+| Phone width (browser, 375 px emulation) | All 9 views | No sideways scrolling | No overflow, and no console errors. Most targets were at least 32 px; the complete button was 28 px, and was enlarged to 44 px. | Pass | Complete button enlarged |
+
+### Not tested for the workspace
+
+- The real AI model, including the quality, cost, and speed of recovery plans. `npm run test:live` now includes three recovery scenarios for this.
+- Whether this helps real users. No user testing has been done.
+- Real phones, Safari, Firefox, and screen readers.
+- A person dragging by hand, on a mouse or a touch screen.
+- The deployed version of this branch.
 
 ## Low-friction intake
 
@@ -45,7 +107,7 @@ These tests were run on 2026-11-05 on the `feat/low-friction-intake` branch. "Au
 | Keyboard (browser) | Tab, arrow keys, Space, digits | Everything works without a mouse | Tab reached the groups with nothing selected. Space selected, arrow keys moved, and typing filled the date and text fields. | Pass | Space didn't clear a selected option at first, although the automated test passed. Fixed and rechecked in the browser. |
 | Delete my data on the intake screen (automated) | Saved text, then delete | Form is emptied | Text and selections were cleared, and the section collapsed. | Pass | Old text stayed visible before this fix |
 
-The live public site runs the previous intake until this branch is merged into `main`. The results under "Public deployment" below describe that earlier version, including the old heading and validation wording.
+The live public site runs the earlier wizard until these branches are merged into `main`. The results under "Public deployment" below describe that earlier version, including the old heading and validation wording.
 
 ## Public deployment
 
