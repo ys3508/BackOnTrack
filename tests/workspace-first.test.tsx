@@ -953,3 +953,31 @@ describe("what the browser check found", () => {
     expect(after.timer?.subtaskId).toBe("n1")
   })
 })
+
+describe("repeated stuck, after accepting code", () => {
+  it("doesn't add smaller steps twice, or suggest a sentence after a line of code", () => {
+    const state = workspaceReducer(withSteps(), {
+      type: "save-work-doc",
+      id: "a",
+      at: AT,
+      content: "<pre><code>print(data.columns)</code></pre>",
+      cursor: 1,
+    })
+    const first = demoTaskRecovery(
+      buildRecoveryRequest(state.tasks[0], state, TODAY, { rejected: [] })
+    ).plan
+    expect(first.steps).toEqual([])
+    expect(first.schedule[0].label).toBeTruthy()
+    const second = demoTaskRecovery(
+      buildRecoveryRequest(state.tasks[0], state, TODAY, {
+        rejected: [
+          {
+            nextStep: first.nextStep.instruction,
+            artifactTitle: first.artifact.title,
+          },
+        ],
+      })
+    ).plan
+    expect(second.nextStep.instruction).not.toContain("print(data.columns)")
+  })
+})

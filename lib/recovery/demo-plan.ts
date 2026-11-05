@@ -86,7 +86,8 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
         kind: concrete.starter.kind === "code" ? "code" : "checklist",
         artifactTitle: concrete.starter.title,
         body: concrete.starter.content,
-        steps: concrete.smallerSteps.slice(0, 3),
+        // Its steps replace the current one, so they aren't also added at the end.
+        steps: [],
         smallerSteps: concrete.smallerSteps,
       })
     }
@@ -118,7 +119,11 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
   }
 
   const lastLine = task.document.trim().split("\n").filter(Boolean).at(-1)
-  if (lastLine) {
+  // "One more sentence" makes no sense after a line of code.
+  const looksLikeCode = /[=(){};]|^\s*(import|from|def|class)\b/.test(
+    lastLine ?? ""
+  )
+  if (lastLine && !looksLikeCode) {
     const quote =
       lastLine.length > 90 ? `${lastLine.slice(0, 87)}...` : lastLine
     list.push({
@@ -544,7 +549,11 @@ export function demoTaskRecovery(
       smallerSteps: template.smallerSteps ?? [],
       choices: template.choices ?? [],
       schedule: [
-        { date: today, minutes: 10, label: template.steps[0] },
+        {
+          date: today,
+          minutes: 10,
+          label: template.steps[0] ?? template.instruction,
+        },
         ...(strategy === "RELEASE"
           ? []
           : [
