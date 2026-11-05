@@ -10,6 +10,7 @@ import {
   useState,
 } from "react"
 
+import { isTimerFinished } from "@/lib/focus/timer"
 import { fetchLiveStatus } from "@/lib/recovery-client"
 import type { Source } from "@/lib/session"
 import { localToday } from "@/lib/workspace/dates"
@@ -26,12 +27,14 @@ export type Route =
   | { view: "workspace" }
   | { view: "tasks" }
   | { view: "task"; id: string }
+  | { view: "focus"; taskId?: string }
   | { view: "guided" }
   | { view: "settings" }
 
 export function parseHash(hash: string): Route {
   const [view, id] = hash.replace(/^#\/?/, "").split("/")
   if (view === "tasks" && id) return { view: "task", id }
+  if (view === "focus") return { view: "focus", taskId: id }
   if (view === "tasks" || view === "guided" || view === "settings") {
     return { view }
   }
@@ -41,6 +44,9 @@ export function parseHash(hash: string): Route {
 export function routeHash(route: Route) {
   if (route.view === "task") return `#/tasks/${route.id}`
   if (route.view === "workspace") return "#/"
+  if (route.view === "focus") {
+    return route.taskId ? `#/focus/${route.taskId}` : "#/focus"
+  }
   return `#/${route.view}`
 }
 
@@ -91,6 +97,25 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     saveWorkspace(state)
+  }, [state])
+
+  useEffect(() => {
+    // Finishes the timer from the wall clock, including after a reload or when
+    // a background tab wakes up, however long the browser throttled it.
+    const { timer } = state
+    if (!timer || timer.runningSince === null) return
+    const check = () => {
+      if (isTimerFinished(timer, Date.now())) {
+        dispatch({ type: "timer-finish", now: Date.now() })
+      }
+    }
+    check()
+    const id = window.setInterval(check, 1000)
+    document.addEventListener("visibilitychange", check)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener("visibilitychange", check)
+    }
   }, [state])
 
   useEffect(() => {

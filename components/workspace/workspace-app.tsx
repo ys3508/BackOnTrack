@@ -1,8 +1,10 @@
 "use client"
 
-import { Settings as SettingsIcon } from "lucide-react"
+import { useEffect } from "react"
+import { Settings as SettingsIcon, Timer } from "lucide-react"
 
 import { RecoveryApp } from "@/components/recovery-app"
+import { FocusView, useNow } from "@/components/workspace/focus-view"
 import { SettingsView } from "@/components/workspace/settings-view"
 import {
   WorkspaceProvider,
@@ -14,6 +16,7 @@ import type { Route } from "@/components/workspace/store"
 import { TaskDetail } from "@/components/workspace/task-detail"
 import { TasksView } from "@/components/workspace/tasks-view"
 import { WorkspaceView } from "@/components/workspace/workspace-view"
+import { formatClock, remainingSeconds } from "@/lib/focus/timer"
 import type { Session, Source } from "@/lib/session"
 import { taskFromSession } from "@/lib/workspace/storage"
 import { cn } from "@/lib/utils"
@@ -33,6 +36,7 @@ const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
     match: ["workspace", "guided"],
   },
   { label: "Tasks", route: { view: "tasks" }, match: ["tasks", "task"] },
+  { label: "Focus", route: { view: "focus" }, match: ["focus"] },
 ]
 
 function Shell() {
@@ -53,6 +57,7 @@ function Shell() {
             <span className="font-heading text-xl">BackOnTrack</span>
           </button>
           <div className="flex items-center gap-1.5">
+            <TimerPill />
             <ModeSwitch
               mode={mode}
               liveAvailable={liveAvailable}
@@ -105,6 +110,7 @@ function Shell() {
           {route.view === "workspace" && <WorkspaceView />}
           {route.view === "tasks" && <TasksView />}
           {route.view === "task" && <TaskDetail id={route.id} />}
+          {route.view === "focus" && <FocusView />}
           {route.view === "settings" && <SettingsView />}
           {route.view === "guided" && <GuidedView />}
         </div>
@@ -115,6 +121,32 @@ function Shell() {
         legal, or financial advice.
       </footer>
     </div>
+  )
+}
+
+/** Keeps the running timer one click away from every view. */
+function TimerPill() {
+  const { state, route, navigate } = useStore()
+  const { timer } = state
+  const now = useNow(Boolean(timer))
+  const remaining = timer ? remainingSeconds(timer, now) : 0
+  const clock = formatClock(remaining)
+
+  useEffect(() => {
+    document.title = timer ? `${clock} · BackOnTrack` : "BackOnTrack AI"
+  }, [timer, clock])
+
+  if (!timer || route.view === "focus") return null
+  return (
+    <button
+      type="button"
+      aria-label={`Open focus timer, ${clock} remaining`}
+      onClick={() => navigate({ view: "focus" })}
+      className="flex min-h-10 items-center gap-1.5 rounded-lg bg-sage-soft px-2.5 text-sm font-medium text-sage tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+    >
+      <Timer className="size-4" aria-hidden />
+      {clock}
+    </button>
   )
 }
 

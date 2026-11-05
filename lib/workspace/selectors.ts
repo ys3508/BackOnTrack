@@ -92,7 +92,7 @@ export function recentActions(state: Workspace, limit = 5) {
   for (const task of state.tasks) {
     for (const event of task.history) {
       const finished =
-        (event.type === "focus" && event.text.startsWith("Focus session")) ||
+        event.text.startsWith("Focus session completed") ||
         COMPLETED_PREFIXES.some((prefix) => event.text.startsWith(prefix))
       if (finished) items.push({ task, event })
     }

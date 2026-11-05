@@ -1,12 +1,15 @@
+import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
 import { shortDate } from "@/lib/workspace/dates"
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
 import type {
+  FocusSession,
   PlannedSession,
   Priority,
   Settings,
   Task,
   TaskEvent,
   TaskStatus,
+  TimerState,
   Workspace,
 } from "@/lib/workspace/schemas"
 
@@ -71,6 +74,28 @@ export type WorkspaceAction =
     }
   | { type: "remove-planned"; at: string; id: string }
   | { type: "toggle-planned"; id: string }
+  | {
+      type: "timer-start"
+      id: string
+      kind: TimerState["kind"]
+      taskId: string | null
+      minutes: number
+      now: number
+      at: string
+    }
+  | { type: "timer-pause"; now: number }
+  | { type: "timer-resume"; now: number }
+  | { type: "timer-reset" }
+  | { type: "timer-cancel" }
+  | { type: "timer-finish"; now: number }
+  | {
+      type: "timer-stop"
+      now: number
+      at: string
+      outcome: "continue-later" | "stuck"
+      note: string
+    }
+  | { type: "timer-acknowledge" }
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "skip-recommendation"; taskId: string; date: string }
   | { type: "replace"; state: Workspace }
@@ -398,6 +423,94 @@ export function workspaceReducer(
         ),
       }
 
+    case "timer-start": {
+      if (state.timer) return state
+      const timer: TimerState = {
+        id: action.id,
+        kind: action.kind,
+        taskId: action.taskId,
+        plannedSeconds: action.minutes * 60,
+        startedAt: action.at,
+        runningSince: action.now,
+        accumulatedMs: 0,
+      }
+      const next = { ...state, timer, finishedSessionId: null }
+      if (action.kind !== "focus" || !action.taskId) return next
+      return mapTask(next, action.taskId, (task) =>
+        task.status === "not-started" ||
+        task.status === "paused" ||
+        task.status === "needs-recovery"
+          ? setTaskStatus(task, "in-progress", action.at)
+          : task
+      )
+    }
+
+    case "timer-pause": {
+      const { timer } = state
+      if (!timer || timer.runningSince === null) return state
+      return {
+        ...state,
+        timer: {
+          ...timer,
+          accumulatedMs: elapsedMs(timer, action.now),
+          runningSince: null,
+        },
+      }
+    }
+
+    case "timer-resume": {
+      const { timer } = state
+      if (!timer || timer.runningSince !== null) return state
+      return { ...state, timer: { ...timer, runningSince: action.now } }
+    }
+
+    case "timer-reset": {
+      const { timer } = state
+      if (!timer) return state
+      return {
+        ...state,
+        timer: { ...timer, accumulatedMs: 0, runningSince: null },
+      }
+    }
+
+    case "timer-cancel":
+      return { ...state, timer: null }
+
+    case "timer-finish": {
+      const { timer } = state
+      if (!timer) return state
+      if (timer.kind === "break") return { ...state, timer: null }
+      const endedAt = new Date(finishTime(timer, action.now)).toISOString()
+      return recordSession(state, timer, {
+        actualSeconds: timer.plannedSeconds,
+        endedAt,
+        outcome: "completed",
+        note: "",
+      })
+    }
+
+    case "timer-stop": {
+      const { timer } = state
+      if (!timer) return state
+      const actualSeconds = Math.floor(elapsedMs(timer, action.now) / 1000)
+      let next = recordSession(state, timer, {
+        actualSeconds,
+        endedAt: action.at,
+        outcome: action.outcome,
+        note: action.note,
+      })
+      next = { ...next, finishedSessionId: null }
+      if (action.outcome === "stuck" && timer.taskId) {
+        next = mapTask(next, timer.taskId, (task) =>
+          setTaskStatus(task, "needs-recovery", action.at)
+        )
+      }
+      return next
+    }
+
+    case "timer-acknowledge":
+      return { ...state, finishedSessionId: null }
+
     case "settings":
       return { ...state, settings: { ...state.settings, ...action.patch } }
 
@@ -416,6 +529,42 @@ export function workspaceReducer(
     case "replace":
       return action.state
   }
+}
+
+function recordSession(
+  state: Workspace,
+  timer: TimerState,
+  result: Pick<FocusSession, "actualSeconds" | "endedAt" | "outcome" | "note">
+): Workspace {
+  const task = state.tasks.find((item) => item.id === timer.taskId)
+  const session: FocusSession = {
+    id: timer.id,
+    taskId: timer.taskId,
+    taskTitle: task?.title ?? "no specific task",
+    plannedMinutes: timer.plannedSeconds / 60,
+    startedAt: timer.startedAt,
+    ...result,
+  }
+  const length = formatMinutes(result.actualSeconds)
+  const text =
+    result.outcome === "completed"
+      ? `Focus session completed (${length})`
+      : result.outcome === "stuck"
+        ? `Stopped focus after ${length}: got stuck`
+        : `Stopped focus after ${length}: will continue later`
+  const next: Workspace = {
+    ...state,
+    timer: null,
+    focusSessions: [...state.focusSessions, session],
+    finishedSessionId: session.id,
+  }
+  if (!task) return next
+  return mapTask(next, task.id, (item) => {
+    const logged = withEvent(item, result.endedAt, "focus", text)
+    return result.note
+      ? withEvent(logged, result.endedAt, "obstacle", result.note)
+      : logged
+  })
 }
 
 function toggleSubtask(task: Task, subId: string, at: string): Task {

@@ -8,6 +8,7 @@ import {
   Pause,
   Play,
   Plus,
+  Timer,
   Trash2,
   X,
 } from "lucide-react"
@@ -16,6 +17,11 @@ import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  FOCUS_OPTIONS,
+  SessionList,
+  useStartFocus,
+} from "@/components/workspace/focus-view"
 import {
   ConfirmDialog,
   ProgressBar,
@@ -129,10 +135,12 @@ function TaskBody({ task }: { task: Task }) {
       </div>
 
       <NextActionCard task={task} />
+      {isActive(task) && <FocusCard task={task} />}
       <ProgressCard task={task} />
       <DetailsCard task={task} onStatus={setStatus} />
       <StepsCard task={task} />
       <DocumentsCard task={task} />
+      <FocusHistoryCard task={task} />
       <HistoryCard task={task} />
 
       <Button
@@ -219,6 +227,59 @@ function NextActionCard({ task }: { task: Task }) {
           Done with this action
         </Button>
       )}
+    </Card>
+  )
+}
+
+function FocusCard({ task }: { task: Task }) {
+  const { state, navigate } = useStore()
+  const start = useStartFocus()
+  const running = state.timer?.taskId === task.id
+  return (
+    <Card>
+      <SectionTitle>Focus on this</SectionTitle>
+      {running ? (
+        <Button
+          type="button"
+          size="xl"
+          className="mt-2"
+          onClick={() => navigate({ view: "focus" })}
+        >
+          <Timer aria-hidden />
+          Open the running timer
+        </Button>
+      ) : (
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {FOCUS_OPTIONS.map((option, index) => (
+            <Button
+              key={option.minutes}
+              type="button"
+              size="xl"
+              variant={index === 0 ? "default" : "outline"}
+              className="h-auto min-h-12 py-2 whitespace-normal"
+              onClick={() => start(task.id, option.minutes)}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function FocusHistoryCard({ task }: { task: Task }) {
+  const { state } = useStore()
+  const sessions = state.focusSessions.filter(
+    (session) => session.taskId === task.id
+  )
+  if (!sessions.length) return null
+  return (
+    <Card>
+      <SectionTitle>Focus sessions</SectionTitle>
+      <div className="mt-2">
+        <SessionList sessions={sessions} />
+      </div>
     </Card>
   )
 }

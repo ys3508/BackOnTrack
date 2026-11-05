@@ -1,9 +1,10 @@
 "use client"
 
-import { Check, ChevronRight, Shuffle } from "lucide-react"
+import { Check, ChevronRight, Play, Shuffle, Timer } from "lucide-react"
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
+import { useStartFocus } from "@/components/workspace/focus-view"
 import {
   DeadlineChip,
   ExpandableList,
@@ -55,6 +56,8 @@ export function TaskRow({
 
 export function WorkspaceView() {
   const { state, today, navigate, dispatch } = useStore()
+  const startFocus = useStartFocus()
+  const defaultMinutes = state.settings.defaultFocusMinutes
   const limit = state.settings.homeListSize
   const recommended = recommendTask(state, today)
   const attention = tasksNeedingAttention(state, today, recommended?.id)
@@ -98,6 +101,15 @@ export function WorkspaceView() {
             <Button
               type="button"
               size="xl"
+              onClick={() => startFocus(recommended.id, defaultMinutes)}
+            >
+              <Play aria-hidden />
+              Start {defaultMinutes} minutes
+            </Button>
+            <Button
+              type="button"
+              size="xl"
+              variant="outline"
               onClick={() =>
                 dispatch({
                   type: "complete-next-action",
@@ -133,6 +145,17 @@ export function WorkspaceView() {
           Quick add
         </h2>
         <QuickAdd />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="xl"
+            variant="outline"
+            onClick={() => navigate({ view: "focus" })}
+          >
+            <Timer aria-hidden />
+            Start Focus
+          </Button>
+        </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
