@@ -56,6 +56,14 @@ The template fits the selection criteria: it is MIT licensed, has a working AI S
 - The Demo Mode helper was renamed after noticing that the `use` prefix would be mistaken for a React hook.
 - On a phone-width screen, the header wrapped to two lines. Button padding was reduced so that it fits on one, and the mode switch's tap targets were enlarged.
 
+## Deployment
+
+The prototype was deployed on 2026-11-05 at https://backontrack-peach.vercel.app, in Demo Mode with no API key.
+
+- **Push to GitHub:** HTTPS pushes had no stored login, so the branch was pushed over SSH using a key already on the development computer. No force push was used.
+- **First deployment:** this was made with the Vercel CLI after the student signed in, because `main` didn't contain the app yet. Vercel rejected the folder name for having capital letters, so the project was named `backontrack`.
+- **Updating `main`:** the CLI also connected the GitHub repository to the project. Once `main` was fast-forwarded to commit `c657c09`, Vercel redeployed automatically. Commits on `main` now redeploy the site.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).
@@ -64,7 +72,8 @@ See [TEST_RESULTS.md](TEST_RESULTS.md).
 
 - **The real AI model has not been tested.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.
 - The Vercel AI Gateway option has not been exercised at all, and its default model ID is unconfirmed.
-- The app has not been deployed to Vercel.
+- The public deployment runs in Demo Mode only. Live AI has not been run on it.
+- Copy and Download have not been confirmed on the public site in a normal browser.
 - The repeat check compares wording and approach labels. A model could still label a similar step differently and pass.
 - Keyword-based high-stakes and crisis detection will have false positives and false negatives. For example, it recognizes "exam" and "bill", but not every phrasing.
 - Rate limits are stored in memory per server instance and reset on restart.

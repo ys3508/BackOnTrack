@@ -6,6 +6,10 @@ BackOnTrack AI is a failure-aware recovery assistant. Most productivity tools re
 
 It was built as a prototype for the AI Lab in AIML-500: Machine Learning Fundamentals at Indiana Wesleyan University. It is not a commercial product.
 
+**Try it:** https://backontrack-peach.vercel.app
+
+The public site runs in Demo Mode, so its responses are prewritten and not AI-generated. No account or API key is needed.
+
 ## How it works
 
 | Stage | What happens |
@@ -94,6 +98,8 @@ Results are in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 
 ## Deploy on Vercel
 
+The prototype is already deployed at https://backontrack-peach.vercel.app, and new commits on `main` redeploy it automatically. To create your own deployment:
+
 1. Import `ys3508/BackOnTrack` at https://vercel.com/new. Vercel detects Next.js, so the defaults work.
 2. Optionally, add `ANTHROPIC_API_KEY` under Settings → Environment Variables. Without it, the deployed app runs in Demo Mode.
 3. Deploy. If you add a key later, redeploy so that it takes effect.
@@ -116,7 +122,7 @@ This repository does not yet have its own license for the original BackOnTrack c
 
 ## Known limitations
 
-- See [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md) for whether live-model testing has been completed.
+- The real AI model has not been tested, and the public site doesn't use it. See [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 - Demo Mode has fixed content and cannot respond to the specifics of what someone types.
 - The repeat check compares wording and approach labels. It reduces repetition, but it cannot prove that two steps are meaningfully different.
 - Safety and high-stakes checks combine keyword matching with the model's judgment, so they can miss cases or flag them wrongly.

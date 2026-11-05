@@ -13,7 +13,8 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
-| Deployment to Vercel | Not run |
+| Deployment to Vercel, in Demo Mode | Pass, publicly reachable at https://backontrack-peach.vercel.app |
+| Workflow on the public URL | Pass, except that Copy and Download are unconfirmed there |
 
 ## What "live" testing does and doesn't show
 
@@ -24,9 +25,27 @@ No real AI model has been called. The following were verified instead:
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
 
+## Public deployment
+
+These tests were run on 2026-11-05 at https://backontrack-peach.vercel.app, with scripted clicks in a browser and with no API key configured. The full set ran on the first deployment, of commit `c657c09`. After `main` was updated to the same commit, Vercel redeployed it and the job application path and basic access checks were run again.
+
+| Scenario | Input | Expected behavior | Actual observed behavior | Pass/Fail | Fixes or iterations |
+| --- | --- | --- | --- | --- | --- |
+| Public access | Logged-out request to the site | Opens with no sign-in | Returned 200 with the app's page, and no Vercel sign-in page. | Pass | Vercel rejected the folder name, so the project was named `backontrack` |
+| Mode | Open the site | Demo Mode labeled; Live AI unavailable | Demo was selected, Live AI was disabled, and the status endpoint reported `live: false`. | Pass | None |
+| Invalid input | Empty text | Inline error | "Please describe it in at least a few words." | Pass | None |
+| Test A | Job application sample | All screens; different Plan B and Plan C; change works; accurate summary | All four Reality Check sections appeared, Reduce was suggested, and one step was shown with all three buttons. Plan B, Plan C, and the changed step all differed. The pending step wasn't listed as completed. | Pass | None |
+| Test B | Missed assignment sample | Unknown policy; caution; override needs acknowledgement | Policy was listed as unknown and a caution appeared. Release stayed blocked until acknowledged, and the summary recorded it as the user's choice. | Pass | None |
+| Test C | Failed attempt sample | No repeats; no pressure to continue | Six different steps appeared across repeated "stuck" presses, then the app offered the summary. | Pass | None |
+| Persistence and deletion | Reload; delete | Restored; then removed | Session survived a reload. Deleting returned to intake and removed the saved text. | Pass | None |
+| Demo privacy | Network log during the workflow | No text sent to the server | Only GET status requests to `/api/recovery` appeared, with no POST. No console errors. | Pass | None |
+| Phone width | Intake at 375 px | No sideways scrolling | No horizontal overflow on the intake screen. | Pass | Other screens were checked at this width on a local build only |
+| Copy summary | Scripted click and real click | Summary copied | **Unconfirmed.** The test browser denies clipboard access, so the app showed its "blocked" message and suggested Download. | Not confirmed | Needs a check in a normal browser |
+| Download | Not clicked on the public site | File downloaded | **Not run** on the public site. It has only passed an automated test with simulated browser functions. | Not run | Needs a check in a normal browser |
+
 ## Required scenarios in Demo Mode
 
-These results come from automated tests (`tests/demo.test.ts`, `tests/workflow.test.tsx`). Tests A and B were also checked in the browser. Demo responses are prewritten, so these results validate the workflow and content, not AI behavior.
+These results come from automated tests (`tests/demo.test.ts`, `tests/workflow.test.tsx`). All three scenarios were also checked on the public site, as listed above. Demo responses are prewritten, so these results validate the workflow and content, not AI behavior.
 
 | Scenario | Input | Expected behavior | Actual observed behavior | Pass/Fail | Fixes or iterations |
 | --- | --- | --- | --- | --- | --- |
@@ -72,7 +91,7 @@ These results come from automated tests (`tests/demo.test.ts`, `tests/workflow.t
 
 - The real AI model, including answer quality, cost, and speed.
 - The Vercel AI Gateway option.
-- A real Vercel deployment.
+- Live AI on the public deployment, which has no API key.
 - Real users.
 - Screen readers, and browsers other than the one built into the development tool.
 
