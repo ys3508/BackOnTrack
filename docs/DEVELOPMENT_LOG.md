@@ -123,6 +123,49 @@ Phases 3 and 4 share a commit, because the calendar was finished while its brows
 - The guided check-in nested one `main` landmark inside another, which the axe scan found.
 - The complete button in the task list was 28 px tall, and now has a 44 px target.
 
+## AI-assisted task execution (version 3)
+
+The `feat/task-execution` branch started from `main` at `4d58986`.
+
+### Repositories reviewed on 2026-11-05
+
+| Repository | License | Decision |
+| --- | --- | --- |
+| `ueberdosis/tiptap` | MIT | Used directly, through its core packages. |
+| `hunghg255/reactjs-tiptap-editor` | MIT | Not used. It brings its own UI, which wouldn't match the existing design. |
+| `kcsujeet/ilamy-calendar` | MIT | Not used. The brief said not to rebuild the calendar. |
+| `Georgegriff/react-dnd-kit-tailwind-shadcn-ui` | MIT | Already reviewed for version 2. No change. |
+| `mozilla/pdf.js` | Apache-2.0 | Used, through `pdfjs-dist`, for reading PDF text in the browser. |
+
+### Phases
+
+| Phase | Commit | What was added | Tests when committed |
+| --- | --- | --- | --- |
+| 1. Breakdown and subtasks | `7f52194` | Data version 2 with a backup, editable breakdowns, real steps, and "Your next small step" | 248 passed |
+| 2. Working editor | `e486af5` | Tiptap document, autosave, export, two-panel layout, backup import, and storage warnings | 260 passed |
+| 3. Intake and AI help | `60f67e4` | Paste and file intake, PDF extraction, consent before sending, and six writing actions | 293 passed |
+| 4. History and recovery | `9e50c9e` | History kinds, recovery attempts, and plans based on real progress | 306 passed |
+| 5. Focus and documentation | Later commits on the branch | Timer in the task, progress check-in, demo examples, and tests | 315 passed |
+
+### Decisions
+
+- **One document per task, saved as HTML in the existing workspace data.** It's simple and exportable. Saves write straight to storage, because a closing page won't wait for React.
+- **Local PDF extraction.** Files stay in the browser, so nothing needs uploading or storing on a server.
+- **Suggestions are preview-only until accepted.** Accepted text carries a mark, the version before it is kept, and the previous saved data format is backed up before migrating.
+- **Consent per task.** The first Live AI request that includes instructions or a document asks first, and changing the instructions asks again.
+- **Progress summaries come from recorded data, not AI.** A model isn't needed to count finished steps, and this way it can't overstate them.
+
+### Problems found by testing
+
+- PDF cleanup called a method on the wrong object, which would have broken every PDF upload. A test with a real PDF caught this.
+- "Replace selected text" split the paragraph in two. It now stays inline when replacing within a sentence.
+- A reload just after typing could lose the last edit, because saving went through React. Saves are now synchronous.
+- Space didn't apply here, but a duplicate "Pause" label did: the task and the timer had the same name, so the timer's is now "Pause timer".
+- The text rules glued a whole list into one long step, and joined a heading to the next sentence. They now work line by line.
+- Stuck-specific plans were being skipped by a rule that started later in the list. Plans tailored to the task now come first.
+- Icons squeezed the step text, so they moved behind an "Edit steps" toggle.
+- Demo text read badly, such as "This section is about Write the introduction", and was reworded.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

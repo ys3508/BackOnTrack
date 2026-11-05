@@ -4,9 +4,40 @@ This document follows the five stages: Empathy → Define → Ideate → Prototy
 
 > **Note on evidence.** No interviews or user studies were carried out while this prototype was built, and none are claimed here. The Empathy and Define sections restate the project brief as working assumptions. **Student to complete:** add your own preliminary research, prompt experiments, and sources in the marked section below.
 
+## How the product evolved
+
+| Version | What it was | Limitation that led to the next version |
+| --- | --- | --- |
+| 1. AI Recovery Assistant | A five-step guided workflow: Reality Check, a decision, one step at a time, and a summary | It advised people, but left them with nothing to act on or return to. |
+| 2. Productivity workspace | Persistent tasks, calendar, focus timer, and recovery plans | It could organize work, but the work itself still happened elsewhere. Suggestions stayed abstract. |
+| 3. AI-assisted task execution | Each task has instructions, editable steps, a working document, writing help, adaptive recovery, and honest progress history | Not yet tested with real users or a real AI model. |
+
+### Where the evidence comes from
+
+| Kind | What's here |
+| --- | --- |
+| **Actual user feedback** | None from other people has been recorded. **Student to complete:** add any test sessions or feedback you've collected. |
+| **Developer observations** | The project's author reported that "I haven't finished my homework for a long time" produced "Write the part of this that matters most, in a single line", which leaves the person to work out what to do. They also observed that version 2 could organize tasks without helping to perform them. Browser testing during development found the bugs listed in the development log. |
+| **Planned capabilities** | Testing with a real AI model and real users, sync between devices, importing Word files, and timer alerts. None of these exist yet. |
+
+### Version 3 design rationale
+
+The product's philosophy became: "Less planning. Less switching between apps. More actual progress."
+
+| Observed limitation | Change | Why |
+| --- | --- | --- |
+| Advice was too abstract | Plans and steps must produce something, and vague advice is rejected | Starting is easier with something concrete on the page |
+| Work happened in other apps | A working document in every task | Switching apps is another chance to stop |
+| Long lists could overwhelm | The home page shows one small step, and the full list is opened on request | Fewer decisions before beginning |
+| A blank page is hard to begin | Openings to pick from, and outlines from the instructions | Editing is easier than starting, and the writer stays the author |
+| A repeated suggestion doesn't help | Recovery uses the current step, document, and what's already failed | A different approach is more useful than the same one again |
+| Time isn't the same as progress | One question after a session, and history that separates suggested, accepted, tried, and done | The record should match what happened |
+
+Tradeoffs: rich features add complexity, so instructions and task settings stay collapsed until needed. Academic help carries an integrity risk, so suggestions stay marked, and invented citations are rejected.
+
 ## Iteration: from "Recovery Advice Assistant" to "Functional Recovery Workspace"
 
-This project has been through the design cycle twice. The first prototype was a five-step wizard that helped people think through a stuck task. The second is a working task manager with recovery built in.
+The first prototype was a five-step wizard that helped people think through a stuck task. The second is a working task manager with recovery built in.
 
 ### What prompted the change
 
