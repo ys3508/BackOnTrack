@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react"
 
@@ -26,7 +27,7 @@ import {
 export type Route =
   | { view: "workspace" }
   | { view: "tasks" }
-  | { view: "task"; id: string }
+  | { view: "task"; id: string; section?: "doc" }
   | { view: "calendar" }
   | { view: "recover"; taskId?: string }
   | { view: "focus"; taskId?: string }
@@ -34,8 +35,12 @@ export type Route =
   | { view: "settings" }
 
 export function parseHash(hash: string): Route {
-  const [view, id] = hash.replace(/^#\/?/, "").split("/")
-  if (view === "tasks" && id) return { view: "task", id }
+  const [view, id, section] = hash.replace(/^#\/?/, "").split("/")
+  if (view === "tasks" && id) {
+    return section === "doc"
+      ? { view: "task", id, section: "doc" }
+      : { view: "task", id }
+  }
   if (view === "focus") return { view: "focus", taskId: id }
   if (view === "recover") return { view: "recover", taskId: id }
   if (
@@ -50,7 +55,9 @@ export function parseHash(hash: string): Route {
 }
 
 export function routeHash(route: Route) {
-  if (route.view === "task") return `#/tasks/${route.id}`
+  if (route.view === "task") {
+    return `#/tasks/${route.id}${route.section ? `/${route.section}` : ""}`
+  }
   if (route.view === "workspace") return "#/"
   if (route.view === "recover") {
     return route.taskId ? `#/recover/${route.taskId}` : "#/recover"
@@ -72,6 +79,10 @@ type Store = {
   statusChecked: boolean
   liveModel: string | null
   deleteAll: () => void
+  /** Applies a change and writes it to storage right away, before returning. */
+  commitNow: (action: WorkspaceAction) => void
+  /** True when the browser refused the last save, usually because it's full. */
+  storageFailed: boolean
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -106,8 +117,29 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     model: string | null
   }>({ checked: false, live: false, model: null })
 
+  const [storageFailed, setStorageFailed] = useState(false)
+  const latest = useRef(state)
+
   useEffect(() => {
-    saveWorkspace(state)
+    latest.current = state
+  }, [state])
+
+  // Used for documents, because a closing page won't wait for React to save.
+  const commitNow = useCallback((action: WorkspaceAction) => {
+    latest.current = workspaceReducer(latest.current, action)
+    saveWorkspace(latest.current)
+    dispatch(action)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    const saved = saveWorkspace(state)
+    queueMicrotask(() => {
+      if (active) setStorageFailed(!saved)
+    })
+    return () => {
+      active = false
+    }
   }, [state])
 
   useEffect(() => {
@@ -182,8 +214,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       statusChecked: status.checked,
       liveModel: status.model,
       deleteAll,
+      commitNow,
+      storageFailed,
     }),
-    [state, route, navigate, today, mode, status, deleteAll]
+    [
+      state,
+      route,
+      navigate,
+      today,
+      mode,
+      status,
+      deleteAll,
+      commitNow,
+      storageFailed,
+    ]
   )
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>

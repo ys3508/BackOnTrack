@@ -25,6 +25,8 @@ import {
 } from "@/components/workspace/focus-view"
 import {
   ConfirmDialog,
+  DeadlineChip,
+  ProgressBar,
   StatusBadge,
   fieldClass,
 } from "@/components/workspace/parts"
@@ -34,9 +36,17 @@ import {
   ReplanDialog,
 } from "@/components/workspace/schedule"
 import { ReleaseDialog, useStatusChange } from "@/components/workspace/status"
+import {
+  WorkingEditor,
+  useWorkingEditor,
+} from "@/components/workspace/working-editor"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { formatDateTime, shortDate } from "@/lib/workspace/dates"
-import { deadlinePassed } from "@/lib/workspace/selectors"
+import {
+  currentSubtask,
+  deadlinePassed,
+  nextActionFor,
+} from "@/lib/workspace/selectors"
 import {
   PRIORITIES,
   PRIORITY_LABEL,
@@ -59,7 +69,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function TaskDetail({ id }: { id: string }) {
+export function TaskDetail({
+  id,
+  focusDocument = false,
+}: {
+  id: string
+  focusDocument?: boolean
+}) {
   const { state, navigate } = useStore()
   const task = state.tasks.find((item) => item.id === id)
 
@@ -78,18 +94,25 @@ export function TaskDetail({ id }: { id: string }) {
       </div>
     )
   }
-  return <TaskBody key={task.id} task={task} />
+  return <TaskBody key={task.id} task={task} focusDocument={focusDocument} />
 }
 
-function TaskBody({ task }: { task: Task }) {
+function TaskBody({
+  task,
+  focusDocument,
+}: {
+  task: Task
+  focusDocument: boolean
+}) {
   const { dispatch, navigate } = useStore()
   const statusChange = useStatusChange()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const { editor, dirty } = useWorkingEditor(task, focusDocument)
 
   const setStatus = (status: TaskStatus) => statusChange.request(task, status)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="space-y-4">
       <button
         type="button"
         onClick={() => navigate({ view: "tasks" })}
@@ -99,80 +122,86 @@ function TaskBody({ task }: { task: Task }) {
         All tasks
       </button>
 
-      <div>
-        <StatusBadge status={task.status} />
-        <ScreenHeading className="mt-2 break-words">{task.title}</ScreenHeading>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        {isActive(task) && (
-          <Button
-            type="button"
-            size="xl"
-            onClick={() => setStatus("completed")}
-          >
-            <Check aria-hidden />
-            Mark complete
-          </Button>
-        )}
-        {task.status === "paused" ? (
-          <Button
-            type="button"
-            size="xl"
-            variant="outline"
-            onClick={() => setStatus("in-progress")}
-          >
-            <Play aria-hidden />
-            Resume
-          </Button>
-        ) : (
-          isActive(task) && (
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <StatusBadge status={task.status} />
+          <ScreenHeading className="mt-2 break-words">
+            {task.title}
+          </ScreenHeading>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {isActive(task) && (
             <Button
               type="button"
               size="xl"
               variant="outline"
-              onClick={() => setStatus("paused")}
+              onClick={() => setStatus("completed")}
             >
-              <Pause aria-hidden />
-              Pause
+              <Check aria-hidden />
+              Mark complete
             </Button>
-          )
-        )}
+          )}
+          {task.status === "paused" ? (
+            <Button
+              type="button"
+              size="xl"
+              variant="outline"
+              onClick={() => setStatus("in-progress")}
+            >
+              <Play aria-hidden />
+              Resume
+            </Button>
+          ) : (
+            isActive(task) && (
+              <Button
+                type="button"
+                size="xl"
+                variant="ghost"
+                onClick={() => setStatus("paused")}
+              >
+                <Pause aria-hidden />
+                Pause
+              </Button>
+            )
+          )}
+        </div>
       </div>
 
-      {isActive(task) && (
-        <Button
-          type="button"
-          size="xl"
-          variant={task.status === "needs-recovery" ? "default" : "outline"}
-          className="w-full sm:w-auto"
-          onClick={() => navigate({ view: "recover", taskId: task.id })}
-        >
-          <LifeBuoy aria-hidden />
-          {task.recovery ? "See your recovery plan" : "I’m stuck on this"}
-        </Button>
-      )}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="space-y-4">
+          {isActive(task) && <CurrentStepCard task={task} />}
+          <BreakdownPanel task={task} guard={(action) => action()} />
+        </div>
+        <div className="space-y-4">
+          {isActive(task) && <FocusCard task={task} />}
+          <WorkingEditor task={task} editor={editor} dirty={dirty} />
+        </div>
+      </div>
 
-      <NextActionCard task={task} />
-      {isActive(task) && <FocusCard task={task} />}
-      <ProgressCard task={task} />
-      <DetailsCard task={task} onStatus={setStatus} />
-      <BreakdownPanel task={task} guard={(action) => action()} />
-      <DocumentsCard task={task} />
-      <ScheduleCard task={task} />
-      <FocusHistoryCard task={task} />
-      <HistoryCard task={task} />
-
-      <Button
-        type="button"
-        size="xl"
-        variant="ghost"
-        className="text-muted-foreground"
-        onClick={() => setConfirmDelete(true)}
-      >
-        <Trash2 aria-hidden />
-        Delete task
-      </Button>
+      <details className="group rounded-2xl border border-border bg-card">
+        <summary className="flex min-h-12 cursor-pointer items-center px-5 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+          More about this task
+        </summary>
+        <div className="space-y-4 border-t border-border p-4">
+          <NextActionCard task={task} />
+          <ProgressCard task={task} />
+          <DetailsCard task={task} onStatus={setStatus} />
+          <ScheduleCard task={task} />
+          <DocumentsCard task={task} />
+          <FocusHistoryCard task={task} />
+          <HistoryCard task={task} />
+          <Button
+            type="button"
+            size="xl"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 aria-hidden />
+            Delete task
+          </Button>
+        </div>
+      </details>
 
       <ConfirmDialog
         open={confirmDelete}
@@ -184,11 +213,57 @@ function TaskBody({ task }: { task: Task }) {
           navigate({ view: "tasks" })
         }}
       >
-        This removes the task, its steps, documents, history, and planned work
+        This removes the task, its steps, document, history, and planned work
         sessions. It can’t be undone.
       </ConfirmDialog>
       <ReleaseDialog {...statusChange.dialog} />
     </div>
+  )
+}
+
+function CurrentStepCard({ task }: { task: Task }) {
+  const { dispatch, navigate } = useStore()
+  const hasStep = Boolean(task.nextAction || currentSubtask(task))
+  return (
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 className="text-sm font-medium text-sage">Right now</h2>
+        <DeadlineChip task={task} />
+      </div>
+      <p className="font-heading text-[1.5rem] leading-snug">
+        {nextActionFor(task)}
+      </p>
+      {task.progress > 0 && (
+        <ProgressBar value={task.progress} label="Task progress" />
+      )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {hasStep && (
+          <Button
+            type="button"
+            size="xl"
+            onClick={() =>
+              dispatch({
+                type: "complete-next-action",
+                id: task.id,
+                at: nowIso(),
+              })
+            }
+          >
+            <Check aria-hidden />
+            Mark this step done
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="xl"
+          variant={task.status === "needs-recovery" ? "default" : "outline"}
+          onClick={() => navigate({ view: "recover", taskId: task.id })}
+        >
+          <LifeBuoy aria-hidden />
+          {task.recovery ? "See your recovery plan" : "I’m stuck"}
+        </Button>
+      </div>
+    </Card>
   )
 }
 

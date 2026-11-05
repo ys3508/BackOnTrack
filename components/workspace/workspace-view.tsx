@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
+  FileText,
   LifeBuoy,
   Play,
   Shuffle,
@@ -197,6 +198,23 @@ export function WorkspaceView() {
               <Shuffle aria-hidden />
               Something else
             </Button>
+            {resuming && (
+              <Button
+                type="button"
+                size="xl"
+                variant="ghost"
+                onClick={() =>
+                  navigate({
+                    view: "task",
+                    id: recommended.id,
+                    section: "doc",
+                  })
+                }
+              >
+                <FileText aria-hidden />
+                Open my document
+              </Button>
+            )}
             <Button
               type="button"
               size="xl"

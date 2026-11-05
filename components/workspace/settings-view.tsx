@@ -1,18 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { Download, Trash2 } from "lucide-react"
+import { useRef, useState } from "react"
+import { Download, Trash2, Upload } from "lucide-react"
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog, fieldClass } from "@/components/workspace/parts"
 import { useStore } from "@/components/workspace/store"
-import { exportWorkspace } from "@/lib/workspace/storage"
-import type { Settings } from "@/lib/workspace/schemas"
+import {
+  STORAGE_LIMIT_BYTES,
+  exportWorkspace,
+  parseImport,
+  storageUsedBytes,
+} from "@/lib/workspace/storage"
+import type { Settings, Workspace } from "@/lib/workspace/schemas"
 
 export function SettingsView() {
   const { state, dispatch, deleteAll } = useStore()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pendingImport, setPendingImport] = useState<Workspace | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
 
   function download() {
     const url = URL.createObjectURL(
@@ -98,14 +106,46 @@ export function SettingsView() {
           Your data
         </h2>
         <p className="text-sm text-muted-foreground">
-          Your tasks are saved only in this browser. There’s no account, and
-          they aren’t synced to other devices.
+          Your tasks and documents are saved only in this browser. There’s no
+          account, and they aren’t synced to other devices. Clearing your
+          browser data deletes them, so export a backup now and then.
+        </p>
+        <p className="text-sm">
+          Using about {(storageUsedBytes() / 1024 / 1024).toFixed(2)} MB of
+          about {STORAGE_LIMIT_BYTES / 1024 / 1024} MB available.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="xl" variant="outline" onClick={download}>
             <Download aria-hidden />
             Export my data
           </Button>
+          <Button
+            type="button"
+            size="xl"
+            variant="outline"
+            onClick={() => fileInput.current?.click()}
+          >
+            <Upload aria-hidden />
+            Import a backup
+          </Button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".json,application/json"
+            aria-label="Backup file to import"
+            className="sr-only"
+            tabIndex={-1}
+            onChange={async (event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ""
+              if (!file) return
+              const parsed = parseImport(await file.text())
+              setImportError(
+                parsed ? null : "That isn’t a BackOnTrack backup file."
+              )
+              setPendingImport(parsed)
+            }}
+          />
           <Button
             type="button"
             size="xl"
@@ -116,7 +156,26 @@ export function SettingsView() {
             Delete all my data
           </Button>
         </div>
+        {importError && (
+          <p role="alert" className="text-sm text-destructive">
+            {importError}
+          </p>
+        )}
       </Card>
+
+      <ConfirmDialog
+        open={Boolean(pendingImport)}
+        title="Replace your data with this backup?"
+        confirmLabel="Replace my data"
+        onCancel={() => setPendingImport(null)}
+        onConfirm={() => {
+          if (pendingImport) dispatch({ type: "replace", state: pendingImport })
+          setPendingImport(null)
+        }}
+      >
+        This backup has {pendingImport?.tasks.length ?? 0} tasks. It replaces
+        everything now in this browser, so export first if you want to keep it.
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={confirmDelete}

@@ -88,6 +88,28 @@ export type WorkspaceAction =
       body: string
     }
   | { type: "delete-document"; id: string; at: string; docId: string }
+  | {
+      type: "save-work-doc"
+      id: string
+      at: string
+      content: string
+      cursor: number
+    }
+  | {
+      type: "restore-work-doc"
+      id: string
+      at: string
+      content: string
+      previous: string
+    }
+  | {
+      type: "accept-doc-suggestion"
+      id: string
+      at: string
+      label: string
+      previous: string
+    }
+  | { type: "log-doc-suggestion"; id: string; at: string; text: string }
   | { type: "log-obstacle"; id: string; at: string; text: string }
   | { type: "add-planned"; at: string; session: PlannedSession }
   | {
@@ -544,6 +566,74 @@ export function workspaceReducer(
         updatedAt: action.at,
         documents: task.documents.filter((doc) => doc.id !== action.docId),
       }))
+
+    case "save-work-doc":
+      return mapTask(state, action.id, (task) => {
+        const previous = task.workDoc?.previous ?? null
+        const unchanged = task.workDoc?.content === action.content
+        const saved: Task = {
+          ...task,
+          lastWorkedAt: unchanged ? task.lastWorkedAt : action.at,
+          workDoc: {
+            content: action.content,
+            cursor: action.cursor,
+            previous,
+            updatedAt: unchanged
+              ? (task.workDoc?.updatedAt ?? action.at)
+              : action.at,
+          },
+        }
+        return task.workDoc || unchanged
+          ? saved
+          : withEvent(
+              saved,
+              action.at,
+              "document",
+              "Started the working document"
+            )
+      })
+
+    case "restore-work-doc":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          {
+            ...task,
+            workDoc: {
+              content: action.content,
+              previous: action.previous,
+              cursor: 0,
+              updatedAt: action.at,
+            },
+          },
+          action.at,
+          "document",
+          "Went back to the version from before a suggestion"
+        )
+      )
+
+    case "accept-doc-suggestion":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          {
+            ...task,
+            lastWorkedAt: action.at,
+            workDoc: {
+              content: task.workDoc?.content ?? "",
+              cursor: task.workDoc?.cursor ?? 0,
+              updatedAt: task.workDoc?.updatedAt ?? action.at,
+              previous: action.previous,
+            },
+          },
+          action.at,
+          "document",
+          `Accepted a suggestion into the document: ${action.label}`
+        )
+      )
+
+    case "log-doc-suggestion":
+      return mapTask(state, action.id, (task) =>
+        withEvent(task, action.at, "document", action.text)
+      )
 
     case "log-obstacle":
       return mapTask(state, action.id, (task) =>
