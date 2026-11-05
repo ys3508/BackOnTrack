@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
@@ -22,6 +22,7 @@ const timerFor = (extra: Partial<TimerState> = {}): TimerState => ({
   id: "s",
   kind: "focus",
   taskId: "a",
+  subtaskId: null,
   plannedSeconds: 300,
   startedAt: new Date(T0).toISOString(),
   runningSince: T0,
@@ -106,7 +107,7 @@ describe("focus sessions and tasks", () => {
     expect(state.timer).toBeNull()
     expect(state.finishedSessionId).toBe("s")
     expect(state.tasks[0].history.at(-1)?.text).toBe(
-      "Focus session completed (5 min)"
+      "Focus session finished (5 min)"
     )
   })
 
@@ -228,10 +229,10 @@ describe("focus screen", () => {
     render(<WorkspaceApp />)
     click("5-minute Quick Start")
     await advance(MIN)
-    click("Pause")
+    click("Pause timer")
     await advance(10 * MIN)
     expect(screen.getByRole("timer")).toHaveTextContent("04:00")
-    click("Resume")
+    click("Resume timer")
     await advance(MIN)
     expect(screen.getByRole("timer")).toHaveTextContent("03:00")
   })
@@ -245,12 +246,16 @@ describe("focus screen", () => {
     ).toBeInTheDocument()
     expect(saved().tasks[0].status).toBe("in-progress")
     expect(saved().focusSessions).toHaveLength(1)
+    expect(screen.getByText("Did you make progress?")).toBeInTheDocument()
+    click("A little")
+    expect(saved().focusSessions[0].progressReport).toBe("a-little")
+    expect(saved().tasks[0].progress).toBe(5)
     expect(
       screen.getByRole("button", { name: /5-minute break/ })
     ).toBeInTheDocument()
 
     click(/5-minute break/)
-    expect(screen.getByText(/^Break/)).toBeInTheDocument()
+    expect(screen.getByText("Break")).toBeInTheDocument()
     expect(saved().focusSessions).toHaveLength(1)
   })
 
@@ -294,12 +299,7 @@ describe("focus screen", () => {
       actualSeconds: 120,
     })
     expect(saved().tasks[0].status).toBe("in-progress")
-    expect(
-      within(
-        screen.getByRole("region", { hidden: true, name: /Session history/ }) ??
-          document.body
-      ).getByText(/Will continue later/)
-    ).toBeInTheDocument()
+    expect(screen.getByText(/Will continue later/)).toBeInTheDocument()
   })
 
   it("resets without saving a session", async () => {

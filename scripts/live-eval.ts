@@ -1,6 +1,6 @@
 /**
  * Runs required Tests A, B and C against the REAL configured AI model.
- * It makes about 15 model calls and spends a small amount of API credit.
+ * It makes about 20 model calls and spends a small amount of API credit.
  *
  *   npm run test:live
  *
@@ -12,12 +12,19 @@ import { dirname } from "node:path"
 
 import { getLiveConfig, getLiveModel } from "../lib/ai/provider"
 import { generateAnalysis, generateNextStep } from "../lib/ai/recovery"
+import {
+  generateTaskBreakdown,
+  generateWritingAssist,
+  generateStepHelp,
+  generateWorkspaceSetup,
+} from "../lib/ai/task-assist"
 import { generateTaskRecovery } from "../lib/ai/task-recovery"
 import { IntakeSchema } from "../lib/schemas"
 import type {
   Analysis,
   NextStepRequest,
   NextStepResult,
+  TaskContext,
   TaskRecoveryRequest,
 } from "../lib/schemas"
 
@@ -191,6 +198,13 @@ async function main() {
         attempts: [],
         obstacles: test.stuck ? [test.stuck] : [],
         openSteps: [],
+        instructions: "",
+        document: "",
+        currentStep: "",
+        stuckOnStep: 0,
+        learned: [],
+        preferredHelp: "",
+        avoidHelp: [],
         focusSessions: test.stuck
           ? [
               {
@@ -240,6 +254,134 @@ async function main() {
     console.log(`  Draft:     ${first.plan.artifact.title}\n`)
     results.push({ test: test.id, request, first, second, checks })
   }
+
+  // Task breakdown and writing help, using real instructions.
+  const instructions =
+    "Assignment 3: Classification\n- Train a classifier on the provided dataset\n- Report the accuracy on the test set\nYou must submit a two-page PDF report."
+  const context: TaskContext = {
+    title: "Finish my machine learning assignment",
+    description: "",
+    deadline: null,
+    originalDeadline: null,
+    status: "In Progress",
+    priority: "Medium",
+    progress: 25,
+    completedActions: ["Completed: Read the assignment requirements"],
+    attempts: [],
+    obstacles: [],
+    openSteps: [],
+    instructions,
+    document: "",
+    currentStep: "Write the introduction",
+    stuckOnStep: 0,
+    learned: [],
+    preferredHelp: "",
+    avoidHelp: [],
+    focusSessions: [],
+  }
+
+  console.log("=== Test G: task breakdown")
+  const breakdown = await generateTaskBreakdown(model, {
+    stage: "task-breakdown",
+    task: context,
+    today,
+    rejected: [],
+  })
+  const breakdownChecks: Check[] = [
+    ["gives several steps", breakdown.steps.length >= 3],
+    ["no built-in fallback was needed", !breakdown.usedFallback],
+    [
+      "doesn't repeat the finished step",
+      !breakdown.steps.some((step) =>
+        /^read the assignment requirements/i.test(step)
+      ),
+    ],
+  ]
+  for (const [name, passed] of breakdownChecks) {
+    if (!passed) failures++
+    console.log(`  ${passed ? "PASS" : "FAIL"}  ${name}`)
+  }
+  console.log(`  Steps: ${breakdown.steps.join(" | ")}\n`)
+  results.push({
+    test: "G: task breakdown",
+    breakdown,
+    checks: breakdownChecks,
+  })
+
+  for (const action of ["outline", "starter", "improve"] as const) {
+    console.log(`=== Test H: writing help (${action})`)
+    const result = await generateWritingAssist(model, {
+      stage: "writing-assist",
+      action,
+      task: context,
+      today,
+      selection:
+        action === "improve" ? "this model it does good on the test" : "",
+      source: "",
+    })
+    const checks: Check[] = [
+      ["has content", result.content.length > 0],
+      ["no built-in fallback was needed", !result.usedFallback],
+    ]
+    for (const [name, passed] of checks) {
+      if (!passed) failures++
+      console.log(`  ${passed ? "PASS" : "FAIL"}  ${name}`)
+    }
+    console.log(`  ${result.content.slice(0, 160)}\n`)
+    results.push({ test: `H: writing help (${action})`, result, checks })
+  }
+
+  const codingContext = {
+    ...context,
+    title: "ML homework",
+    instructions:
+      "Train a classifier on the provided dataset, and submit a one-page report with its test accuracy.",
+    currentStep: "Train a classifier on the provided dataset",
+  }
+
+  console.log("=== Test I: help with one big step")
+  const stepHelp = await generateStepHelp(model, {
+    stage: "step-help",
+    task: codingContext,
+    today,
+    step: codingContext.currentStep,
+  })
+  const stepChecks: Check[] = [
+    ["no built-in fallback was needed", !stepHelp.usedFallback],
+    [
+      "the first action isn't to think about it",
+      !/^\s*(think|consider|reflect)/i.test(stepHelp.firstAction),
+    ],
+    ["gives something to start from", stepHelp.starter.content.length > 0],
+  ]
+  for (const [name, passed] of stepChecks) {
+    if (!passed) failures++
+    console.log(`  ${passed ? "PASS" : "FAIL"}  ${name}`)
+  }
+  console.log(`  First action: ${stepHelp.firstAction}\n`)
+  results.push({ test: "I: step help", stepHelp, checks: stepChecks })
+
+  console.log("=== Test J: first workspace from instructions")
+  const setup = await generateWorkspaceSetup(model, {
+    stage: "workspace-setup",
+    task: { ...codingContext, currentStep: "", completedActions: [] },
+    today,
+  })
+  const setupChecks: Check[] = [
+    ["no built-in fallback was needed", !setup.usedFallback],
+    ["names what has to be handed in", setup.deliverables.length > 0],
+    ["gives several steps", setup.steps.length >= 3],
+    ["doesn't invent a date", setup.datesMentioned.length === 0],
+    ["prepares questions to answer", setup.questions.length > 0],
+    ["prepares an outline", setup.outline.length > 0],
+    ["prepares a first section", setup.firstSection.content.length > 0],
+  ]
+  for (const [name, passed] of setupChecks) {
+    if (!passed) failures++
+    console.log(`  ${passed ? "PASS" : "FAIL"}  ${name}`)
+  }
+  console.log(`  Deliverables: ${setup.deliverables.join(" | ")}\n`)
+  results.push({ test: "J: workspace setup", setup, checks: setupChecks })
 
   mkdirSync(dirname(OUTPUT), { recursive: true })
   writeFileSync(

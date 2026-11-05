@@ -123,6 +123,124 @@ Phases 3 and 4 share a commit, because the calendar was finished while its brows
 - The guided check-in nested one `main` landmark inside another, which the axe scan found.
 - The complete button in the task list was 28 px tall, and now has a 44 px target.
 
+## AI-assisted task execution (version 3)
+
+The `feat/task-execution` branch started from `main` at `4d58986`.
+
+### Repositories reviewed on 2026-11-05
+
+| Repository | License | Decision |
+| --- | --- | --- |
+| `ueberdosis/tiptap` | MIT | Used directly, through its core packages. |
+| `hunghg255/reactjs-tiptap-editor` | MIT | Not used. It brings its own UI, which wouldn't match the existing design. |
+| `kcsujeet/ilamy-calendar` | MIT | Not used. The brief said not to rebuild the calendar. |
+| `Georgegriff/react-dnd-kit-tailwind-shadcn-ui` | MIT | Already reviewed for version 2. No change. |
+| `mozilla/pdf.js` | Apache-2.0 | Used, through `pdfjs-dist`, for reading PDF text in the browser. |
+
+### Phases
+
+| Phase | Commit | What was added | Tests when committed |
+| --- | --- | --- | --- |
+| 1. Breakdown and subtasks | `7f52194` | Data version 2 with a backup, editable breakdowns, real steps, and "Your next small step" | 248 passed |
+| 2. Working editor | `e486af5` | Tiptap document, autosave, export, two-panel layout, backup import, and storage warnings | 260 passed |
+| 3. Intake and AI help | `60f67e4` | Paste and file intake, PDF extraction, consent before sending, and six writing actions | 293 passed |
+| 4. History and recovery | `9e50c9e` | History kinds, recovery attempts, and plans based on real progress | 306 passed |
+| 5. Focus and documentation | `d4b706b` and later | Timer in the task, progress check-in, demo examples, and tests | 315 passed |
+
+### Decisions
+
+- **One document per task, saved as HTML in the existing workspace data.** It's simple and exportable. Saves write straight to storage, because a closing page won't wait for React.
+- **Local PDF extraction.** Files stay in the browser, so nothing needs uploading or storing on a server.
+- **Suggestions are preview-only until accepted.** Accepted text carries a mark, the version before it is kept, and the previous saved data format is backed up before migrating.
+- **Consent per task.** The first Live AI request that includes instructions or a document asks first, and changing the instructions asks again.
+- **Progress summaries come from recorded data, not AI.** A model isn't needed to count finished steps, and this way it can't overstate them.
+
+### Problems found by testing
+
+- PDF cleanup called a method on the wrong object, which would have broken every PDF upload. A test with a real PDF caught this.
+- "Replace selected text" split the paragraph in two. It now stays inline when replacing within a sentence.
+- A reload just after typing could lose the last edit, because saving went through React. Saves are now synchronous.
+- The task and the timer both had a "Pause" button, so the timer's is now "Pause timer".
+- The text rules glued a whole list into one long step, and joined a heading to the next sentence. They now work line by line.
+- Stuck-specific plans were being skipped by a rule that started later in the list. Plans tailored to the task now come first.
+- Icons squeezed the step text, so they moved behind an "Edit steps" toggle.
+- Demo text read badly, such as "This section is about Write the introduction", and was reworded.
+
+## From task manager to execution support
+
+This followed a review of version 3, on the same `feat/task-execution` branch.
+
+### Decisions
+
+- **Concrete steps in Demo Mode come from fixed wording rules.** They can be wrong, and the interface labels them. Real understanding needs Live AI.
+- **Code is for copying, not running.** Running Python in the browser would add a lot for a small gain. Code is labeled as not run.
+- **Smaller steps replace only the current step.** Finished work stays, and the user can uncheck the replacement.
+- **"Plan remaining work" is arithmetic, not AI.** It's predictable, costs nothing, and is labeled as calculated. It has no way to change a deadline.
+- **A step stays in one sitting if a day has room.** Steps that don't fit are reported, not squeezed in.
+- **Priority is optional.** Existing tasks keep the priority they have.
+- **Under 60 seconds and not finished counts as an interrupted attempt.** It's kept in the history, but left out of focused time and the calendar.
+
+### Problems found by testing
+
+All of these were found in a real browser after the automated tests had passed.
+
+- A second "I'm stuck" offered the same step back as its own next action, which is exactly what the review warned about. Steps that are already small now go smaller.
+- Smaller steps could repeat steps already on the list, or be added twice when a plan was accepted. Both are now filtered out.
+- A suggested session read "undefined", because that plan had no steps to name it after.
+- Splitting a step left the running timer pointing at a step that no longer existed.
+- After a code starter, a plan suggested adding "one more sentence" after a line of code.
+- The first version of the planner scattered a step across days in 5-minute pieces.
+
+## Easy return and Zero-Start
+
+This followed a product review, on the same branch. The review recommended building these two first. The Failure-Aware Engine and Personal Friction Map are longer-term, and weren't started.
+
+### Decisions
+
+- **"Away" is based on when the app was last opened, for 3 days or more.** Basing it on task activity would treat someone who opens the app daily as absent. The threshold is a judgment call, and hasn't been tested.
+- **Old data and first use never trigger the return screen,** because no last-opened time exists yet.
+- **The return screen doesn't call AI.** Opening the app shouldn't send anything anywhere, so its small suggestion uses a labeled built-in rule.
+- **Choosing an entry point counts as accepting.** It replaces "Use this", and the document can still be edited first. Suggested steps still wait for their own approval.
+
+### Problems found by testing
+
+All of these were found in a real browser after the automated tests had passed.
+
+- After choosing an entry, the cursor landed on the list rather than in its text. It now selects the first placeholder.
+- A new paper's first action was "Find the submission page", from whichever step came first.
+- Text typed over a placeholder kept the "suggested" highlight, so the user's own words looked like a suggestion. Typed text is now never marked, anywhere in suggested text.
+
+## Failure-aware learning
+
+### Decisions
+
+- **Counting, not machine learning.** With a handful of records in one browser, counting is explainable and honest, and a trained model wouldn't have enough data.
+- **A separate log that holds no text.** It stores event type, time, task ID, task kind, whether the document was empty, and outcomes. Deleting a task removes its records.
+- **"Progress" means a finished step, a real focus session, or at least 5 of the user's own words.** Accepted suggestions and code blocks don't count, so accepting help can't count as its own success. Editing code isn't detected, which undercounts coding work.
+- **Task kind comes from wording,** so it can be wrong.
+- **Preference options are limited to ones that change something,** so no choice is silently ignored.
+
+### Problems found by testing
+
+- Clicking "I'm stuck" three times in a minute produced a "pattern", found in a real browser. Events on one task within an hour now count once.
+- A plan's note quoted a different pattern from the one behind its choice.
+
+## Suggested order and Daily Rescue Plan
+
+### Decisions
+
+- **One scoring function** for the home page's suggestion, the Tasks order, and the daily plan, so they don't disagree.
+- **Time estimates are optional.** Without one, a task's open steps count as 25 minutes each, and any risk warning says it's a rough guess.
+- **Marking an item done for today doesn't complete the task.** A day's plan and a task's status are separate.
+- **The plan is only offered with two or more tasks,** since there's nothing to arrange otherwise.
+
+### Problems found by testing
+
+Both were found by trying a realistic scenario in a real browser, after all automated tests had passed.
+
+- A high-priority task due tomorrow, needing 4 hours, got 10 minutes because it had been missed before, while 40 minutes went to tasks that could wait. Urgent work now gets the time.
+- A 5-minute email was described as "Break it into small steps". Tasks with no steps are now named plainly.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).
@@ -130,9 +248,13 @@ See [TEST_RESULTS.md](TEST_RESULTS.md).
 ## Known limitations
 
 - **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.
-- The public site runs in Demo Mode, with no API key, so its suggestions are templates.
+- The public site runs in Demo Mode, with no API key, so its suggestions are templates. Version 3 isn't on it until the `feat/task-execution` branch is merged.
+- Browser storage is limited to about 5 MB per site, and a long document uses more of it. The app warns when a save fails, and backups can be exported and imported.
+- If two tabs edit the same task, the last save wins.
+- Documents have one earlier version kept, from before the last accepted suggestion. There's no full version history.
+- Requirement extraction in Demo Mode uses text rules, so it can miss or misread requirements. The interface says to check.
+- Citation checks look for common citation and link patterns, so unusual formats can get through.
 - The timer can't alert the user when it ends, beyond the screen and tab title.
-- Importing an exported file isn't supported.
 - On a phone-width month view, calendar titles are cut off, although tapping a day lists them in full.
 - A person dragging Kanban cards by hand hasn't been tested. Keyboard dragging and simulated pointer dragging worked.
 - The Vercel AI Gateway option has not been exercised at all, and its default model ID is unconfirmed.

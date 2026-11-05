@@ -43,8 +43,15 @@ const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
 ]
 
 function Shell() {
-  const { route, navigate, mode, liveAvailable, statusChecked, dispatch } =
-    useStore()
+  const {
+    route,
+    navigate,
+    mode,
+    liveAvailable,
+    statusChecked,
+    dispatch,
+    storageFailed,
+  } = useStore()
   const routeKey =
     route.view === "task"
       ? `task-${route.id}`
@@ -55,7 +62,7 @@ function Shell() {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="border-b border-border/70">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
           <button
             type="button"
             onClick={() => navigate({ view: "workspace" })}
@@ -86,7 +93,7 @@ function Shell() {
         </div>
         <nav
           aria-label="Main"
-          className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-3 sm:px-4"
+          className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 sm:px-4"
         >
           {NAV_ITEMS.map((item) => {
             const current = item.match.includes(route.view)
@@ -110,14 +117,32 @@ function Shell() {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 pt-6 pb-16 sm:px-6 sm:pt-8">
+      {storageFailed && (
+        <div
+          role="alert"
+          className="bg-sand-soft px-6 py-3 text-center text-sm text-sand"
+        >
+          Your browser’s storage is full, so recent changes aren’t saved.{" "}
+          <button
+            type="button"
+            onClick={() => navigate({ view: "settings" })}
+            className="font-medium underline underline-offset-2"
+          >
+            Export your data
+          </button>
+        </div>
+      )}
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-5 pt-6 pb-16 sm:px-6 sm:pt-8">
         <div
           key={routeKey}
           className="animate-in duration-300 fade-in slide-in-from-bottom-1"
         >
           {route.view === "workspace" && <WorkspaceView />}
           {route.view === "tasks" && <TasksView />}
-          {route.view === "task" && <TaskDetail id={route.id} />}
+          {route.view === "task" && (
+            <TaskDetail id={route.id} section={route.section} />
+          )}
           {route.view === "calendar" && <CalendarView />}
           {route.view === "focus" && <FocusView />}
           {route.view === "recover" && <RecoverView taskId={route.taskId} />}
@@ -146,12 +171,22 @@ function TimerPill() {
     document.title = timer ? `${clock} · BackOnTrack` : "BackOnTrack AI"
   }, [timer, clock])
 
-  if (!timer || route.view === "focus") return null
+  // These views already show the timer.
+  const shownHere =
+    route.view === "focus" ||
+    (route.view === "task" && route.id === timer?.taskId)
+  if (!timer || shownHere) return null
   return (
     <button
       type="button"
       aria-label={`Open focus timer, ${clock} remaining`}
-      onClick={() => navigate({ view: "focus" })}
+      onClick={() =>
+        navigate(
+          timer.taskId
+            ? { view: "task", id: timer.taskId, section: "doc" }
+            : { view: "focus" }
+        )
+      }
       className="flex min-h-10 items-center gap-1.5 rounded-lg bg-sage-soft px-2.5 text-sm font-medium text-sage tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
     >
       <Timer className="size-4" aria-hidden />

@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useAiConsent } from "@/components/workspace/ai-consent"
 import { ExpandableList, StatusBadge } from "@/components/workspace/parts"
 import { QuickAdd } from "@/components/workspace/quick-add"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
@@ -30,7 +31,11 @@ import type { ObstacleChoice, RejectedPlan, Strategy } from "@/lib/schemas"
 import { shortDate } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
 import type { StoredRecovery, Task } from "@/lib/workspace/schemas"
-import { tasksNeedingAttention } from "@/lib/workspace/selectors"
+import {
+  currentSubtask,
+  tasksNeedingAttention,
+  usefulSmallerSteps,
+} from "@/lib/workspace/selectors"
 
 export function RecoverView({ taskId }: { taskId?: string }) {
   const { state, navigate } = useStore()
@@ -126,6 +131,7 @@ function useRecoveryRequest(task: Task) {
       dispatch({
         type: "set-recovery",
         id: task.id,
+        obstacle: options.obstacle ?? "",
         recovery: {
           analysis: result.analysis,
           plan: result.plan,
@@ -150,6 +156,7 @@ function useRecoveryRequest(task: Task) {
 function RecoverTask({ task }: { task: Task }) {
   const { navigate, mode, dispatch } = useStore()
   const recovery = useRecoveryRequest(task)
+  const consent = useAiConsent(task)
 
   const useDemoLink =
     mode === "live" && recovery.error
@@ -185,11 +192,15 @@ function RecoverTask({ task }: { task: Task }) {
           key={task.recovery.createdAt}
           task={task}
           pending={task.recovery}
-          onRequest={recovery.run}
+          onRequest={(options) => consent.guard(() => recovery.run(options))}
         />
       ) : (
-        <StartRecovery task={task} onRequest={recovery.run} />
+        <StartRecovery
+          task={task}
+          onRequest={(options) => consent.guard(() => recovery.run(options))}
+        />
       )}
+      {consent.dialog}
     </div>
   )
 }
@@ -216,9 +227,7 @@ function StartRecovery({
         : obstacle && obstacle !== "unsure"
           ? OBSTACLE_LABEL[obstacle]
           : ""
-    if (text) {
-      dispatch({ type: "log-obstacle", id: task.id, at: nowIso(), text })
-    }
+    dispatch({ type: "report-stuck", id: task.id, at: nowIso(), text })
     onRequest({ obstacle: text })
   }
 
@@ -281,6 +290,9 @@ function PlanPreview({
   const { decision } = analysis
 
   const [useNextAction, setUseNextAction] = useState(true)
+  const [splitStep, setSplitStep] = useState(true)
+  const current = currentSubtask(task)
+  const smaller = usefulSmallerSteps(task, plan.smallerSteps)
   const [useDraft, setUseDraft] = useState(true)
   const [draftTitle, setDraftTitle] = useState(plan.artifact.title)
   const [draft, setDraft] = useState(plan.artifact.body)
@@ -295,6 +307,15 @@ function PlanPreview({
   const releaseBlocked = markReleased && decision.highStakes && !acknowledged
 
   function accept() {
+    dispatch({
+      type: "log-help",
+      id: task.id,
+      at: nowIso(),
+      helpKind:
+        splitStep && current && smaller.length
+          ? "smaller-steps"
+          : "recovery-plan",
+    })
     dispatch({
       type: "apply-recovery",
       id: task.id,
@@ -311,6 +332,15 @@ function PlanPreview({
       ),
       release: chosen === "RELEASE" && markReleased,
     })
+    if (splitStep && current && smaller.length) {
+      dispatch({
+        type: "split-subtask",
+        id: task.id,
+        at: nowIso(),
+        subId: current.id,
+        steps: smaller.map((title) => ({ id: newId(), title })),
+      })
+    }
     navigate({ view: "task", id: task.id })
   }
 
@@ -423,12 +453,71 @@ function PlanPreview({
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
+        {plan.artifact.kind === "code" && (
+          <p className="text-xs text-muted-foreground">
+            This code hasn’t been run, and BackOnTrack can’t run it. Copy it
+            into your own environment, and fill in the brackets.
+          </p>
+        )}
         {plan.artifact.kind === "email" && (
           <p className="text-xs text-muted-foreground">
             BackOnTrack never sends anything. Sending this is up to you.
           </p>
         )}
       </Card>
+
+      {smaller.length > 0 && current && (
+        <Card>
+          <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+            Make this step smaller
+          </h2>
+          <CheckRow
+            checked={splitStep}
+            onChange={setSplitStep}
+            label={`Replace “${current.title}” with: ${smaller.join(" → ")}`}
+          />
+          <p className="text-xs text-muted-foreground">
+            Finished steps aren’t touched.
+          </p>
+        </Card>
+      )}
+
+      {plan.choices.length > 0 && (
+        <Card className="space-y-2">
+          <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+            Pick one to put in your document
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Suggested text for you to change. It’s marked as suggested until you
+            clear the highlight.
+          </p>
+          <ul className="space-y-2">
+            {plan.choices.map((choice) => (
+              <li key={choice}>
+                <Button
+                  type="button"
+                  size="xl"
+                  variant="outline"
+                  className="h-auto min-h-11 w-full justify-start py-2 text-left font-normal whitespace-normal"
+                  onClick={() => {
+                    dispatch({
+                      type: "append-to-doc",
+                      id: task.id,
+                      at: nowIso(),
+                      text: choice,
+                      label: plan.headline,
+                    })
+                    accept()
+                    navigate({ view: "task", id: task.id, section: "doc" })
+                  }}
+                >
+                  {choice}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {plan.steps.length > 0 && (
         <Card>

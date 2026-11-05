@@ -1,12 +1,23 @@
 import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
 import { shortDate } from "@/lib/workspace/dates"
-import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
+import { observeFriction } from "@/lib/workspace/friction"
+import type { DailyPlan, HelpKind, Learning } from "@/lib/workspace/schemas"
+import {
+  STATUS_LABEL,
+  PRIORITY_LABEL,
+  isInterrupted,
+} from "@/lib/workspace/schemas"
+import { currentSubtask } from "@/lib/workspace/selectors"
 import type {
   FocusSession,
+  Instructions,
+  PendingBreakdown,
   PlannedSession,
   Priority,
+  RecoveryAttempt,
   StoredRecovery,
   Settings,
+  Subtask,
   Task,
   TaskEvent,
   TaskStatus,
@@ -25,13 +36,21 @@ export type WorkspaceAction =
       description?: string
       deadline?: string | null
       priority?: Priority
+      estimateMinutes?: number | null
     }
   | {
       type: "edit-task"
       id: string
       at: string
       patch: Partial<
-        Pick<Task, "title" | "description" | "priority" | "nextAction">
+        Pick<
+          Task,
+          | "title"
+          | "description"
+          | "priority"
+          | "nextAction"
+          | "estimateMinutes"
+        >
       >
     }
   | {
@@ -54,7 +73,36 @@ export type WorkspaceAction =
       title: string
     }
   | { type: "toggle-subtask"; id: string; at: string; subId: string }
-  | { type: "remove-subtask"; id: string; subId: string }
+  | { type: "remove-subtask"; id: string; at: string; subId: string }
+  | {
+      type: "edit-subtask"
+      id: string
+      at: string
+      subId: string
+      title: string
+    }
+  | { type: "move-subtask"; id: string; subId: string; direction: -1 | 1 }
+  | {
+      type: "split-subtask"
+      id: string
+      at: string
+      subId: string
+      steps: { id: string; title: string }[]
+    }
+  | { type: "set-current-subtask"; id: string; at: string; subId: string }
+  | {
+      type: "set-breakdown"
+      id: string
+      at: string
+      breakdown: PendingBreakdown
+    }
+  | {
+      type: "accept-breakdown"
+      id: string
+      at: string
+      steps: { id: string; title: string }[]
+    }
+  | { type: "decline-breakdown"; id: string; at: string }
   | {
       type: "save-document"
       id: string
@@ -64,6 +112,35 @@ export type WorkspaceAction =
       body: string
     }
   | { type: "delete-document"; id: string; at: string; docId: string }
+  | {
+      type: "save-work-doc"
+      id: string
+      at: string
+      content: string
+      cursor: number
+    }
+  | {
+      type: "restore-work-doc"
+      id: string
+      at: string
+      content: string
+      previous: string
+    }
+  | {
+      type: "accept-doc-suggestion"
+      id: string
+      at: string
+      label: string
+      previous: string
+    }
+  | { type: "log-doc-suggestion"; id: string; at: string; text: string }
+  | {
+      type: "set-instructions"
+      id: string
+      at: string
+      instructions: Instructions | null
+    }
+  | { type: "set-ai-consent"; id: string; at: string }
   | { type: "log-obstacle"; id: string; at: string; text: string }
   | { type: "add-planned"; at: string; session: PlannedSession }
   | {
@@ -75,7 +152,19 @@ export type WorkspaceAction =
     }
   | { type: "remove-planned"; at: string; id: string }
   | { type: "toggle-planned"; id: string }
-  | { type: "set-recovery"; id: string; recovery: StoredRecovery | null }
+  | {
+      type: "set-recovery"
+      id: string
+      recovery: StoredRecovery | null
+      obstacle?: string
+    }
+  | {
+      type: "append-to-doc"
+      id: string
+      at: string
+      text: string
+      label: string
+    }
   | { type: "decline-recovery"; id: string; at: string }
   | {
       type: "apply-recovery"
@@ -92,6 +181,7 @@ export type WorkspaceAction =
       id: string
       kind: TimerState["kind"]
       taskId: string | null
+      subtaskId?: string | null
       minutes: number
       now: number
       at: string
@@ -109,12 +199,43 @@ export type WorkspaceAction =
       note: string
     }
   | { type: "timer-acknowledge" }
+  | {
+      type: "report-focus"
+      sessionId: string
+      report: "yes" | "a-little" | "stuck"
+      at: string
+    }
+  | { type: "report-stuck"; id: string; at: string; text: string }
   | { type: "settings"; patch: Partial<Settings> }
+  | { type: "mark-opened"; at: string }
+  | { type: "set-daily-plan"; plan: DailyPlan }
+  | { type: "toggle-daily-item"; taskId: string }
+  | { type: "move-daily-item"; taskId: string; by: -1 | 1 }
+  | { type: "log-help"; id: string; at: string; helpKind: HelpKind }
+  | { type: "learning"; patch: Partial<Learning> }
+  | { type: "delete-friction"; id: string }
+  | { type: "clear-friction" }
   | { type: "skip-recommendation"; taskId: string; date: string }
   | { type: "replace"; state: Workspace }
 
 function eventId(at: string, task: Task) {
   return `${at}-${task.history.length}`
+}
+
+/** Records what an event really means, so a suggestion never reads as done work. */
+export function inferEventKind(
+  type: TaskEvent["type"],
+  text: string
+): TaskEvent["kind"] {
+  if (/^(Completed|Status changed to Completed)/.test(text)) return "completed"
+  if (/^Reported progress/.test(text)) return "attempted"
+  if (/^Accepted/.test(text)) return "accepted"
+  if (/^Suggested/.test(text)) return "suggested"
+  if (type === "focus" || type === "obstacle" || type === "stuck") {
+    return "attempted"
+  }
+  if (/^Tried/.test(text)) return "attempted"
+  return "info"
 }
 
 export function withEvent(
@@ -126,9 +247,16 @@ export function withEvent(
   return {
     ...task,
     updatedAt: at,
-    history: [...task.history, { id: eventId(at, task), at, type, text }].slice(
-      -MAX_HISTORY
-    ),
+    history: [
+      ...task.history,
+      {
+        id: eventId(at, task),
+        at,
+        type,
+        text,
+        kind: inferEventKind(type, text),
+      },
+    ].slice(-MAX_HISTORY),
   }
 }
 
@@ -169,6 +297,10 @@ export function workspaceReducer(
   state: Workspace,
   action: WorkspaceAction
 ): Workspace {
+  return observeFriction(state, applyAction(state, action), action)
+}
+
+function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
   switch (action.type) {
     case "create-task": {
       const deadline = action.deadline ?? null
@@ -178,7 +310,7 @@ export function workspaceReducer(
           title: action.title.trim(),
           description: action.description?.trim() ?? "",
           status: "not-started",
-          priority: action.priority ?? "medium",
+          priority: action.priority ?? "none",
           deadline,
           originalDeadline: deadline,
           progress: 0,
@@ -191,6 +323,14 @@ export function workspaceReducer(
           completedAt: null,
           recovery: null,
           rejectedPlans: [],
+          workDoc: null,
+          instructions: null,
+          aiConsentAt: null,
+          pendingBreakdown: null,
+          currentSubtaskId: null,
+          lastWorkedAt: null,
+          recoveryAttempts: [],
+          estimateMinutes: action.estimateMinutes ?? null,
         },
         action.at,
         "created",
@@ -301,6 +441,12 @@ export function workspaceReducer(
         ...state,
         tasks: state.tasks.filter((task) => task.id !== action.id),
         planned: state.planned.filter((item) => item.taskId !== action.id),
+        dailyPlan: state.dailyPlan && {
+          ...state.dailyPlan,
+          items: state.dailyPlan.items.filter(
+            (item) => item.taskId !== action.id
+          ),
+        },
       }
 
     case "add-subtask":
@@ -310,7 +456,13 @@ export function workspaceReducer(
             ...task,
             subtasks: [
               ...task.subtasks,
-              { id: action.subId, title: action.title.trim(), done: false },
+              {
+                id: action.subId,
+                title: action.title.trim(),
+                done: false,
+                source: "user" as const,
+                completedAt: null,
+              },
             ],
           },
           action.at,
@@ -325,10 +477,149 @@ export function workspaceReducer(
       )
 
     case "remove-subtask":
+      return mapTask(state, action.id, (task) => {
+        const sub = task.subtasks.find((item) => item.id === action.subId)
+        if (!sub) return task
+        const subtasks = task.subtasks.filter(
+          (item) => item.id !== action.subId
+        )
+        return withEvent(
+          {
+            ...task,
+            subtasks,
+            progress: stepProgress(subtasks, task.progress),
+          },
+          action.at,
+          "subtask",
+          `Removed step: ${sub.title}`
+        )
+      })
+
+    case "edit-subtask":
+      return mapTask(state, action.id, (task) => {
+        const title = action.title.trim()
+        const sub = task.subtasks.find((item) => item.id === action.subId)
+        if (!sub || !title || title === sub.title) return task
+        return withEvent(
+          {
+            ...task,
+            subtasks: task.subtasks.map((item) =>
+              item.id === action.subId ? { ...item, title } : item
+            ),
+          },
+          action.at,
+          "subtask",
+          `Edited step: ${title}`
+        )
+      })
+
+    case "move-subtask":
+      return mapTask(state, action.id, (task) => {
+        const index = task.subtasks.findIndex((sub) => sub.id === action.subId)
+        const target = index + action.direction
+        if (index < 0 || target < 0 || target >= task.subtasks.length)
+          return task
+        const subtasks = [...task.subtasks]
+        const [moved] = subtasks.splice(index, 1)
+        subtasks.splice(target, 0, moved)
+        return { ...task, subtasks }
+      })
+
+    case "split-subtask": {
+      // A running timer follows the work to the first of the smaller steps.
+      const timer =
+        state.timer?.subtaskId === action.subId && action.steps.length
+          ? { ...state.timer, subtaskId: action.steps[0].id }
+          : state.timer
+      return mapTask({ ...state, timer }, action.id, (task) => {
+        const index = task.subtasks.findIndex((sub) => sub.id === action.subId)
+        if (index < 0 || !action.steps.length) return task
+        const original = task.subtasks[index]
+        // A finished step is real work, so it's never replaced.
+        if (original.done) return task
+        const subtasks = [...task.subtasks]
+        subtasks.splice(
+          index,
+          1,
+          ...action.steps.map((step) => ({
+            id: step.id,
+            title: step.title.trim(),
+            done: false,
+            source: original.source,
+            completedAt: null,
+          }))
+        )
+        return withEvent(
+          {
+            ...task,
+            subtasks,
+            currentSubtaskId: null,
+            progress: stepProgress(subtasks, task.progress),
+          },
+          action.at,
+          "subtask",
+          `Accepted smaller steps in place of: ${original.title}`
+        )
+      })
+    }
+
+    case "set-current-subtask":
       return mapTask(state, action.id, (task) => ({
         ...task,
-        subtasks: task.subtasks.filter((sub) => sub.id !== action.subId),
+        currentSubtaskId: action.subId,
+        lastWorkedAt: action.at,
       }))
+
+    case "set-breakdown":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          { ...task, pendingBreakdown: action.breakdown },
+          action.at,
+          "breakdown",
+          `Suggested a breakdown with ${action.breakdown.steps.length} steps (${sourceName(action.breakdown)})`
+        )
+      )
+
+    case "accept-breakdown":
+      return mapTask(state, action.id, (task) => {
+        const pending = task.pendingBreakdown
+        const source: Subtask["source"] = pending?.source ?? "user"
+        // Finished work always stays. Only the steps still open are replaced.
+        const done = task.subtasks.filter((sub) => sub.done)
+        const subtasks = [
+          ...done,
+          ...action.steps.map((step) => ({
+            id: step.id,
+            title: step.title.trim(),
+            done: false,
+            source,
+            completedAt: null,
+          })),
+        ]
+        return withEvent(
+          {
+            ...task,
+            subtasks,
+            pendingBreakdown: null,
+            currentSubtaskId: null,
+            lastWorkedAt: action.at,
+            progress: stepProgress(subtasks, task.progress),
+          },
+          action.at,
+          "breakdown",
+          `Accepted a breakdown with ${action.steps.length} steps${done.length ? ` (kept ${done.length} finished)` : ""}`
+        )
+      })
+
+    case "decline-breakdown":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          { ...task, pendingBreakdown: null },
+          action.at,
+          "breakdown",
+          "Declined a suggested breakdown"
+        )
+      )
 
     case "save-document":
       return mapTask(state, action.id, (task) => {
@@ -375,6 +666,97 @@ export function workspaceReducer(
         updatedAt: action.at,
         documents: task.documents.filter((doc) => doc.id !== action.docId),
       }))
+
+    case "save-work-doc":
+      return mapTask(state, action.id, (task) => {
+        const previous = task.workDoc?.previous ?? null
+        const unchanged = task.workDoc?.content === action.content
+        const saved: Task = {
+          ...task,
+          lastWorkedAt: unchanged ? task.lastWorkedAt : action.at,
+          workDoc: {
+            content: action.content,
+            cursor: action.cursor,
+            previous,
+            updatedAt: unchanged
+              ? (task.workDoc?.updatedAt ?? action.at)
+              : action.at,
+          },
+        }
+        return task.workDoc || unchanged
+          ? saved
+          : withEvent(
+              saved,
+              action.at,
+              "document",
+              "Started the working document"
+            )
+      })
+
+    case "restore-work-doc":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          {
+            ...task,
+            workDoc: {
+              content: action.content,
+              previous: action.previous,
+              cursor: 0,
+              updatedAt: action.at,
+            },
+          },
+          action.at,
+          "document",
+          "Went back to the version from before a suggestion"
+        )
+      )
+
+    case "accept-doc-suggestion":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          {
+            ...task,
+            lastWorkedAt: action.at,
+            workDoc: {
+              content: task.workDoc?.content ?? "",
+              cursor: task.workDoc?.cursor ?? 0,
+              updatedAt: task.workDoc?.updatedAt ?? action.at,
+              previous: action.previous,
+            },
+          },
+          action.at,
+          "document",
+          `Accepted a suggestion into the document: ${action.label}`
+        )
+      )
+
+    case "set-instructions":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          {
+            ...task,
+            instructions: action.instructions,
+            // Agreeing to send old text doesn't cover new text.
+            aiConsentAt: null,
+          },
+          action.at,
+          "instructions",
+          action.instructions
+            ? `Added instructions${action.instructions.sourceName ? ` from ${action.instructions.sourceName}` : ""}`
+            : "Removed the instructions"
+        )
+      )
+
+    case "set-ai-consent":
+      return mapTask(state, action.id, (task) => ({
+        ...task,
+        aiConsentAt: action.at,
+      }))
+
+    case "log-doc-suggestion":
+      return mapTask(state, action.id, (task) =>
+        withEvent(task, action.at, "document", action.text)
+      )
 
     case "log-obstacle":
       return mapTask(state, action.id, (task) =>
@@ -439,10 +821,49 @@ export function workspaceReducer(
       }
 
     case "set-recovery":
-      return mapTask(state, action.id, (task) => ({
-        ...task,
-        recovery: action.recovery,
-      }))
+      return mapTask(state, action.id, (task) => {
+        const recovery = action.recovery
+        if (!recovery) return { ...task, recovery: null }
+        const attempt: RecoveryAttempt = {
+          id: `${recovery.createdAt}-${task.recoveryAttempts.length}`,
+          at: recovery.createdAt,
+          subtaskId: currentSubtask(task)?.id ?? null,
+          obstacle: action.obstacle ?? "",
+          suggestion: recovery.plan.nextStep.instruction,
+          source: recovery.source,
+          outcome: "suggested",
+        }
+        return withEvent(
+          {
+            ...task,
+            recovery,
+            recoveryAttempts: [...task.recoveryAttempts, attempt].slice(-50),
+          },
+          recovery.createdAt,
+          "recovery",
+          `Suggested a recovery plan (${sourceName(recovery)}): ${recovery.plan.nextStep.instruction}`
+        )
+      })
+
+    case "append-to-doc":
+      return mapTask(state, action.id, (task) => {
+        const previous = task.workDoc?.content ?? ""
+        return withEvent(
+          {
+            ...task,
+            lastWorkedAt: action.at,
+            workDoc: {
+              content: `${previous}<p><span data-suggested="true">${escapeHtml(action.text)}</span></p>`,
+              cursor: task.workDoc?.cursor ?? 0,
+              previous,
+              updatedAt: action.at,
+            },
+          },
+          action.at,
+          "document",
+          `Accepted a suggestion into the document: ${action.label}`
+        )
+      })
 
     case "decline-recovery":
       return mapTask(state, action.id, (task) => {
@@ -452,6 +873,7 @@ export function workspaceReducer(
           {
             ...task,
             recovery: null,
+            recoveryAttempts: markLastAttempt(task, "declined"),
             rejectedPlans: [
               ...task.rejectedPlans,
               {
@@ -485,10 +907,16 @@ export function workspaceReducer(
         let updated: Task = {
           ...task,
           recovery: null,
+          recoveryAttempts: markLastAttempt(task, "accepted"),
           nextAction: action.nextAction ?? task.nextAction,
           subtasks: [
             ...task.subtasks,
-            ...action.steps.map((step) => ({ ...step, done: false })),
+            ...action.steps.map((step) => ({
+              ...step,
+              done: false,
+              source,
+              completedAt: null,
+            })),
           ],
           documents: action.document
             ? [
@@ -543,6 +971,7 @@ export function workspaceReducer(
         id: action.id,
         kind: action.kind,
         taskId: action.taskId,
+        subtaskId: action.subtaskId ?? null,
         plannedSeconds: action.minutes * 60,
         startedAt: action.at,
         runningSince: action.now,
@@ -550,13 +979,19 @@ export function workspaceReducer(
       }
       const next = { ...state, timer, finishedSessionId: null }
       if (action.kind !== "focus" || !action.taskId) return next
-      return mapTask(next, action.taskId, (task) =>
-        task.status === "not-started" ||
-        task.status === "paused" ||
-        task.status === "needs-recovery"
-          ? setTaskStatus(task, "in-progress", action.at)
-          : task
-      )
+      return mapTask(next, action.taskId, (task) => {
+        const started = withEvent(
+          { ...task, lastWorkedAt: action.at },
+          action.at,
+          "focus",
+          `Started a focus session (${action.minutes} min)`
+        )
+        return task.status === "not-started" ||
+          task.status === "paused" ||
+          task.status === "needs-recovery"
+          ? setTaskStatus(started, "in-progress", action.at)
+          : started
+      })
     }
 
     case "timer-pause": {
@@ -622,8 +1057,118 @@ export function workspaceReducer(
       return next
     }
 
+    case "report-focus": {
+      const session = state.focusSessions.find(
+        (item) => item.id === action.sessionId
+      )
+      if (!session) return state
+      const next: Workspace = {
+        ...state,
+        focusSessions: state.focusSessions.map((item) =>
+          item.id === action.sessionId
+            ? { ...item, progressReport: action.report }
+            : item
+        ),
+      }
+      if (!session.taskId) return next
+      return mapTask(next, session.taskId, (task) => {
+        if (action.report === "stuck") {
+          return setTaskStatus(
+            withEvent(
+              task,
+              action.at,
+              "stuck",
+              "Reported being stuck after a focus session"
+            ),
+            "needs-recovery",
+            action.at
+          )
+        }
+        const reported = withEvent(
+          task,
+          action.at,
+          "progress",
+          `Reported progress after a focus session: ${action.report === "yes" ? "yes" : "a little"}`
+        )
+        // With steps, progress comes only from steps the user marks finished.
+        return task.subtasks.length
+          ? reported
+          : {
+              ...reported,
+              progress: Math.min(
+                95,
+                task.progress + (action.report === "yes" ? 10 : 5)
+              ),
+            }
+      })
+    }
+
+    case "report-stuck":
+      return mapTask(state, action.id, (task) => {
+        const reported = withEvent(
+          task,
+          action.at,
+          "stuck",
+          "Reported being stuck"
+        )
+        return action.text
+          ? withEvent(reported, action.at, "obstacle", action.text)
+          : reported
+      })
+
     case "timer-acknowledge":
       return { ...state, finishedSessionId: null }
+
+    case "log-help":
+      return state
+
+    case "learning":
+      return { ...state, learning: { ...state.learning, ...action.patch } }
+
+    case "delete-friction":
+      return {
+        ...state,
+        frictionLog: state.frictionLog.filter((item) => item.id !== action.id),
+      }
+
+    case "clear-friction":
+      return {
+        ...state,
+        frictionLog: [],
+        learning: { ...state.learning, dismissed: [] },
+      }
+
+    case "set-daily-plan":
+      return { ...state, dailyPlan: action.plan }
+
+    case "toggle-daily-item":
+      return state.dailyPlan
+        ? {
+            ...state,
+            dailyPlan: {
+              ...state.dailyPlan,
+              items: state.dailyPlan.items.map((item) =>
+                item.taskId === action.taskId
+                  ? { ...item, done: !item.done }
+                  : item
+              ),
+            },
+          }
+        : state
+
+    case "move-daily-item": {
+      if (!state.dailyPlan) return state
+      const items = [...state.dailyPlan.items]
+      const from = items.findIndex((item) => item.taskId === action.taskId)
+      const to = from + action.by
+      if (from < 0 || to < 0 || to >= items.length) return state
+      const [moved] = items.splice(from, 1)
+      items.splice(to, 0, moved)
+      return { ...state, dailyPlan: { ...state.dailyPlan, items } }
+    }
+
+    case "mark-opened":
+      return { ...state, lastOpenedAt: action.at }
 
     case "settings":
       return { ...state, settings: { ...state.settings, ...action.patch } }
@@ -655,14 +1200,18 @@ function recordSession(
     id: timer.id,
     taskId: timer.taskId,
     taskTitle: task?.title ?? "no specific task",
+    subtaskId: timer.subtaskId,
+    progressReport: null,
     plannedMinutes: timer.plannedSeconds / 60,
     startedAt: timer.startedAt,
     ...result,
   }
   const length = formatMinutes(result.actualSeconds)
-  const text =
-    result.outcome === "completed"
-      ? `Focus session completed (${length})`
+  const interrupted = isInterrupted(session)
+  const text = interrupted
+    ? `Interrupted attempt (${length})${result.outcome === "stuck" ? ": got stuck" : ""}`
+    : result.outcome === "completed"
+      ? `Focus session finished (${length})`
       : result.outcome === "stuck"
         ? `Stopped focus after ${length}: got stuck`
         : `Stopped focus after ${length}: will continue later`
@@ -681,18 +1230,50 @@ function recordSession(
   })
 }
 
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
+/** The most recent suggestion is the one the user has just decided about. */
+function markLastAttempt(task: Task, outcome: RecoveryAttempt["outcome"]) {
+  const attempts = [...task.recoveryAttempts]
+  const last = attempts.at(-1)
+  if (last?.outcome === "suggested") {
+    attempts[attempts.length - 1] = { ...last, outcome }
+  }
+  return attempts
+}
+
+function stepProgress(subtasks: Task["subtasks"], fallback: number) {
+  if (!subtasks.length) return fallback
+  const done = subtasks.filter((item) => item.done).length
+  return Math.round((done / subtasks.length) * 100)
+}
+
+function sourceName(pending: { source: "live" | "demo" }) {
+  return pending.source === "live" ? "Live AI" : "Demo Mode template"
+}
+
 function toggleSubtask(task: Task, subId: string, at: string): Task {
   const sub = task.subtasks.find((item) => item.id === subId)
   if (!sub) return task
   const subtasks = task.subtasks.map((item) =>
-    item.id === subId ? { ...item, done: !item.done } : item
+    item.id === subId
+      ? { ...item, done: !item.done, completedAt: item.done ? null : at }
+      : item
   )
-  const done = subtasks.filter((item) => item.done).length
   return withEvent(
     {
       ...task,
       subtasks,
-      progress: Math.round((done / subtasks.length) * 100),
+      lastWorkedAt: at,
+      currentSubtaskId:
+        task.currentSubtaskId === subId ? null : task.currentSubtaskId,
+      progress: stepProgress(subtasks, task.progress),
     },
     at,
     "subtask",

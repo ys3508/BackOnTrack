@@ -52,7 +52,7 @@ export function DeadlineChip({ task }: { task: Task }) {
 }
 
 export function PriorityChip({ task }: { task: Task }) {
-  if (task.priority === "medium") return null
+  if (task.priority === "medium" || task.priority === "none") return null
   return (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <Flag className="size-3.5" aria-hidden />

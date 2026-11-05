@@ -29,10 +29,11 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   released: "Released",
 }
 
-export const PRIORITIES = ["low", "medium", "high"] as const
+export const PRIORITIES = ["none", "low", "medium", "high"] as const
 export type Priority = (typeof PRIORITIES)[number]
 
 export const PRIORITY_LABEL: Record<Priority, string> = {
+  none: "No priority",
   low: "Low",
   medium: "Medium",
   high: "High",
@@ -54,8 +55,15 @@ export const TaskEventSchema = z.object({
     "schedule",
     "obstacle",
     "recovery",
+    "breakdown",
+    "stuck",
+    "instructions",
   ]),
   text: z.string(),
+  /** Separates a suggestion from something accepted, tried, or really finished. */
+  kind: z
+    .enum(["info", "suggested", "accepted", "attempted", "completed"])
+    .default("info"),
 })
 export type TaskEvent = z.infer<typeof TaskEventSchema>
 
@@ -63,6 +71,8 @@ export const SubtaskSchema = z.object({
   id: z.string(),
   title: z.string(),
   done: z.boolean(),
+  source: z.enum(["user", "live", "demo"]).default("user"),
+  completedAt: z.string().nullable().default(null),
 })
 export type Subtask = z.infer<typeof SubtaskSchema>
 
@@ -74,6 +84,48 @@ export const TaskDocumentSchema = z.object({
   updatedAt: z.string(),
 })
 export type TaskDocument = z.infer<typeof TaskDocumentSchema>
+
+/** The task's rich-text document, stored as sanitized editor HTML. */
+export const WorkDocSchema = z.object({
+  content: z.string(),
+  updatedAt: z.string(),
+  /** Where the cursor was, so returning can continue from the same place. */
+  cursor: z.number().default(0),
+  /** The version from before the last accepted AI suggestion. */
+  previous: z.string().nullable().default(null),
+})
+export type WorkDoc = z.infer<typeof WorkDocSchema>
+
+export const InstructionsSchema = z.object({
+  text: z.string(),
+  sourceName: z.string().default(""),
+  kind: z.enum(["paste", "file"]).default("paste"),
+  truncated: z.boolean().default(false),
+  addedAt: z.string(),
+})
+export type Instructions = z.infer<typeof InstructionsSchema>
+
+/** A suggested breakdown. These aren't task steps until the user accepts them. */
+export const PendingBreakdownSchema = z.object({
+  steps: z.array(z.string()),
+  note: z.string().default(""),
+  ambiguities: z.array(z.string()).default([]),
+  source: z.enum(["live", "demo"]),
+  usedFallback: z.boolean().default(false),
+  createdAt: z.string(),
+})
+export type PendingBreakdown = z.infer<typeof PendingBreakdownSchema>
+
+export const RecoveryAttemptSchema = z.object({
+  id: z.string(),
+  at: z.string(),
+  subtaskId: z.string().nullable().default(null),
+  obstacle: z.string().default(""),
+  suggestion: z.string(),
+  source: z.enum(["live", "demo"]),
+  outcome: z.enum(["suggested", "accepted", "declined"]),
+})
+export type RecoveryAttempt = z.infer<typeof RecoveryAttemptSchema>
 
 /** A recovery plan waiting for the user's decision. Nothing is applied yet. */
 export const StoredRecoverySchema = z.object({
@@ -92,7 +144,7 @@ export const TaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(""),
   status: z.enum(TASK_STATUSES),
-  priority: z.enum(PRIORITIES).default("medium"),
+  priority: z.enum(PRIORITIES).default("none"),
   deadline: DateString.nullable().default(null),
   /** The first deadline ever set. Rescheduling work never changes it. */
   originalDeadline: DateString.nullable().default(null),
@@ -106,6 +158,16 @@ export const TaskSchema = z.object({
   completedAt: z.string().nullable().default(null),
   recovery: StoredRecoverySchema.nullable().catch(null).default(null),
   rejectedPlans: z.array(RejectedPlanSchema).catch([]).default([]),
+  workDoc: WorkDocSchema.nullable().catch(null).default(null),
+  instructions: InstructionsSchema.nullable().catch(null).default(null),
+  /** When the user agreed to send this task's documents to the AI provider. */
+  aiConsentAt: z.string().nullable().catch(null).default(null),
+  pendingBreakdown: PendingBreakdownSchema.nullable().catch(null).default(null),
+  currentSubtaskId: z.string().nullable().catch(null).default(null),
+  lastWorkedAt: z.string().nullable().catch(null).default(null),
+  recoveryAttempts: z.array(RecoveryAttemptSchema).catch([]).default([]),
+  /** The user's rough guess at the whole task, in minutes. Optional. */
+  estimateMinutes: z.number().positive().nullable().catch(null).default(null),
 })
 export type Task = z.infer<typeof TaskSchema>
 
@@ -119,6 +181,9 @@ export const FocusSessionSchema = z.object({
   endedAt: z.string(),
   outcome: z.enum(["completed", "continue-later", "stuck"]),
   note: z.string().default(""),
+  subtaskId: z.string().nullable().default(null),
+  /** The user's own answer. Elapsed time alone is never treated as progress. */
+  progressReport: z.enum(["yes", "a-little", "stuck"]).nullable().default(null),
 })
 export type FocusSession = z.infer<typeof FocusSessionSchema>
 
@@ -138,6 +203,7 @@ export const TimerSchema = z.object({
   id: z.string(),
   kind: z.enum(["focus", "break"]),
   taskId: z.string().nullable(),
+  subtaskId: z.string().nullable().default(null),
   plannedSeconds: z.number(),
   startedAt: z.string(),
   /** Wall-clock milliseconds when it last started running, or null if paused. */
@@ -162,8 +228,106 @@ export const DEFAULT_SETTINGS: Settings = {
   homeListSize: 3,
 }
 
+export const ESTIMATE_OPTIONS = [5, 15, 30, 60, 120, 240]
+
+export const estimateLabel = (minutes: number) =>
+  minutes < 60
+    ? `About ${minutes} min`
+    : `About ${minutes / 60} ${minutes === 60 ? "hour" : "hours"}`
+
+export const DailyPlanItemSchema = z.object({
+  taskId: z.string(),
+  subtaskId: z.string().nullable().default(null),
+  title: z.string(),
+  action: z.string(),
+  minutes: z.number(),
+  reason: z.string().default(""),
+  done: z.boolean().default(false),
+})
+export type DailyPlanItem = z.infer<typeof DailyPlanItemSchema>
+
+export const ENERGY_LEVELS = ["low", "okay", "good"] as const
+export type Energy = (typeof ENERGY_LEVELS)[number]
+
+export const DailyPlanSchema = z.object({
+  date: z.string(),
+  minutes: z.number(),
+  energy: z.enum(ENERGY_LEVELS).nullable().default(null),
+  items: z.array(DailyPlanItemSchema),
+  createdAt: z.string(),
+})
+export type DailyPlan = z.infer<typeof DailyPlanSchema>
+
+export const HELP_KINDS = [
+  "prepared",
+  "outline",
+  "draft",
+  "checklist",
+  "code",
+  "smaller-steps",
+  "recovery-plan",
+] as const
+export type HelpKind = (typeof HELP_KINDS)[number]
+
+export const HELP_LABEL: Record<HelpKind, string> = {
+  prepared: "A prepared document",
+  outline: "An outline",
+  draft: "A rough draft to edit",
+  checklist: "A checklist",
+  code: "A code starting point",
+  "smaller-steps": "Smaller steps",
+  "recovery-plan": "A recovery plan",
+}
+
+export type TaskKind = "writing" | "code" | "other"
+
+/** One moment that shows whether work is moving. Never holds the user's text. */
+export const FrictionEventSchema = z.object({
+  id: z.string(),
+  at: z.string(),
+  kind: z.enum(["stuck", "session", "moved", "help"]),
+  taskId: z.string(),
+  taskKind: z.enum(["writing", "code", "other"]),
+  blankDoc: z.boolean(),
+  interrupted: z.boolean().default(false),
+  helpKind: z.enum(HELP_KINDS).nullable().default(null),
+  /** The user's own word count when help was accepted. */
+  baselineWords: z.number().default(0),
+  outcome: z.enum(["progress", "stuck"]).nullable().default(null),
+})
+export type FrictionEvent = z.infer<typeof FrictionEventSchema>
+
+export const LearningSchema = z.object({
+  enabled: z.boolean().default(true),
+  dismissed: z.array(z.string()).default([]),
+  preferred: z.enum(HELP_KINDS).nullable().default(null),
+})
+export type Learning = z.infer<typeof LearningSchema>
+
+export const DEFAULT_LEARNING: Learning = {
+  enabled: true,
+  dismissed: [],
+  preferred: null,
+}
+
+/** Under a minute and stopped early: an interrupted attempt, not focus time. */
+export const INTERRUPTED_UNDER_SECONDS = 60
+
+export function isInterrupted(session: FocusSession) {
+  return (
+    session.outcome !== "completed" &&
+    session.actualSeconds < INTERRUPTED_UNDER_SECONDS
+  )
+}
+
+export function isFocusTime(session: FocusSession) {
+  return !isInterrupted(session)
+}
+
+export const WORKSPACE_VERSION = 2
+
 export type Workspace = {
-  version: 1
+  version: 2
   tasks: Task[]
   focusSessions: FocusSession[]
   planned: PlannedSession[]
@@ -174,10 +338,15 @@ export type Workspace = {
   /** Tasks set aside from the home recommendation for one day. */
   skipped: { date: string; taskIds: string[] }
   legacyMigrated: boolean
+  /** When the app was last opened, kept only in this browser. */
+  lastOpenedAt: string | null
+  frictionLog: FrictionEvent[]
+  learning: Learning
+  dailyPlan: DailyPlan | null
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
-  version: 1,
+  version: 2,
   tasks: [],
   focusSessions: [],
   planned: [],
@@ -186,6 +355,10 @@ export const EMPTY_WORKSPACE: Workspace = {
   settings: DEFAULT_SETTINGS,
   skipped: { date: "", taskIds: [] },
   legacyMigrated: false,
+  lastOpenedAt: null,
+  frictionLog: [],
+  learning: DEFAULT_LEARNING,
+  dailyPlan: null,
 }
 
 export const ACTIVE_STATUSES: TaskStatus[] = [

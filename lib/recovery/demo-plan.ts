@@ -1,4 +1,12 @@
 import { applySafetyGuards } from "@/lib/guards"
+import { similarity } from "@/lib/guards"
+import { categorize } from "@/lib/recovery/categorize"
+import { concreteStep } from "@/lib/recovery/concrete"
+import { preparedParts } from "@/lib/recovery/demo-setup"
+import { preparedDocument } from "@/lib/recovery/prepared"
+import { startsPrepared } from "@/lib/workspace/patterns"
+import type { Category } from "@/lib/recovery/categorize"
+import { extractRequirements } from "@/lib/recovery/demo-breakdown"
 import { contextIntake, taskFacts } from "@/lib/recovery/context"
 import type {
   Analysis,
@@ -15,40 +23,10 @@ import { addDays, shortDate } from "@/lib/workspace/dates"
  * data, so it's useful without an API key, but it isn't AI and doesn't claim to be.
  */
 
-type Category = "academic" | "job" | "message" | "admin" | "general"
-
-export function categorize(text: string): Category {
-  const value = text.toLowerCase()
-  if (
-    /\b(homework|assignment|essay|paper|thesis|exams?|class|course|professor|study|lab report|syllabus|quiz|midterm|final)\b/.test(
-      value
-    )
-  ) {
-    return "academic"
-  }
-  if (
-    /\b(jobs?|appl(y|ying|ication|ications)|resume|résumé|cover letter|interview)\b/.test(
-      value
-    )
-  ) {
-    return "job"
-  }
-  if (
-    /\b(email|e-mail|reply|respond|message|call back|text back)\b/.test(value)
-  ) {
-    return "message"
-  }
-  if (
-    /\b(tax(es)?|bills?|forms?|insurance|rent|appointment|visa|paperwork|renew)\b/.test(
-      value
-    )
-  ) {
-    return "admin"
-  }
-  return "general"
-}
-
 type Template = {
+  adapted?: string
+  smallerSteps?: string[]
+  choices?: string[]
   headline: string
   instruction: string
   why: string
@@ -58,6 +36,147 @@ type Template = {
   artifactTitle: string
   body: string
   steps: string[]
+}
+
+/** Plans built from the user's real progress, tried before the general ones. */
+function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
+  const { task, obstacle } = request
+  const list: Template[] = []
+  const reported = [obstacle, ...task.obstacles].join(" ")
+  const requirements = extractRequirements(task.instructions, 8)
+
+  const confused =
+    /understand|unclear|confus|not sure what|don.t know what|what .* wants/i.test(
+      reported
+    ) || /review|read .*instructions/i.test(task.currentStep)
+  if (requirements.length && confused) {
+    list.push({
+      headline: "Pull out what’s actually being asked",
+      instruction:
+        "Read this checklist of what your instructions ask for, and mark anything unclear with a question mark.",
+      why: "It turns the instructions into a short list. These lines were pulled out with simple text rules, so check them against the original.",
+      minutes: 5,
+      approach: "gather-information",
+      kind: "checklist",
+      artifactTitle: "What the instructions ask for",
+      body: [
+        "What's being asked:",
+        ...requirements.map((item) => `- [ ] ${item}`),
+        "",
+        "What I'd ask about:",
+        "- [anything unclear]",
+      ].join("\n"),
+      steps: [
+        "Mark anything unclear",
+        "Choose the checklist item you understand best",
+      ],
+    })
+  }
+
+  // What their records suggest comes before the other approaches.
+  const avoids = (kind: string) => task.avoidHelp.includes(kind)
+  if (
+    startsPrepared(task.preferredHelp) &&
+    !task.document.trim() &&
+    !avoids("prepared")
+  ) {
+    const parts = preparedParts(task, requirements)
+    list.push({
+      headline: "Start from a prepared document",
+      instruction: `Fill in the first [bracket] under “${parts.firstSection.title}”`,
+      why: "There’s no blank page to face, because you’d be editing something that’s already there.",
+      minutes: 5,
+      approach: "shrink-scope",
+      kind: "outline",
+      artifactTitle: "A prepared document",
+      body: preparedDocument({
+        ...parts,
+        deliverables: requirements,
+        starter: { kind: "draft", title: "", content: "" },
+        firstAction: "",
+      }),
+      steps: [],
+      adapted: task.learned[0] ?? "",
+    })
+  }
+
+  // A coding step, or one that's already resisted a plan, gets made smaller.
+  if (task.currentStep) {
+    const concrete = concreteStep(task.currentStep)
+    const different = similarity(concrete.firstAction, task.currentStep) < 0.8
+    if (
+      different &&
+      (concrete.starter.kind === "code" ||
+        task.stuckOnStep > 0 ||
+        task.preferredHelp === "smaller-steps") &&
+      !(avoids("smaller-steps") && concrete.starter.kind !== "code")
+    ) {
+      list.push({
+        headline: `Make “${task.currentStep}” smaller`,
+        instruction: concrete.firstAction,
+        why: concrete.why,
+        minutes: 5,
+        approach: "shrink-scope",
+        kind: concrete.starter.kind === "code" ? "code" : "checklist",
+        artifactTitle: concrete.starter.title,
+        body: concrete.starter.content,
+        // Its steps replace the current one, so they aren't also added at the end.
+        steps: [],
+        smallerSteps: concrete.smallerSteps,
+      })
+    }
+  }
+
+  const writing = /writ|draft|introduc|paragraph|outline|section/i.test(
+    task.currentStep
+  )
+  if (writing) {
+    const subject = requirements[0] ?? "[your topic]"
+    list.push({
+      headline: "Pick an opening, and change it",
+      instruction:
+        "Choose one of these openings to put in your document, then change anything you like.",
+      why: "Editing something on the page is easier than facing a blank one. These are templates for you to finish, and you stay the author.",
+      minutes: 5,
+      approach: "write-in-app",
+      kind: "note",
+      artifactTitle: `Openings: ${task.title}`,
+      body: `Notes for this section of ${task.title}:
+[what you want to say]`,
+      steps: ["Insert one opening", "Fill in its brackets"],
+      choices: [
+        `This section covers: ${subject.replace(/\.$/, "")}. My main point is [your main point].`,
+        `I first looked at [what you looked at], and found [what you found].`,
+        `The question here is [your question], and my answer is [your answer] because [your reason].`,
+      ],
+    })
+  }
+
+  const lastLine = task.document.trim().split("\n").filter(Boolean).at(-1)
+  // "One more sentence" makes no sense after a line of code.
+  const looksLikeCode = /[=(){};]|^\s*(import|from|def|class)\b/.test(
+    lastLine ?? ""
+  )
+  if (lastLine && !looksLikeCode) {
+    const quote =
+      lastLine.length > 90 ? `${lastLine.slice(0, 87)}...` : lastLine
+    list.push({
+      headline: "Pick up where your document stops",
+      instruction: `Add one more sentence after “${quote}”`,
+      why: "You've already started, so this uses what's there instead of beginning again.",
+      minutes: 5,
+      approach: "write-in-app",
+      kind: "note",
+      artifactTitle: `Where my document stops: ${task.title}`,
+      body: `My document stops at:
+${lastLine}
+
+What comes next, roughly:
+[one line]`,
+      steps: ["Add one sentence to your document"],
+    })
+  }
+  return list
 }
 
 function templates(
@@ -416,14 +535,17 @@ export function demoTaskRecovery(
   const lowEnergy = /energy|overwhelm|too big/i.test(obstacle)
   const offset = justStuck || lowEnergy ? 1 : 0
 
+  const adaptive = strategy === "RELEASE" ? [] : adaptiveTemplates(request)
   const list =
     strategy === "RELEASE"
       ? [releaseTemplate(request)]
-      : templates(request, category)
+      : [...adaptive, ...templates(request, category)]
   const used = new Set(rejected.map((item) => item.artifactTitle))
   const available = list.filter((item) => !used.has(item.artifactTitle))
+  // A plan built from this task's own progress already fits, so it comes first.
+  const stillTailored = adaptive.some((item) => !used.has(item.artifactTitle))
   const template =
-    available[Math.min(offset, available.length - 1)] ??
+    available[stillTailored ? 0 : Math.min(offset, available.length - 1)] ??
     PAUSE_TEMPLATE(task.title)
   const exhausted = available.length === 0
 
@@ -437,6 +559,7 @@ export function demoTaskRecovery(
       ? `Your last focus session stopped early${lastNote ? ` (“${lastNote}”)` : ""}, so this is smaller.`
       : "",
     obstacle ? `You said: “${obstacle}”.` : "",
+    template.adapted ? `Based on your records: ${template.adapted}` : "",
   ]
     .filter(Boolean)
     .join(" ")
@@ -458,8 +581,14 @@ export function demoTaskRecovery(
         body: template.body,
       },
       steps,
+      smallerSteps: template.smallerSteps ?? [],
+      choices: template.choices ?? [],
       schedule: [
-        { date: today, minutes: 10, label: template.steps[0] },
+        {
+          date: today,
+          minutes: 10,
+          label: template.steps[0] ?? template.instruction,
+        },
         ...(strategy === "RELEASE"
           ? []
           : [

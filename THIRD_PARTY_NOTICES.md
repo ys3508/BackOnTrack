@@ -38,11 +38,20 @@ SOFTWARE.
 | [dnd-kit](https://github.com/clauderic/dnd-kit) (`@dnd-kit/core`) | Kanban drag and drop, as an npm dependency | MIT, Copyright (c) 2021, Claudéric Demers |
 | [axe-core](https://github.com/dequelabs/axe-core) | Accessibility tests only. Not shipped in the app. | MPL-2.0 |
 
+## Components added for task execution
+
+| Project | Use | License |
+| --- | --- | --- |
+| [Tiptap](https://github.com/ueberdosis/tiptap) (`@tiptap/core`, `react`, `pm`, `starter-kit`, `extension-list`, `extensions`, `markdown`) | Working document editor, as npm dependencies | MIT |
+| [PDF.js](https://github.com/mozilla/pdf.js) (`pdfjs-dist`) | Reading PDF text in the browser, as an npm dependency | Apache-2.0, Copyright Mozilla and the PDF.js contributors. The license is included in the package. |
+
 ## Projects reviewed, with no code copied
 
 | Project | License found on 2026-11-05 | Outcome |
 | --- | --- | --- |
 | [Georgegriff/react-dnd-kit-tailwind-shadcn-ui](https://github.com/Georgegriff/react-dnd-kit-tailwind-shadcn-ui) | MIT, Copyright (c) 2023 George Griffiths | Its approach to keyboard sensors and screen-reader announcements informed the board, which was written separately for this app's data. |
+| [hunghg255/reactjs-tiptap-editor](https://github.com/hunghg255/reactjs-tiptap-editor) | MIT | Not used. It brings its own interface, so core Tiptap fits the app's design with less code. |
+| [kcsujeet/ilamy-calendar](https://github.com/kcsujeet/ilamy-calendar) | MIT | Not used. The brief said not to rebuild the calendar, so FullCalendar stays. |
 | [natuomi/pomodoro](https://github.com/natuomi/pomodoro) | MIT | Not used. It counts `setInterval` ticks, and this project needs wall-clock timing. |
 | [ZainnQureshii/flowtask](https://github.com/ZainnQureshii/flowtask) | No LICENSE file, and none detected by GitHub, although its README says "MIT" | Not used. Without an explicit license file, no code was taken from it. |
 | [albertkupperdev/sapling](https://github.com/albertkupperdev/sapling) | None | Not used. |

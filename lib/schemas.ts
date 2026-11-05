@@ -1,6 +1,8 @@
 import { z } from "zod"
 
 export const LIMITS = {
+  contextInstructions: 12000,
+  contextDocument: 8000,
   responsibility: 2000,
   detail: 300,
   legacyNotes: 700,
@@ -221,6 +223,7 @@ export const ARTIFACT_KINDS = [
   "schedule",
   "checklist",
   "note",
+  "code",
 ] as const
 
 /** No length or size limits here, for the same reason as the schemas above. */
@@ -245,6 +248,16 @@ export const RecoveryPlanSchema = z.object({
       .describe("A usable draft. Use [brackets] for details you don't have."),
   }),
   steps: z.array(z.string()).describe("Up to 6 small, concrete steps."),
+  smallerSteps: z
+    .array(z.string())
+    .describe(
+      "If the current step is too big, 2 to 5 smaller steps to replace it. Otherwise empty."
+    ),
+  choices: z
+    .array(z.string())
+    .describe(
+      "Up to 3 short options the user can insert into their document, such as opening sentences. Empty if not useful."
+    ),
   schedule: z
     .array(
       z.object({
@@ -275,6 +288,17 @@ export const TaskContextSchema = z.object({
   attempts: z.array(shortText).max(15),
   obstacles: z.array(shortText).max(10),
   openSteps: z.array(shortText).max(15),
+  /** Task instructions the user provided, shortened to a safe length. */
+  instructions: z.string().max(LIMITS.contextInstructions).default(""),
+  /** Plain text from the working document, shortened to a safe length. */
+  document: z.string().max(LIMITS.contextDocument).default(""),
+  currentStep: shortText.default(""),
+  /** How many recovery plans have already been tried on the current step. */
+  stuckOnStep: z.number().min(0).default(0),
+  /** Guesses from the user's own records, only if learning is switched on. */
+  learned: z.array(shortText).max(6).default([]),
+  preferredHelp: z.string().max(40).default(""),
+  avoidHelp: z.array(z.string().max(40)).max(7).default([]),
   focusSessions: z
     .array(
       z.object({
@@ -314,8 +338,156 @@ export type TaskRecoveryResult = {
   exhausted?: boolean
 }
 
+/* ---------- Task breakdown ---------- */
+
+export const TaskBreakdownOutputSchema = z.object({
+  note: z.string().describe("One short sentence about the plan, or empty."),
+  steps: z
+    .array(z.string())
+    .describe("3 to 8 concrete steps, not repeating finished ones."),
+  ambiguities: z
+    .array(z.string())
+    .describe("Unclear requirements worth asking about. Empty if none."),
+})
+export type TaskBreakdownOutput = z.infer<typeof TaskBreakdownOutputSchema>
+
+export const TaskBreakdownRequestSchema = z.object({
+  stage: z.literal("task-breakdown"),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+  rejected: z.array(z.array(shortText).max(10)).max(3).default([]),
+})
+export type TaskBreakdownRequest = z.infer<typeof TaskBreakdownRequestSchema>
+
+export type TaskBreakdownResult = TaskBreakdownOutput & {
+  usedFallback?: boolean
+}
+
+/* ---------- Starting work ---------- */
+
+const StarterSchema = z.object({
+  kind: z.enum(["outline", "draft", "code", "checklist"]),
+  title: z.string(),
+  content: z
+    .string()
+    .describe(
+      "Markdown to start from. Use fenced code for code, and [brackets] for anything unknown."
+    ),
+})
+
+export const StepHelpOutputSchema = z.object({
+  firstAction: z
+    .string()
+    .describe(
+      "One physical action for the next few minutes, like 'Open the dataset and identify the target column'."
+    ),
+  why: z.string(),
+  starter: StarterSchema,
+  smallerSteps: z
+    .array(z.string())
+    .describe("2 to 5 smaller steps that could replace this step."),
+  note: z.string().describe("A short caveat, or empty."),
+})
+export type StepHelpOutput = z.infer<typeof StepHelpOutputSchema>
+export type StepHelpResult = StepHelpOutput & { usedFallback?: boolean }
+
+export const StepHelpRequestSchema = z.object({
+  stage: z.literal("step-help"),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+  step: shortText,
+})
+export type StepHelpRequest = z.infer<typeof StepHelpRequestSchema>
+
+export const WorkspaceSetupOutputSchema = z.object({
+  summary: z.string().describe("One short sentence on what this task is."),
+  deliverables: z
+    .array(z.string())
+    .describe("What has to be handed in, from the instructions only."),
+  datesMentioned: z
+    .array(z.string())
+    .describe(
+      "Dates exactly as written in the instructions. Never invent one."
+    ),
+  dependencies: z
+    .array(z.string())
+    .describe("What the work relies on, such as a provided dataset."),
+  unclear: z
+    .array(z.string())
+    .describe("Questions worth asking. Can be empty."),
+  steps: z.array(z.string()).describe("3 to 8 small, concrete steps."),
+  firstAction: z.string().describe("One physical action to begin with."),
+  starter: StarterSchema,
+  questions: z
+    .array(z.string())
+    .describe("2 to 4 questions the user can answer to get going."),
+  outline: z
+    .array(z.string())
+    .describe("3 to 7 section names or points, as an editable structure."),
+  firstSection: z.object({
+    title: z.string().describe("The name of the first section."),
+    content: z
+      .string()
+      .describe(
+        "An editable start, with [brackets] for anything only the user can supply."
+      ),
+  }),
+  note: z.string().describe("A short caveat, or empty."),
+})
+export type WorkspaceSetupOutput = z.infer<typeof WorkspaceSetupOutputSchema>
+export type WorkspaceSetupResult = WorkspaceSetupOutput & {
+  usedFallback?: boolean
+}
+
+export const WorkspaceSetupRequestSchema = z.object({
+  stage: z.literal("workspace-setup"),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+})
+export type WorkspaceSetupRequest = z.infer<typeof WorkspaceSetupRequestSchema>
+
+/* ---------- Writing assistance ---------- */
+
+export const WRITING_ACTIONS = [
+  "outline",
+  "code",
+  "explain",
+  "starter",
+  "split",
+  "summarize",
+  "improve",
+] as const
+export type WritingAction = (typeof WRITING_ACTIONS)[number]
+
+export const WritingAssistOutputSchema = z.object({
+  title: z.string().describe("A few words saying what this suggestion is."),
+  content: z
+    .string()
+    .describe("Markdown to preview. Use [brackets] for missing details."),
+  note: z.string().describe("A short caveat for the user, or empty."),
+})
+export type WritingAssistOutput = z.infer<typeof WritingAssistOutputSchema>
+
+export const WritingAssistRequestSchema = z.object({
+  stage: z.literal("writing-assist"),
+  action: z.enum(WRITING_ACTIONS),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+  selection: z.string().max(LIMITS.contextDocument).default(""),
+  source: z.string().max(LIMITS.contextInstructions).default(""),
+})
+export type WritingAssistRequest = z.infer<typeof WritingAssistRequestSchema>
+
+export type WritingAssistResult = WritingAssistOutput & {
+  usedFallback?: boolean
+}
+
 export const RecoveryRequestSchema = z.discriminatedUnion("stage", [
   AnalyzeRequestSchema,
   NextStepRequestSchema,
   TaskRecoveryRequestSchema,
+  TaskBreakdownRequestSchema,
+  WritingAssistRequestSchema,
+  StepHelpRequestSchema,
+  WorkspaceSetupRequestSchema,
 ])

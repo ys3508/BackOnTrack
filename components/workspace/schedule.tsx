@@ -173,6 +173,7 @@ export function PlannedSessionRow({
         >
           {showTask ? `${title}: ` : ""}
           {session.minutes} min{session.time ? ` at ${session.time}` : ""}
+          {session.label ? `: ${session.label}` : ""}
         </span>
       </label>
       <label>

@@ -1,5 +1,5 @@
 import { addDays, daysBetween } from "@/lib/workspace/dates"
-import { isActive } from "@/lib/workspace/schemas"
+import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type { Task, TaskEvent, Workspace } from "@/lib/workspace/schemas"
 
 /** A task whose deadline has passed. Interface text stays calm about this. */
@@ -7,18 +7,65 @@ export function deadlinePassed(task: Task, today: string) {
   return Boolean(isActive(task) && task.deadline && task.deadline < today)
 }
 
+/** The step being worked on: the one chosen by the user, or else the first open. */
+/**
+ * Keeps only smaller steps that really change the list: none that repeat another
+ * step, and at least two, since swapping one step for one more isn't a split.
+ */
+export function usefulSmallerSteps(task: Task, steps: string[]) {
+  const key = (text: string) => text.trim().toLowerCase()
+  const current = currentSubtask(task)
+  if (!current) return []
+  const others = new Set(
+    task.subtasks
+      .filter((sub) => sub.id !== current.id)
+      .map((sub) => key(sub.title))
+  )
+  const kept = steps.filter((step) => step.trim() && !others.has(key(step)))
+  return kept.length >= 2 &&
+    kept.some((step) => key(step) !== key(current.title))
+    ? kept
+    : []
+}
+
+export function currentSubtask(task: Task) {
+  const chosen = task.subtasks.find(
+    (sub) => sub.id === task.currentSubtaskId && !sub.done
+  )
+  return chosen ?? task.subtasks.find((sub) => !sub.done) ?? null
+}
+
+export function stepCounts(task: Task) {
+  return {
+    done: task.subtasks.filter((sub) => sub.done).length,
+    total: task.subtasks.length,
+  }
+}
+
 /** The single next action for a task. */
 export function nextActionFor(task: Task) {
   if (task.nextAction) return task.nextAction
-  const open = task.subtasks.find((sub) => !sub.done)
+  const open = currentSubtask(task)
   if (open) return open.title
   if (task.status === "needs-recovery") {
     return `Get a recovery plan for “${task.title}”`
   }
-  return `Spend 5 minutes on “${task.title}”`
+  return `Break “${task.title}” into small steps`
 }
 
-function score(task: Task, state: Workspace, today: string) {
+/** The task to come back to: the one most recently worked on, and still open. */
+export function resumeTask(state: Workspace) {
+  const candidates = state.tasks.filter(
+    (task) => isActive(task) && task.status !== "paused" && task.lastWorkedAt
+  )
+  return (
+    [...candidates].sort((a, b) =>
+      (b.lastWorkedAt ?? "").localeCompare(a.lastWorkedAt ?? "")
+    )[0] ?? null
+  )
+}
+
+export function priorityScore(task: Task, state: Workspace, today: string) {
   let value = 0
   if (task.priority === "high") value += 20
   if (task.priority === "medium") value += 10
@@ -48,7 +95,7 @@ export function recommendTask(state: Workspace, today: string): Task | null {
   if (!candidates.length) return null
   return [...candidates].sort(
     (a, b) =>
-      score(b, state, today) - score(a, state, today) ||
+      priorityScore(b, state, today) - priorityScore(a, state, today) ||
       a.createdAt.localeCompare(b.createdAt)
   )[0]
 }
@@ -85,19 +132,49 @@ export function upcomingDeadlines(state: Workspace, today: string, days = 14) {
     .sort((a, b) => a.deadline.localeCompare(b.deadline))
 }
 
-const COMPLETED_PREFIXES = ["Completed", "Status changed to Completed"]
-
 export function recentActions(state: Workspace, limit = 5) {
   const items: { task: Task; event: TaskEvent }[] = []
   for (const task of state.tasks) {
     for (const event of task.history) {
-      const finished =
-        event.text.startsWith("Focus session completed") ||
-        COMPLETED_PREFIXES.some((prefix) => event.text.startsWith(prefix))
-      if (finished) items.push({ task, event })
+      // Time on a timer isn't listed as done, only work the user finished.
+      if (event.kind === "completed") items.push({ task, event })
     }
   }
   return items
     .sort((a, b) => b.event.at.localeCompare(a.event.at))
     .slice(0, limit)
+}
+
+/** A plain summary from recorded facts. Time on a timer is reported as time only. */
+export function progressSummary(task: Task, state: Workspace) {
+  const { done, total } = stepCounts(task)
+  const all = state.focusSessions.filter(
+    (session) => session.taskId === task.id
+  )
+  const sessions = all.filter(isFocusTime)
+  const interrupted = all.length - sessions.length
+  const minutes = Math.round(
+    sessions.reduce((sum, session) => sum + session.actualSeconds, 0) / 60
+  )
+  const parts = []
+  if (total) parts.push(`${done} of ${total} steps finished`)
+  if (sessions.length) {
+    parts.push(
+      `${minutes} min on the timer over ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`
+    )
+  }
+  if (interrupted) {
+    parts.push(
+      `${interrupted} interrupted ${interrupted === 1 ? "attempt" : "attempts"}`
+    )
+  }
+  if (task.recoveryAttempts.length) {
+    const accepted = task.recoveryAttempts.filter(
+      (attempt) => attempt.outcome === "accepted"
+    ).length
+    parts.push(
+      `${accepted} of ${task.recoveryAttempts.length} recovery ${task.recoveryAttempts.length === 1 ? "plan" : "plans"} accepted`
+    )
+  }
+  return parts.join(" · ")
 }

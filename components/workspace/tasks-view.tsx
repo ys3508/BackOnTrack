@@ -24,6 +24,7 @@ import {
 import { QuickAdd } from "@/components/workspace/quick-add"
 import { ReleaseDialog, useStatusChange } from "@/components/workspace/status"
 import { useStore } from "@/components/workspace/store"
+import { rankTasks } from "@/lib/planning/priority"
 import { STATUS_LABEL, TASK_STATUSES, isActive } from "@/lib/workspace/schemas"
 import type { Task, TaskStatus } from "@/lib/workspace/schemas"
 import { cn } from "@/lib/utils"
@@ -37,7 +38,8 @@ const FILTERS: { value: Filter; label: string }[] = [
 ]
 
 export function TasksView() {
-  const { state } = useStore()
+  const { state, today } = useStore()
+  const [ordering, setOrdering] = useState<"suggested" | "added">("suggested")
   const [layout, setLayout] = useState<"list" | "board">("list")
   const [filter, setFilter] = useState<Filter>("active")
   const statusChange = useStatusChange()
@@ -49,6 +51,16 @@ export function TasksView() {
         ? isActive(task)
         : !isActive(task)
   )
+
+  const ranked = rankTasks(state, today)
+  const place = (task: Task) => {
+    const index = ranked.findIndex((entry) => entry.task.id === task.id)
+    return index < 0 ? ranked.length : index
+  }
+  const shown =
+    ordering === "suggested" && filter === "active"
+      ? [...visible].sort((a, b) => place(a) - place(b))
+      : visible
 
   return (
     <div className="space-y-5">
@@ -104,13 +116,50 @@ export function TasksView() {
               </button>
             ))}
           </div>
+          {filter === "active" && (
+            <div
+              role="group"
+              aria-label="Order tasks"
+              className="flex items-center gap-1.5"
+            >
+              <span className="text-sm text-muted-foreground">Order:</span>
+              {(
+                [
+                  { value: "suggested", label: "Suggested" },
+                  { value: "added", label: "As added" },
+                ] as const
+              ).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={ordering === option.value}
+                  onClick={() => setOrdering(option.value)}
+                  className={cn(
+                    "min-h-10 rounded-full border px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+                    ordering === option.value
+                      ? "border-primary bg-sage-soft"
+                      : "border-border bg-card"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
           {visible.length ? (
             <ul className="space-y-2">
-              {visible.map((task) => (
+              {shown.map((task) => (
                 <TaskListItem
                   key={task.id}
                   task={task}
                   onStatus={statusChange.request}
+                  reason={
+                    ordering === "suggested" && filter === "active"
+                      ? ranked
+                          .find((entry) => entry.task.id === task.id)
+                          ?.reasons.join(". ")
+                      : undefined
+                  }
                 />
               ))}
             </ul>
@@ -132,9 +181,11 @@ export function TasksView() {
 function TaskListItem({
   task,
   onStatus,
+  reason,
 }: {
   task: Task
   onStatus: (task: Task, status: TaskStatus) => void
+  reason?: string
 }) {
   const { navigate } = useStore()
   const done = task.status === "completed"
@@ -173,6 +224,11 @@ function TaskListItem({
             <DeadlineChip task={task} />
             <PriorityChip task={task} />
           </span>
+          {reason && (
+            <span className="mt-1 block text-sm text-muted-foreground">
+              Why here: {reason}.
+            </span>
+          )}
           {task.progress > 0 && (
             <ProgressBar
               value={task.progress}

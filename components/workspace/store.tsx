@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react"
 
@@ -14,6 +15,7 @@ import { isTimerFinished } from "@/lib/focus/timer"
 import { fetchLiveStatus } from "@/lib/recovery-client"
 import type { Source } from "@/lib/session"
 import { localToday } from "@/lib/workspace/dates"
+import { isAway } from "@/lib/workspace/returning"
 import { workspaceReducer } from "@/lib/workspace/reducer"
 import type { WorkspaceAction } from "@/lib/workspace/reducer"
 import type { Workspace } from "@/lib/workspace/schemas"
@@ -23,10 +25,13 @@ import {
   saveWorkspace,
 } from "@/lib/workspace/storage"
 
+/** Where a task opens: its document, or straight into getting help. */
+export type TaskSection = "doc" | "help" | "setup"
+
 export type Route =
   | { view: "workspace" }
   | { view: "tasks" }
-  | { view: "task"; id: string }
+  | { view: "task"; id: string; section?: TaskSection }
   | { view: "calendar" }
   | { view: "recover"; taskId?: string }
   | { view: "focus"; taskId?: string }
@@ -34,8 +39,12 @@ export type Route =
   | { view: "settings" }
 
 export function parseHash(hash: string): Route {
-  const [view, id] = hash.replace(/^#\/?/, "").split("/")
-  if (view === "tasks" && id) return { view: "task", id }
+  const [view, id, section] = hash.replace(/^#\/?/, "").split("/")
+  if (view === "tasks" && id) {
+    return section === "doc" || section === "help" || section === "setup"
+      ? { view: "task", id, section }
+      : { view: "task", id }
+  }
   if (view === "focus") return { view: "focus", taskId: id }
   if (view === "recover") return { view: "recover", taskId: id }
   if (
@@ -50,7 +59,9 @@ export function parseHash(hash: string): Route {
 }
 
 export function routeHash(route: Route) {
-  if (route.view === "task") return `#/tasks/${route.id}`
+  if (route.view === "task") {
+    return `#/tasks/${route.id}${route.section ? `/${route.section}` : ""}`
+  }
   if (route.view === "workspace") return "#/"
   if (route.view === "recover") {
     return route.taskId ? `#/recover/${route.taskId}` : "#/recover"
@@ -72,6 +83,13 @@ type Store = {
   statusChecked: boolean
   liveModel: string | null
   deleteAll: () => void
+  /** Applies a change and writes it to storage right away, before returning. */
+  commitNow: (action: WorkspaceAction) => void
+  /** True when the browser refused the last save, usually because it's full. */
+  storageFailed: boolean
+  /** True after time away, until the user has chosen a way back in. */
+  returning: boolean
+  finishReturn: () => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -106,8 +124,33 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     model: string | null
   }>({ checked: false, live: false, model: null })
 
+  const [storageFailed, setStorageFailed] = useState(false)
+  const latest = useRef(state)
+  const [returning, setReturning] = useState(() =>
+    isAway(state.lastOpenedAt, Date.now())
+  )
+  const finishReturn = useCallback(() => setReturning(false), [])
+
   useEffect(() => {
-    saveWorkspace(state)
+    latest.current = state
+  }, [state])
+
+  // Used for documents, because a closing page won't wait for React to save.
+  const commitNow = useCallback((action: WorkspaceAction) => {
+    latest.current = workspaceReducer(latest.current, action)
+    saveWorkspace(latest.current)
+    dispatch(action)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    const saved = saveWorkspace(state)
+    queueMicrotask(() => {
+      if (active) setStorageFailed(!saved)
+    })
+    return () => {
+      active = false
+    }
   }, [state])
 
   useEffect(() => {
@@ -128,6 +171,18 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener("visibilitychange", check)
     }
   }, [state])
+
+  useEffect(() => {
+    // Also covers a tab left open for days and only now looked at again.
+    const opened = () => {
+      if (document.visibilityState !== "visible") return
+      if (isAway(latest.current.lastOpenedAt, Date.now())) setReturning(true)
+      dispatch({ type: "mark-opened", at: nowIso() })
+    }
+    dispatch({ type: "mark-opened", at: nowIso() })
+    document.addEventListener("visibilitychange", opened)
+    return () => document.removeEventListener("visibilitychange", opened)
+  }, [])
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash(window.location.hash))
@@ -182,8 +237,24 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       statusChecked: status.checked,
       liveModel: status.model,
       deleteAll,
+      commitNow,
+      storageFailed,
+      returning,
+      finishReturn,
     }),
-    [state, route, navigate, today, mode, status, deleteAll]
+    [
+      state,
+      route,
+      navigate,
+      today,
+      mode,
+      status,
+      deleteAll,
+      commitNow,
+      storageFailed,
+      returning,
+      finishReturn,
+    ]
   )
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>

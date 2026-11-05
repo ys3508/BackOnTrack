@@ -105,6 +105,8 @@ describe("calendar items", () => {
             endedAt: AT,
             outcome: "completed",
             note: "",
+            subtaskId: null,
+            progressReport: null,
           },
         ],
       },

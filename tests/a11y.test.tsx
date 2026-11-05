@@ -97,7 +97,7 @@ beforeEach(() => {
 
 describe("automated accessibility scan", () => {
   it.each([
-    ["workspace home", "#/", /Your one next thing/],
+    ["workspace home", "#/", /Your next small step/],
     ["tasks list", "#/tasks", /Tasks/],
     ["task detail", "#/tasks/a", /Biology homework/],
     ["calendar", "#/calendar", /Calendar/],
@@ -141,6 +141,51 @@ describe("automated accessibility scan", () => {
       await screen.findByRole("button", { name: "Get a recovery plan" })
     )
     await user.click(await screen.findByRole("button", { name: /See why/ }))
+    expect(await violations()).toEqual([])
+  })
+
+  it("finds no violations with the timer, a breakdown, and a suggestion open", async () => {
+    window.location.hash = "#/tasks/b"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(
+      await screen.findByRole("button", { name: "Break this down" })
+    )
+    await screen.findByLabelText("Suggested step 1")
+    await user.click(
+      await screen.findByRole("button", { name: "Generate an outline" })
+    )
+    await screen.findByLabelText(/Suggested text/)
+    await user.click(
+      await screen.findByRole("button", { name: "5-minute Quick Start" })
+    )
+    await screen.findByRole("timer")
+    expect(await violations()).toEqual([])
+  })
+
+  it("finds no violations with step help and the planner open", async () => {
+    window.location.hash = "#/tasks/a"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(
+      await screen.findByRole("button", { name: "Help me do this" })
+    )
+    await screen.findByLabelText(/Suggested, and not in your document/)
+    await user.click(
+      await screen.findByRole("button", { name: "Plan remaining work" })
+    )
+    await screen.findByRole("list", { name: "Suggested work sessions" })
+    expect(await violations()).toEqual([])
+  })
+
+  it("finds no violations with a new task's setup open", async () => {
+    window.location.hash = "#/tasks/b"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(
+      await screen.findByRole("button", { name: /Set up my workspace/ })
+    )
+    await screen.findByLabelText(/Suggested, and not in your document/)
     expect(await violations()).toEqual([])
   })
 

@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 226 of 226 |
+| Automated tests (`npm test`) | Pass, 441 of 441 (also from a clean clone, and with the system set to Kiritimati time) |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
@@ -24,6 +24,141 @@ No real AI model has been called. The following were verified instead:
 - A manual test ran the production build with the real Anthropic SDK client over HTTP, against a throwaway local server returning canned answers.
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
+
+## Suggested order and Daily Rescue Plan
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch. This feature uses rules, so it needs no AI model. "Yesterday's" plan was simulated with test data.
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| Urgent task, a missed plan, and others | Browser, realistic scenario | At first, the task due tomorrow got 10 of 50 minutes. After the fix, it got all 50, and the others were listed under "Not today". | Failed, then fixed |
+| Quick email before a longer task | Automated | The email went first, with its reason, when nothing was due now. It stayed out when it would squeeze out what's due. | Pass |
+| Never exceeds the time available | Automated, 5 time options | Always under what the user gave | Pass |
+| Low energy, and no energy given | Browser and automated | With low energy, 35 of 60 minutes were planned. It works without an answer. | Pass |
+| Deadline at risk | Browser and automated | Stated, marked as a guess if there's no estimate. All deadlines and statuses were unchanged afterward. | Pass |
+| Reorder, remove, and add before using | Automated | The saved plan matched the user's changes. Nothing was saved before "Use this plan". | Pass |
+| Suggested order with reasons on Tasks | Browser and automated | Ordered and explained, and can be turned off | Pass |
+| Phone width | Browser, 375 px | No sideways scrolling | Pass |
+| Accessibility scan | Automated (axe-core in jsdom, with color contrast off) | No violations | Pass |
+| **Whether these plans are realistic for real people** | **Not run.** The weights and percentages haven't been tested. | | **Not run** |
+| **Real-case test on a real assignment** | **Not run** | | **Not run** |
+
+## Failure-aware learning
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch, in Demo Mode. Records spread over days were written directly into browser storage or created with test dates. **No one has used this over real days.**
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| Hint appears from real clicks | Browser, three real "I'm stuck" flows | Records held only actions, with no text. A hint appeared, but all 3 happened within a minute. | Failed, then fixed |
+| Repeated clicks in one moment | Automated | Three within the hour on one task count once, so no pattern | Pass after fix |
+| Below 3 moments, or older than 60 days | Automated | Nothing claimed, and plans unchanged | Pass |
+| Plan changes from evidence | Browser and automated | With 3 stuck moments on empty documents, the first plan became "Start from a prepared document", and its note gave the reason | Pass |
+| Help followed by progress, or not | Automated | Outline at 3 of 4 was preferred. Smaller steps at 0 of 3 moved aside. Accepted suggestions didn't count as progress. | Pass |
+| Dismissing, deleting, and switching off | Browser (viewing) and automated | The pattern stopped being used. Records deleted one at a time or all together, and dropping below 3 removed the pattern. No new records when off. | Pass |
+| No text in records, and removal with the task | Automated | No title or obstacle text appeared in the log | Pass |
+| Accessibility scan of Settings and the hint | Automated (axe-core in jsdom, with color contrast off) | No violations | Pass |
+| **Whether changing the help actually helps anyone** | **Not measured** | | **Not run** |
+| **Real model following these guesses** | **Not run: no API key was available.** The prompt includes them, but how well it uses them is unknown. | | **Not run** |
+
+## Easy return and Zero-Start
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch, in Demo Mode. Time away was simulated by setting the saved last-opened time to 14 days ago. Nobody actually left for two weeks.
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| Return screen after time away | Browser, desktop and 375 px wide | One "Continue working" button, the steps done, where the document stops, and the next step. No overdue tasks, counts, or time-away figure. The button was visible without scrolling on both. | Pass |
+| Honest about deadlines | Browser and automated | Stated the missed deadline for this task, and one bill due tomorrow. Old overdue tasks weren't listed. No deadline changed. | Pass |
+| Continue working | Browser and automated | Opened the document with its text intact. Home was normal afterwards. | Pass |
+| Editor focus after Continue working | Browser | **Not confirmed.** The pane was in the background, where the browser pauses the animation frame that focusing relies on. The same mechanism worked earlier in a visible pane. | Not confirmed |
+| Not shown on first use, or after a 1-day gap | Automated | The normal home appeared | Pass |
+| "I haven't started my research paper" | Browser and automated | Prepared what's being asked, questions, an outline, and an introduction. It invented no requirements or sources, and nothing was written until an entry was chosen. | Pass |
+| Choosing an entry, then typing | Browser, real typing | The cursor selected "[topic]", typing replaced it, and the text was saved | Pass after fix |
+| Accessibility scan of the return screen | Automated (axe-core in jsdom, with color contrast off) | No violations | Pass |
+| **Real model: prepared workspace** | **Not run: no API key was available.** Added to `npm run test:live`. | | **Not run** |
+| **Time to First Action, Recovery Success, Return-to-Action** | **Not measured.** The plan is in [DESIGN_THINKING.md](DESIGN_THINKING.md). | | **Not run** |
+| **Real users, including adults with ADHD** | **Not run** | | **Not run** |
+
+## Execution support (review of version 3)
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch, in Demo Mode unless marked otherwise.
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| "Start 5 minutes" opens the step's document | Browser, desktop and 375 px wide | Went to the task's document with the cursor in the editor, and a small timer naming the step | Pass |
+| "Help me do this" on "Train a classifier" | Browser | First action: "Open the dataset and identify the target column", with a code starter marked as not run. The document was unchanged until accepted. | Pass |
+| Accepting it | Browser | Code block in the editor. Steps went from 4 to 7. The finished step and the deadline were unchanged. | Pass |
+| "I'm stuck" repeatedly | Browser and automated | Failed at first, offering the same step back. After the fix: "Find where the dataset file is saved", then two different plans. | Pass after fix |
+| "Plan remaining work" | Browser and automated | Three 25-minute sessions were proposed. Nothing was saved until confirmed, then they appeared on the calendar. The deadline was unchanged. | Pass |
+| Steps that don't fit, weekends, past or missing deadlines | Automated | Reported as not fitting, and the deadline wasn't changed | Pass |
+| Interrupted session | Browser and automated | Stopped at 11 seconds: "Interrupted attempt, not counted as focus time". Not on the calendar. | Pass |
+| Optional priority | Browser and automated | New tasks default to "No priority". Saved priorities are kept. | Pass |
+| Accessibility scan with the new panels open | Automated (axe-core in jsdom) | No violations | Pass |
+| **Real model: step help and workspace setup** | **Not run: no API key was available.** Added to `npm run test:live`. | | **Not run** |
+| **Real-case test on a real assignment** | **Not run.** The protocol is in [DESIGN_THINKING.md](DESIGN_THINKING.md). | | **Not run** |
+
+Demo Mode matches wording, so these results show the workflow and the safeguards. They don't show that it understands a real assignment.
+
+## AI-assisted task execution (version 3)
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch. "Automated" means the Vitest suites in `tests/`. "Browser" means a production build run locally in Chromium, with real typing or scripted clicks as noted. **No real AI model was used, because no API key was available.**
+
+### Required tests
+
+| # | Scenario | Actual observed behavior | Result | Fixes or iterations |
+| --- | --- | --- | --- | --- |
+| 1 | Creating a task and generating subtasks | Automated and browser. Steps came from pasted and uploaded instructions, and from templates. They weren't real steps until accepted. | Pass (Demo Mode) | Stopped glued-together steps |
+| 2 | Editing and completing subtasks | Automated: edit, reorder, delete, add, complete, and a choice of current step. Browser: completing updated the count and the next step. | Pass | Controls moved behind "Edit steps" |
+| 3 | Saving and restoring a working document | Automated and browser. Text, formatting, and cursor were restored. | Pass | None |
+| 4 | Refreshing without losing work | Browser: real typing, then a reload with no delay. The text survived. | Pass | Saves made synchronous first |
+| 5 | Uploading and extracting a valid document | Real PDFs in the browser and in Node, with text extracted across pages. Text and Markdown files automated. | Pass | Fixed a cleanup call that broke PDF reading |
+| 6 | Unsupported or malformed files | Automated and browser: .docx, a fake PDF, and a near-empty PDF each gave a clear message, and saved nothing. Automated: oversize, binary, corrupted, password-protected, and too many pages. | Pass | None |
+| 7 | AI outline, accepted or rejected | Automated: nothing changed before accepting, and rejecting kept the text. Browser: accepting added it after the writer's own text, highlighted. Uses Demo Mode, or a fake server for Live. | Pass, without a real model | None |
+| 8 | Starting and stopping a focus session | Automated and browser: it ran beside the document, on the same page, and Stop offered both choices. | Pass | None |
+| 9 | Reporting being stuck | Automated and browser. It was recorded in history, with the reason, and opened Recovery. | Pass | None |
+| 10 | A different Plan B | Automated and browser. A checklist came first, then a different plan. Also automated: reworded repeats from a mock model were rejected. | Pass, without a real model | Tailored plans made to come first |
+| 11 | Preserving completed work after replanning | Automated: finished steps stayed, and only open ones were replaced, with a notice. | Pass | None |
+| 12 | Correct history timestamps | Automated: a timer noticed 3 hours late recorded its real end time. Browser: entries showed the right times, newest first. | Pass | None |
+| 13 | Migration of saved data | Automated and browser. A version 1 save kept its steps, draft, and history, and a backup was kept. Older guided sessions still migrate. | Pass | None |
+| 14 | Mobile responsiveness | Browser, 375 px emulation, 8 views: no sideways scrolling, and one column. Not tried on a real phone. | Pass, emulated | Enlarged small targets |
+| 15 | Keyboard accessibility | Browser: typing, Cmd+B, Cmd+Z, and Enter to add tasks, with real key presses. Automated: step controls and an axe-core scan of the new screens, with no violations. A complete keyboard-only walkthrough wasn't done. | Partial pass | None |
+| 16 | Production build and TypeScript | Build, typecheck, and lint passed. | Pass | None |
+
+### Definition of Done
+
+`tests/execution.test.tsx` runs these as one continuous test in Demo Mode. The browser checks covered them too, using sample tasks, though not as one continuous run.
+
+| Step | Actual observed behavior | Result |
+| --- | --- | --- |
+| 1. Create a task | Added with quick add. | Pass |
+| 2. Paste or upload instructions | Pasted in the test. A real PDF was uploaded in the browser. | Pass |
+| 3. Ask for a breakdown | Steps came from the instructions. Demo Mode uses text rules, not AI. | Pass, Demo Mode |
+| 4. Edit before accepting | The edited step was the one saved. | Pass |
+| 5. Open a working document | It's on the task page. | Pass |
+| 6. Generate an outline or starting content | Previewed, then added, marked as suggested. | Pass, Demo Mode |
+| 7. Edit and save the document | The user's text saved automatically. | Pass |
+| 8. Start a short focus session | The timer ran beside the document, showing the current step. | Pass |
+| 9. Complete a subtask | Done while the timer ran. The task stayed open. | Pass |
+| 10. Report being stuck, and get a different approach | Got a checklist, then a different plan. | Pass, Demo Mode |
+| 11. Return later, and resume | "Continue where you left off", with the progress and document restored. | Pass |
+| 12. See progress and recovery history | Each entry was present, with suggested, accepted, tried, and done kept apart. | Pass |
+
+### Live AI
+
+| Check | Result |
+| --- | --- |
+| **Real model: breakdown, writing help, and recovery quality** | **Not run: no API key was available.** Run `npm run test:live`, which now covers them. |
+| Mock model through the API: data sent, retries, fallback, and invalid requests | Pass |
+| Real SDK client against a local fake server, in the browser: consent dialog, then breakdown, outline, and recovery | Pass, for wiring only. Cancel sent nothing, the 3 requests included the instructions, and results were labeled Live AI. |
+| Live AI on the public site | Not run. The site has no API key. |
+
+### Not tested for version 3
+
+- Real users, including people with ADHD.
+- Real phones, Safari, Firefox, and screen readers.
+- Real-world scanned or password-protected PDFs. Those paths used a near-empty file or a simulated error.
+- A document large enough to fill browser storage in a real browser. The warning was tested by simulating a full store.
+- Two tabs open on one task.
+- This branch on Vercel. The preview needs a Vercel login, so it wasn't opened.
 
 ## Functional recovery workspace
 

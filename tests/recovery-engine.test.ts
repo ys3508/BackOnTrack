@@ -5,7 +5,8 @@ import { DEMO_SCENARIOS } from "@/lib/demo/scenarios"
 import { resetRateLimitForTests } from "@/lib/ai/rate-limit"
 import { normalizePlan, planProblem } from "@/lib/ai/task-recovery"
 import { buildRecoveryRequest, buildTaskContext } from "@/lib/recovery/context"
-import { categorize, demoTaskRecovery } from "@/lib/recovery/demo-plan"
+import { categorize } from "@/lib/recovery/categorize"
+import { demoTaskRecovery } from "@/lib/recovery/demo-plan"
 import { TaskRecoveryRequestSchema } from "@/lib/schemas"
 import type { RecoveryPlan, TaskRecoveryRequest } from "@/lib/schemas"
 import { workspaceReducer } from "@/lib/workspace/reducer"
@@ -53,6 +54,13 @@ function requestFor(
       attempts: [],
       obstacles: [],
       openSteps: [],
+      instructions: "",
+      document: "",
+      currentStep: "",
+      stuckOnStep: 0,
+      learned: [],
+      preferredHelp: "",
+      avoidHelp: [],
       focusSessions: [],
       ...extra,
     },
@@ -293,6 +301,8 @@ describe("plan checks", () => {
     },
     artifact: { kind: "note", title: "Note", body: "Body" },
     steps: Array.from({ length: 9 }, (_, i) => `Step ${i}`),
+    choices: ["a", "b", "c", "d"],
+    smallerSteps: [],
     schedule: [
       { date: "2020-01-01", minutes: 10, label: "Past" },
       { date: "not a date", minutes: 10, label: "Bad" },
@@ -365,6 +375,8 @@ describe("POST /api/recovery task-recovery", () => {
     },
     artifact: { kind: "email", title: "Draft", body: "Hello [name]" },
     steps: ["One"],
+    choices: [],
+    smallerSteps: [],
     schedule: [{ date: TODAY, minutes: 10, label: "Start" }],
     ...extra,
   })

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Coffee, Pause, Play, RotateCcw, Square } from "lucide-react"
+import { Check, Coffee, Pause, Play, RotateCcw, Square } from "lucide-react"
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
@@ -10,9 +10,9 @@ import { ExpandableList, fieldClass } from "@/components/workspace/parts"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { formatClock, formatMinutes, remainingSeconds } from "@/lib/focus/timer"
 import { formatDateTime } from "@/lib/workspace/dates"
-import { isActive } from "@/lib/workspace/schemas"
+import { isActive, isInterrupted } from "@/lib/workspace/schemas"
 import type { FocusSession, Task, TimerState } from "@/lib/workspace/schemas"
-import { recommendTask } from "@/lib/workspace/selectors"
+import { currentSubtask, recommendTask } from "@/lib/workspace/selectors"
 
 export const FOCUS_OPTIONS = [
   { minutes: 5, label: "5-minute Quick Start" },
@@ -48,26 +48,35 @@ export function useNow(active: boolean) {
 }
 
 /** Starts focus from anywhere. A session already running is never overwritten. */
-export function useStartFocus() {
+export function useStartFocus({ stay = false } = {}) {
   const { state, dispatch, navigate } = useStore()
   return (taskId: string | null, minutes: number) => {
     if (!state.timer) {
+      const task = state.tasks.find((item) => item.id === taskId)
       dispatch({
         type: "timer-start",
         id: newId(),
         kind: "focus",
         taskId,
+        subtaskId: task ? (currentSubtask(task)?.id ?? null) : null,
         minutes,
         now: Date.now(),
         at: nowIso(),
       })
     }
-    navigate({ view: "focus" })
+    if (stay) return
+    // Focus opens the work itself. Only a session with no task stays on Focus.
+    const running = state.timer?.taskId ?? (state.timer ? null : taskId)
+    navigate(
+      running
+        ? { view: "task", id: running, section: "doc" }
+        : { view: "focus" }
+    )
   }
 }
 
 export function FocusView() {
-  const { state, route } = useStore()
+  const { state, route, navigate } = useStore()
   const preselected = route.view === "focus" ? route.taskId : undefined
   const finished = state.focusSessions.find(
     (session) => session.id === state.finishedSessionId
@@ -77,7 +86,25 @@ export function FocusView() {
     <div className="mx-auto max-w-2xl space-y-5">
       <ScreenHeading>Focus</ScreenHeading>
       {state.timer ? (
-        <ActiveTimer timer={state.timer} />
+        <>
+          <ActiveTimer timer={state.timer} />
+          {state.timer.taskId && (
+            <Button
+              type="button"
+              size="xl"
+              className="w-full sm:w-auto"
+              onClick={() =>
+                navigate({
+                  view: "task",
+                  id: state.timer!.taskId!,
+                  section: "doc",
+                })
+              }
+            >
+              Open my work
+            </Button>
+          )}
+        </>
       ) : finished ? (
         <FinishedPanel session={finished} />
       ) : (
@@ -134,21 +161,116 @@ function StartPanel({ preselected }: { preselected?: string }) {
   )
 }
 
-function ActiveTimer({ timer }: { timer: TimerState }) {
+export function ActiveTimer({
+  timer,
+  compact = false,
+}: {
+  timer: TimerState
+  /** A slim version for working alongside the document. */
+  compact?: boolean
+}) {
   const { state, dispatch } = useStore()
   const running = timer.runningSince !== null
   const now = useNow(true)
   const remaining = remainingSeconds(timer, now)
   const task = state.tasks.find((item) => item.id === timer.taskId)
+  const step = task?.subtasks.find((sub) => sub.id === timer.subtaskId)
   const [stopping, setStopping] = useState(false)
   const isBreak = timer.kind === "break"
+
+  const controls = stopping ? (
+    <StopChoice timer={timer} task={task} onCancel={() => setStopping(false)} />
+  ) : (
+    <div
+      className={
+        compact
+          ? "flex flex-wrap gap-1"
+          : "flex flex-col justify-center gap-2 sm:flex-row sm:flex-wrap"
+      }
+    >
+      {running ? (
+        <Button
+          type="button"
+          size={compact ? "lg" : "xl"}
+          className={compact ? "min-h-11" : undefined}
+          variant={compact ? "outline" : "default"}
+          onClick={() => dispatch({ type: "timer-pause", now: Date.now() })}
+        >
+          <Pause aria-hidden />
+          {compact ? "Pause timer" : "Pause"}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          size={compact ? "lg" : "xl"}
+          className={compact ? "min-h-11" : undefined}
+          onClick={() => dispatch({ type: "timer-resume", now: Date.now() })}
+        >
+          <Play aria-hidden />
+          {compact ? "Resume timer" : "Resume"}
+        </Button>
+      )}
+      <Button
+        type="button"
+        size={compact ? "lg" : "xl"}
+        className={compact ? "min-h-11" : undefined}
+        variant={compact ? "ghost" : "outline"}
+        onClick={() => dispatch({ type: "timer-reset" })}
+      >
+        <RotateCcw aria-hidden />
+        Reset
+      </Button>
+      <Button
+        type="button"
+        size={compact ? "lg" : "xl"}
+        className={compact ? "min-h-11" : undefined}
+        variant="ghost"
+        onClick={() =>
+          isBreak ? dispatch({ type: "timer-cancel" }) : setStopping(true)
+        }
+      >
+        <Square aria-hidden />
+        {isBreak ? "End break" : "Stop"}
+      </Button>
+    </div>
+  )
+
+  const label = isBreak
+    ? "Break"
+    : (step?.title ?? task?.title ?? "Focus session")
+
+  if (compact) {
+    return (
+      <div className="sticky top-2 z-10 rounded-2xl border border-primary/40 bg-card p-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <p className="flex min-w-0 items-baseline gap-2.5">
+            <span
+              role="timer"
+              aria-label={`${formatClock(remaining)} remaining`}
+              className="font-heading text-2xl tabular-nums"
+            >
+              {formatClock(remaining)}
+            </span>
+            <span className="min-w-0 text-sm break-words text-muted-foreground">
+              {label}
+              {!running && " (paused)"}
+            </span>
+          </p>
+          {controls}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Card className="text-center">
       <p className="text-sm font-medium text-sage">
-        {isBreak ? "Break" : task ? task.title : "Focus session"}
+        {label}
         {!running && " (paused)"}
       </p>
+      {step && task && (
+        <p className="text-xs text-muted-foreground">{task.title}</p>
+      )}
       <p
         role="timer"
         aria-label={`${formatClock(remaining)} remaining`}
@@ -156,64 +278,12 @@ function ActiveTimer({ timer }: { timer: TimerState }) {
       >
         {formatClock(remaining)}
       </p>
-
-      {stopping ? (
-        <StopChoice
-          timer={timer}
-          task={task}
-          onCancel={() => setStopping(false)}
-        />
-      ) : (
-        <div className="flex flex-col justify-center gap-2 sm:flex-row sm:flex-wrap">
-          {running ? (
-            <Button
-              type="button"
-              size="xl"
-              onClick={() => dispatch({ type: "timer-pause", now: Date.now() })}
-            >
-              <Pause aria-hidden />
-              Pause
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="xl"
-              onClick={() =>
-                dispatch({ type: "timer-resume", now: Date.now() })
-              }
-            >
-              <Play aria-hidden />
-              Resume
-            </Button>
-          )}
-          <Button
-            type="button"
-            size="xl"
-            variant="outline"
-            onClick={() => dispatch({ type: "timer-reset" })}
-          >
-            <RotateCcw aria-hidden />
-            Reset
-          </Button>
-          <Button
-            type="button"
-            size="xl"
-            variant="ghost"
-            onClick={() =>
-              isBreak ? dispatch({ type: "timer-cancel" }) : setStopping(true)
-            }
-          >
-            <Square aria-hidden />
-            {isBreak ? "End break" : "Stop"}
-          </Button>
-        </div>
-      )}
+      {controls}
     </Card>
   )
 }
 
 function StopChoice({
-  timer,
   task,
   onCancel,
 }: {
@@ -294,16 +364,75 @@ function StopChoice({
       <Button type="button" size="xl" variant="ghost" onClick={onCancel}>
         Keep going
       </Button>
-      <span className="sr-only">
-        Time so far on this session: {timer.plannedSeconds} seconds planned.
-      </span>
     </div>
   )
 }
 
-function FinishedPanel({ session }: { session: FocusSession }) {
+export function FinishedPanel({
+  session,
+  onTask = false,
+}: {
+  session: FocusSession
+  /** Already on the task's page, so there's nowhere to navigate to. */
+  onTask?: boolean
+}) {
   const { state, dispatch, navigate } = useStore()
   const task = state.tasks.find((item) => item.id === session.taskId)
+  const step = task
+    ? (task.subtasks.find((sub) => sub.id === session.subtaskId && !sub.done) ??
+      currentSubtask(task))
+    : null
+
+  const answer = (report: "yes" | "a-little" | "stuck") => {
+    dispatch({
+      type: "report-focus",
+      sessionId: session.id,
+      report,
+      at: nowIso(),
+    })
+    if (report === "stuck" && task) {
+      dispatch({ type: "timer-acknowledge" })
+      navigate({ view: "recover", taskId: task.id })
+    }
+  }
+
+  if (task && session.progressReport === null) {
+    return (
+      <Card className="space-y-3">
+        <h2 className="font-heading text-3xl">
+          {formatMinutes(session.actualSeconds)} of focus, done.
+        </h2>
+        <p className="text-[15px]" id="progress-question">
+          Did you make progress?
+        </p>
+        <div
+          role="group"
+          aria-labelledby="progress-question"
+          className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+        >
+          <Button type="button" size="xl" onClick={() => answer("yes")}>
+            Yes
+          </Button>
+          <Button
+            type="button"
+            size="xl"
+            variant="outline"
+            onClick={() => answer("a-little")}
+          >
+            A little
+          </Button>
+          <Button
+            type="button"
+            size="xl"
+            variant="outline"
+            onClick={() => answer("stuck")}
+          >
+            I got stuck
+          </Button>
+        </div>
+      </Card>
+    )
+  }
 
   const acknowledge = () => dispatch({ type: "timer-acknowledge" })
   const startNext = (kind: "focus" | "break", minutes: number) => {
@@ -337,7 +466,27 @@ function FinishedPanel({ session }: { session: FocusSession }) {
         )}
       </div>
 
-      {task && (
+      {step && task && (
+        <Button
+          type="button"
+          size="xl"
+          className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:w-auto"
+          onClick={() => {
+            dispatch({
+              type: "toggle-subtask",
+              id: task.id,
+              at: nowIso(),
+              subId: step.id,
+            })
+            acknowledge()
+          }}
+        >
+          <Check aria-hidden />
+          Mark “{step.title}” done
+        </Button>
+      )}
+
+      {task && !task.subtasks.length && (
         <div>
           <label
             htmlFor="focus-progress"
@@ -395,7 +544,7 @@ function FinishedPanel({ session }: { session: FocusSession }) {
                 status: "completed",
               })
               acknowledge()
-              navigate({ view: "task", id: task.id })
+              if (!onTask) navigate({ view: "task", id: task.id })
             }}
           >
             The task is finished
@@ -407,9 +556,11 @@ function FinishedPanel({ session }: { session: FocusSession }) {
           variant="ghost"
           onClick={() => {
             acknowledge()
-            navigate(
-              task ? { view: "task", id: task.id } : { view: "workspace" }
-            )
+            if (!onTask) {
+              navigate(
+                task ? { view: "task", id: task.id } : { view: "workspace" }
+              )
+            }
           }}
         >
           Done for now
@@ -432,7 +583,9 @@ export function SessionList({ sessions }: { sessions: FocusSession[] }) {
             {formatMinutes(session.actualSeconds)}
           </span>{" "}
           of {session.plannedMinutes} min on {session.taskTitle} ·{" "}
-          {OUTCOME_LABEL[session.outcome]}
+          {isInterrupted(session)
+            ? "Interrupted attempt, not counted as focus time"
+            : OUTCOME_LABEL[session.outcome]}
           {session.note && `: ${session.note}`}
           <span className="block text-xs text-muted-foreground">
             {formatDateTime(session.endedAt)}

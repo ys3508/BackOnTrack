@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   ArrowLeft,
   LifeBuoy,
@@ -11,20 +11,30 @@ import {
   Plus,
   Timer,
   Trash2,
-  X,
+  Sparkles,
 } from "lucide-react"
 
+import { useAiConsent } from "@/components/workspace/ai-consent"
+import { BreakdownPanel } from "@/components/workspace/breakdown-panel"
+import { InstructionsPanel } from "@/components/workspace/instructions-panel"
+import { PatternHint } from "@/components/workspace/pattern-hint"
+import { PlanRemaining } from "@/components/workspace/plan-remaining"
+import { WritingAssist } from "@/components/workspace/writing-assist"
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  ActiveTimer,
   FOCUS_OPTIONS,
+  FinishedPanel,
   SessionList,
   useStartFocus,
 } from "@/components/workspace/focus-view"
 import {
   ConfirmDialog,
+  DeadlineChip,
+  ProgressBar,
   StatusBadge,
   fieldClass,
 } from "@/components/workspace/parts"
@@ -34,20 +44,37 @@ import {
   ReplanDialog,
 } from "@/components/workspace/schedule"
 import { ReleaseDialog, useStatusChange } from "@/components/workspace/status"
-import { newId, nowIso, useStore } from "@/components/workspace/store"
-import { formatDateTime, shortDate } from "@/lib/workspace/dates"
-import { deadlinePassed } from "@/lib/workspace/selectors"
 import {
+  WorkingEditor,
+  useWorkingEditor,
+} from "@/components/workspace/working-editor"
+import { useTaskHelp } from "@/components/workspace/step-help"
+import { newId, nowIso, useStore } from "@/components/workspace/store"
+import type { TaskSection } from "@/components/workspace/store"
+import { cn } from "@/lib/utils"
+import { formatDateTime, shortDate } from "@/lib/workspace/dates"
+import { taskKindOf } from "@/lib/workspace/friction"
+import { hintFor } from "@/lib/workspace/patterns"
+import {
+  currentSubtask,
+  deadlinePassed,
+  nextActionFor,
+  progressSummary,
+} from "@/lib/workspace/selectors"
+import {
+  ESTIMATE_OPTIONS,
   PRIORITIES,
   PRIORITY_LABEL,
   STATUS_LABEL,
   TASK_STATUSES,
+  estimateLabel,
   isActive,
 } from "@/lib/workspace/schemas"
 import type {
   Priority,
   Task,
   TaskDocument,
+  TaskEvent,
   TaskStatus,
 } from "@/lib/workspace/schemas"
 
@@ -59,7 +86,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function TaskDetail({ id }: { id: string }) {
+export function TaskDetail({
+  id,
+  section,
+}: {
+  id: string
+  section?: TaskSection
+}) {
   const { state, navigate } = useStore()
   const task = state.tasks.find((item) => item.id === id)
 
@@ -78,18 +111,52 @@ export function TaskDetail({ id }: { id: string }) {
       </div>
     )
   }
-  return <TaskBody key={task.id} task={task} />
+  return <TaskBody key={task.id} task={task} section={section} />
 }
 
-function TaskBody({ task }: { task: Task }) {
-  const { dispatch, navigate } = useStore()
+function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
+  const { state, dispatch, navigate, mode } = useStore()
   const statusChange = useStatusChange()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const { editor, dirty } = useWorkingEditor(task, section === "doc")
+  const consent = useAiConsent(task)
+  const help = useTaskHelp(task, editor, consent.guard)
+  const timerHere = state.timer?.taskId === task.id ? state.timer : null
+  // Opened to work, or already working: the document comes first on a phone.
+  const working = Boolean(section) || Boolean(timerHere)
+  const brandNew =
+    isActive(task) &&
+    !task.subtasks.length &&
+    !task.workDoc?.content &&
+    !task.pendingBreakdown
+
+  const [now] = useState(() => Date.now())
+  const noticed =
+    isActive(task) && !timerHere
+      ? hintFor(state, task, taskKindOf(task), now)
+      : null
+  // A new task already offers to set itself up, so that isn't said twice.
+  const hint = brandNew && noticed?.action === "setup" ? null : noticed
+
+  // Help asked for on the home page starts as soon as the editor is ready.
+  const started = useRef(false)
+  useEffect(() => {
+    if (!editor || started.current) return
+    if (section !== "help" && section !== "setup") return
+    started.current = true
+    const timer = window.setTimeout(() => {
+      if (section === "help") help.requestStep()
+      else help.requestSetup()
+    }, 0)
+    return () => window.clearTimeout(timer)
+    // Runs once, for the section this page was opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, section])
 
   const setStatus = (status: TaskStatus) => statusChange.request(task, status)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="space-y-4">
       <button
         type="button"
         onClick={() => navigate({ view: "tasks" })}
@@ -99,80 +166,128 @@ function TaskBody({ task }: { task: Task }) {
         All tasks
       </button>
 
-      <div>
-        <StatusBadge status={task.status} />
-        <ScreenHeading className="mt-2 break-words">{task.title}</ScreenHeading>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        {isActive(task) && (
-          <Button
-            type="button"
-            size="xl"
-            onClick={() => setStatus("completed")}
-          >
-            <Check aria-hidden />
-            Mark complete
-          </Button>
-        )}
-        {task.status === "paused" ? (
-          <Button
-            type="button"
-            size="xl"
-            variant="outline"
-            onClick={() => setStatus("in-progress")}
-          >
-            <Play aria-hidden />
-            Resume
-          </Button>
-        ) : (
-          isActive(task) && (
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <StatusBadge status={task.status} />
+          <ScreenHeading className="mt-2 break-words">
+            {task.title}
+          </ScreenHeading>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {isActive(task) && (
             <Button
               type="button"
               size="xl"
               variant="outline"
-              onClick={() => setStatus("paused")}
+              onClick={() => setStatus("completed")}
             >
-              <Pause aria-hidden />
-              Pause
+              <Check aria-hidden />
+              Mark complete
             </Button>
-          )
-        )}
+          )}
+          {task.status === "paused" ? (
+            <Button
+              type="button"
+              size="xl"
+              variant="outline"
+              onClick={() => setStatus("in-progress")}
+            >
+              <Play aria-hidden />
+              Resume
+            </Button>
+          ) : (
+            isActive(task) && (
+              <Button
+                type="button"
+                size="xl"
+                variant="ghost"
+                onClick={() => setStatus("paused")}
+              >
+                <Pause aria-hidden />
+                Pause
+              </Button>
+            )
+          )}
+        </div>
       </div>
 
-      {isActive(task) && (
-        <Button
-          type="button"
-          size="xl"
-          variant={task.status === "needs-recovery" ? "default" : "outline"}
-          className="w-full sm:w-auto"
-          onClick={() => navigate({ view: "recover", taskId: task.id })}
+      {timerHere && <ActiveTimer timer={timerHere} compact />}
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div
+          className={cn(
+            "space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:overflow-y-auto lg:pr-1",
+            working && "order-2 lg:order-none"
+          )}
         >
-          <LifeBuoy aria-hidden />
-          {task.recovery ? "See your recovery plan" : "I’m stuck on this"}
-        </Button>
-      )}
+          {isActive(task) && (
+            <CurrentStepCard task={task} onHelp={help.requestStep} />
+          )}
+          <InstructionsPanel
+            task={task}
+            startOpen={working && Boolean(task.instructions)}
+          />
+          {hint && (
+            <PatternHint
+              hint={hint}
+              onAct={() => {
+                if (hint.action === "setup") help.requestSetup()
+                else if (hint.action === "help") help.requestStep()
+                else if (hint.action === "editor") editor?.commands.focus()
+                else navigate({ view: "recover", taskId: task.id })
+              }}
+            />
+          )}
+          {brandNew && (
+            <Card className="space-y-2">
+              <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+                Set this up for me
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {mode === "live"
+                  ? "AI reads what this asks for, and prepares steps and a place to start. You check everything first."
+                  : "Demo Mode uses templates and your instructions, not AI, to prepare steps and a place to start. You check everything first."}
+              </p>
+              <Button type="button" size="xl" onClick={help.requestSetup}>
+                <Sparkles aria-hidden />
+                Set up my workspace
+              </Button>
+            </Card>
+          )}
+          <BreakdownPanel task={task} guard={consent.guard} />
+        </div>
+        <div className="min-w-0 space-y-4">
+          {help.panel}
+          {isActive(task) && !timerHere && <FocusCard task={task} />}
+          <WorkingEditor task={task} editor={editor} dirty={dirty} />
+          <WritingAssist task={task} editor={editor} guard={consent.guard} />
+        </div>
+      </div>
 
-      <NextActionCard task={task} />
-      {isActive(task) && <FocusCard task={task} />}
-      <ProgressCard task={task} />
-      <DetailsCard task={task} onStatus={setStatus} />
-      <StepsCard task={task} />
-      <DocumentsCard task={task} />
-      <ScheduleCard task={task} />
-      <FocusHistoryCard task={task} />
-      <HistoryCard task={task} />
-
-      <Button
-        type="button"
-        size="xl"
-        variant="ghost"
-        className="text-muted-foreground"
-        onClick={() => setConfirmDelete(true)}
-      >
-        <Trash2 aria-hidden />
-        Delete task
-      </Button>
+      <details className="group rounded-2xl border border-border bg-card">
+        <summary className="flex min-h-12 cursor-pointer items-center px-5 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+          More about this task
+        </summary>
+        <div className="space-y-4 border-t border-border p-4">
+          <NextActionCard task={task} />
+          <ProgressCard task={task} />
+          <DetailsCard task={task} onStatus={setStatus} />
+          <ScheduleCard task={task} />
+          <DocumentsCard task={task} />
+          <FocusHistoryCard task={task} />
+          <HistoryCard task={task} />
+          <Button
+            type="button"
+            size="xl"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 aria-hidden />
+            Delete task
+          </Button>
+        </div>
+      </details>
 
       <ConfirmDialog
         open={confirmDelete}
@@ -184,11 +299,63 @@ function TaskBody({ task }: { task: Task }) {
           navigate({ view: "tasks" })
         }}
       >
-        This removes the task, its steps, documents, history, and planned work
+        This removes the task, its steps, document, history, and planned work
         sessions. It can’t be undone.
       </ConfirmDialog>
       <ReleaseDialog {...statusChange.dialog} />
+      {consent.dialog}
     </div>
+  )
+}
+
+function CurrentStepCard({ task, onHelp }: { task: Task; onHelp: () => void }) {
+  const { dispatch, navigate } = useStore()
+  const hasStep = Boolean(task.nextAction || currentSubtask(task))
+  return (
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 className="text-sm font-medium text-sage">Right now</h2>
+        <DeadlineChip task={task} />
+      </div>
+      <p className="font-heading text-[1.5rem] leading-snug">
+        {nextActionFor(task)}
+      </p>
+      {task.progress > 0 && (
+        <ProgressBar value={task.progress} label="Task progress" />
+      )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button type="button" size="xl" onClick={onHelp}>
+          <Sparkles aria-hidden />
+          Help me do this
+        </Button>
+        {hasStep && (
+          <Button
+            type="button"
+            size="xl"
+            variant="outline"
+            onClick={() =>
+              dispatch({
+                type: "complete-next-action",
+                id: task.id,
+                at: nowIso(),
+              })
+            }
+          >
+            <Check aria-hidden />
+            Mark this step done
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="xl"
+          variant={task.status === "needs-recovery" ? "default" : "outline"}
+          onClick={() => navigate({ view: "recover", taskId: task.id })}
+        >
+          <LifeBuoy aria-hidden />
+          {task.recovery ? "See your recovery plan" : "I’m stuck"}
+        </Button>
+      </div>
+    </Card>
   )
 }
 
@@ -253,37 +420,52 @@ function NextActionCard({ task }: { task: Task }) {
 
 function FocusCard({ task }: { task: Task }) {
   const { state, navigate } = useStore()
-  const start = useStartFocus()
-  const running = state.timer?.taskId === task.id
-  return (
-    <Card>
-      <SectionTitle>Focus on this</SectionTitle>
-      {running ? (
+  const start = useStartFocus({ stay: true })
+  const { timer } = state
+  const finished = state.focusSessions.find(
+    (session) =>
+      session.id === state.finishedSessionId && session.taskId === task.id
+  )
+
+  if (timer?.kind === "break") return <ActiveTimer timer={timer} compact />
+  if (finished) return <FinishedPanel session={finished} onTask />
+  if (timer) {
+    return (
+      <Card>
+        <SectionTitle>Focus on this</SectionTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A session is already running on something else.
+        </p>
         <Button
           type="button"
           size="xl"
+          variant="outline"
           className="mt-2"
           onClick={() => navigate({ view: "focus" })}
         >
           <Timer aria-hidden />
           Open the running timer
         </Button>
-      ) : (
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {FOCUS_OPTIONS.map((option, index) => (
-            <Button
-              key={option.minutes}
-              type="button"
-              size="xl"
-              variant={index === 0 ? "default" : "outline"}
-              className="h-auto min-h-12 py-2 whitespace-normal"
-              onClick={() => start(task.id, option.minutes)}
-            >
-              {option.label}
-            </Button>
-          ))}
-        </div>
-      )}
+      </Card>
+    )
+  }
+  return (
+    <Card>
+      <SectionTitle>Focus on this</SectionTitle>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {FOCUS_OPTIONS.map((option, index) => (
+          <Button
+            key={option.minutes}
+            type="button"
+            size="xl"
+            variant={index === 0 ? "default" : "outline"}
+            className="h-auto min-h-12 py-2 whitespace-normal"
+            onClick={() => start(task.id, option.minutes)}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
     </Card>
   )
 }
@@ -318,6 +500,7 @@ function ScheduleCard({ task }: { task: Task }) {
           ))}
         </ul>
       )}
+      {isActive(task) && <PlanRemaining taskId={task.id} />}
       <PlanSessionForm taskId={task.id} idPrefix="task-plan" />
       <ReplanDialog
         task={replanning ? task : null}
@@ -383,6 +566,38 @@ function DetailsCard({
   return (
     <Card className="space-y-3">
       <SectionTitle>Details</SectionTitle>
+      <div>
+        <label
+          htmlFor="task-estimate"
+          className="mb-1 block text-sm font-medium"
+        >
+          Time the whole task needs (optional)
+        </label>
+        <select
+          id="task-estimate"
+          value={task.estimateMinutes ?? ""}
+          onChange={(event) =>
+            dispatch({
+              type: "edit-task",
+              id: task.id,
+              at: nowIso(),
+              patch: {
+                estimateMinutes: event.target.value
+                  ? Number(event.target.value)
+                  : null,
+              },
+            })
+          }
+          className={fieldClass}
+        >
+          <option value="">Not sure</option>
+          {ESTIMATE_OPTIONS.map((value) => (
+            <option key={value} value={value}>
+              {estimateLabel(value)}
+            </option>
+          ))}
+        </select>
+      </div>
       <div>
         <label htmlFor="task-title" className="mb-1 block text-sm font-medium">
           Title
@@ -511,96 +726,6 @@ function DetailsCard({
   )
 }
 
-function StepsCard({ task }: { task: Task }) {
-  const { dispatch } = useStore()
-  const [title, setTitle] = useState("")
-  return (
-    <Card>
-      <SectionTitle>Steps</SectionTitle>
-      {task.subtasks.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {task.subtasks.map((sub) => (
-            <li key={sub.id} className="flex items-center gap-1">
-              <label className="flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-lg px-1 has-focus-visible:ring-3 has-focus-visible:ring-ring/30">
-                <input
-                  type="checkbox"
-                  checked={sub.done}
-                  onChange={() =>
-                    dispatch({
-                      type: "toggle-subtask",
-                      id: task.id,
-                      at: nowIso(),
-                      subId: sub.id,
-                    })
-                  }
-                  className="size-5 accent-[var(--primary)]"
-                />
-                <span
-                  className={
-                    sub.done ? "text-muted-foreground line-through" : undefined
-                  }
-                >
-                  {sub.title}
-                </span>
-              </label>
-              <button
-                type="button"
-                aria-label={`Remove ${sub.title}`}
-                onClick={() =>
-                  dispatch({
-                    type: "remove-subtask",
-                    id: task.id,
-                    subId: sub.id,
-                  })
-                }
-                className="grid size-11 place-items-center rounded-md text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form
-        className="mt-2 flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!title.trim()) return
-          dispatch({
-            type: "add-subtask",
-            id: task.id,
-            at: nowIso(),
-            subId: newId(),
-            title,
-          })
-          setTitle("")
-        }}
-      >
-        <label htmlFor="new-step" className="sr-only">
-          New step
-        </label>
-        <Input
-          id="new-step"
-          value={title}
-          maxLength={200}
-          placeholder="Add a step..."
-          onChange={(event) => setTitle(event.target.value)}
-          className="h-11 flex-1"
-        />
-        <Button
-          type="submit"
-          size="xl"
-          variant="outline"
-          disabled={!title.trim()}
-        >
-          <Plus aria-hidden />
-          Add
-        </Button>
-      </form>
-    </Card>
-  )
-}
-
 function DocumentsCard({ task }: { task: Task }) {
   const { dispatch } = useStore()
   return (
@@ -639,6 +764,7 @@ function DocumentEditor({ task, doc }: { task: Task; doc: TaskDocument }) {
   const [title, setTitle] = useState(doc.title)
   const [body, setBody] = useState(doc.body)
   const [copied, setCopied] = useState(false)
+  const [added, setAdded] = useState(false)
 
   const save = () => {
     if (title !== doc.title || body !== doc.body) {
@@ -698,6 +824,24 @@ function DocumentEditor({ task, doc }: { task: Task; doc: TaskDocument }) {
           type="button"
           variant="ghost"
           size="lg"
+          disabled={added || !body.trim()}
+          onClick={() => {
+            dispatch({
+              type: "append-to-doc",
+              id: task.id,
+              at: nowIso(),
+              text: body,
+              label: title,
+            })
+            setAdded(true)
+          }}
+        >
+          {added ? "Added to working document" : "Add to working document"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="lg"
           className="text-muted-foreground"
           onClick={() =>
             dispatch({
@@ -723,16 +867,42 @@ function DocumentEditor({ task, doc }: { task: Task; doc: TaskDocument }) {
   )
 }
 
+const KIND_LABEL: Partial<Record<TaskEvent["kind"], string>> = {
+  suggested: "Suggested",
+  accepted: "Accepted",
+  attempted: "Tried",
+  completed: "Done",
+}
+
+const KIND_STYLE: Partial<Record<TaskEvent["kind"], string>> = {
+  suggested: "bg-indigo-soft text-indigo",
+  accepted: "bg-secondary text-foreground",
+  attempted: "bg-sand-soft text-sand",
+  completed: "bg-sage-soft text-sage",
+}
+
 function HistoryCard({ task }: { task: Task }) {
+  const { state } = useStore()
   const [expanded, setExpanded] = useState(false)
-  const events = [...task.history].reverse()
+  const events = [...task.history].sort((a, b) => b.at.localeCompare(a.at))
   const shown = expanded ? events : events.slice(0, 5)
+  const summary = progressSummary(task, state)
   return (
     <Card>
       <SectionTitle>History</SectionTitle>
+      {summary && (
+        <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
+      )}
       <ol className="mt-2 space-y-2 text-sm">
         {shown.map((event) => (
           <li key={event.id}>
+            {KIND_LABEL[event.kind] && (
+              <span
+                className={`mr-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${KIND_STYLE[event.kind]}`}
+              >
+                {KIND_LABEL[event.kind]}
+              </span>
+            )}
             <span className="break-words">{event.text}</span>
             <span className="block text-xs text-muted-foreground">
               {formatDateTime(event.at)}

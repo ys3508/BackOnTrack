@@ -70,7 +70,7 @@ describe("definition of done", () => {
     await user.click(screen.getByRole("button", { name: "Add" }))
 
     // 2. See it in the workspace.
-    await screen.findByRole("heading", { name: "Your one next thing" })
+    await screen.findByRole("heading", { name: "Your next small step" })
     await user.click(await button("Finish my biology homework"))
 
     // 3. View and modify its deadline.
@@ -86,9 +86,9 @@ describe("definition of done", () => {
     expect(saved().tasks[0].status).toBe("in-progress")
 
     // 5. Pause and resume work.
-    await user.click(await button("Pause"))
+    await user.click(await button("Pause timer"))
     expect(saved().timer.runningSince).toBeNull()
-    await user.click(await button("Resume"))
+    await user.click(await button("Resume timer"))
     expect(saved().timer.runningSince).not.toBeNull()
 
     // Stop early, and report getting stuck.
@@ -309,6 +309,8 @@ describe("with Live AI", () => {
     },
     artifact: { kind: "email", title: "AI draft", body: "AI body" },
     steps: ["AI step one"],
+    choices: [],
+    smallerSteps: [],
     schedule: [],
   }
 

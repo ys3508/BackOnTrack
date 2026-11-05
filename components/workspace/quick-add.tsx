@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { fieldClass } from "@/components/workspace/parts"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
-import { PRIORITIES, PRIORITY_LABEL } from "@/lib/workspace/schemas"
+import {
+  ESTIMATE_OPTIONS,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  estimateLabel,
+} from "@/lib/workspace/schemas"
 import type { Priority } from "@/lib/workspace/schemas"
 
 /** A title is all that's required. Everything else can wait. */
@@ -25,7 +30,8 @@ export function QuickAdd({
   const { dispatch } = useStore()
   const [title, setTitle] = useState("")
   const [deadline, setDeadline] = useState(initialDeadline ?? "")
-  const [priority, setPriority] = useState<Priority>("medium")
+  const [priority, setPriority] = useState<Priority>("none")
+  const [estimate, setEstimate] = useState("")
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -38,10 +44,12 @@ export function QuickAdd({
       title,
       deadline: deadline || null,
       priority,
+      estimateMinutes: estimate ? Number(estimate) : null,
     })
+    setEstimate("")
     setTitle("")
     setDeadline(initialDeadline ?? "")
-    setPriority("medium")
+    setPriority("none")
     onAdded?.(id)
   }
 
@@ -66,7 +74,7 @@ export function QuickAdd({
         </Button>
       </div>
       {showDetails && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           <div>
             <label
               htmlFor="quick-add-deadline"
@@ -88,7 +96,7 @@ export function QuickAdd({
               htmlFor="quick-add-priority"
               className="mb-1 block text-sm font-medium"
             >
-              Priority
+              Priority (optional)
             </label>
             <select
               id="quick-add-priority"
@@ -99,6 +107,27 @@ export function QuickAdd({
               {PRIORITIES.map((value) => (
                 <option key={value} value={value}>
                   {PRIORITY_LABEL[value]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="quick-add-estimate"
+              className="mb-1 block text-sm font-medium"
+            >
+              Time needed (optional)
+            </label>
+            <select
+              id="quick-add-estimate"
+              value={estimate}
+              onChange={(event) => setEstimate(event.target.value)}
+              className={fieldClass}
+            >
+              <option value="">Not sure</option>
+              {ESTIMATE_OPTIONS.map((value) => (
+                <option key={value} value={value}>
+                  {estimateLabel(value)}
                 </option>
               ))}
             </select>

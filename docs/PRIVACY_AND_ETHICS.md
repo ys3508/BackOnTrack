@@ -4,7 +4,7 @@ This is a description of how the prototype works, not legal advice or a formal p
 
 ## User data handling
 
-The app stores what the user enters: tasks, descriptions, deadlines, steps, notes and drafts, planned work, focus sessions, reported obstacles, and each task's history. It has no accounts, and it doesn't ask for a name or email. It has no analytics.
+The app stores what the user enters: tasks, descriptions, instructions, working documents, deadlines, steps, notes and drafts, planned work, focus sessions, reported obstacles, and each task's history. It has no accounts, and it doesn't ask for a name or email. It has no analytics.
 
 This content can be sensitive, because people may describe their work, health, or finances. Tasks and drafts may also include other people's names.
 
@@ -15,6 +15,15 @@ This content can be sensitive, because people may describe their work, health, o
 - The data stays until the user deletes it or clears the browser's data, and it isn't backed up.
 - It isn't encrypted, so anyone using the same browser profile could read it. Use a private window on a shared computer.
 - API keys are never stored in the browser.
+- The latest daily plan is saved here too, including the energy level if one was chosen. It isn't sent to the AI service.
+- To work out which help to offer first, the app keeps a log of moments such as getting stuck, focus sessions, moved work sessions, and accepted help. It holds no task titles or written text. It has its own controls in Settings: view, delete, or switch off. Deleting a task removes its records, and Delete all removes everything.
+- The time the app was last opened is saved too, only in this browser, and is included in backups. It's used to offer an easier return after time away. It isn't sent anywhere, and there's no streak or usage tracking.
+- Browsers usually allow about 5 MB for this. Settings shows the amount used, and the app warns if a save fails.
+- Before moving saved data to a new format, or if it can't be read, a copy is kept under `backontrack.workspace.backup`. Deleting all data removes this too.
+
+### Uploaded files
+
+Files are read in the browser, using PDF.js for PDFs. They're never sent to this app's server or kept as files. Only the extracted text is saved, up to 30,000 characters, and the app says when text was cut. Type and size are checked first: PDF up to 10 MB and 100 pages, and .txt or .md up to 1 MB. Scanned or unreadable files produce a message asking the user to paste the text, and the app doesn't claim to have read them.
 
 ## API data transmission
 
@@ -24,7 +33,9 @@ This content can be sensitive, because people may describe their work, health, o
 | Live AI | Browser → this app's server (`/api/recovery`) → the AI provider, only when the user asks for a suggestion |
 | Tasks, focus, and calendar | Nowhere, in any mode |
 
-When someone asks for a recovery plan in Live AI mode, the selected task's details are sent: its title, description, deadline, status, progress, recent history, focus sessions, and reported obstacles. Other tasks aren't sent. The screen says this before they ask.
+When someone asks for a breakdown, writing help, or a recovery plan in Live AI mode, the selected task's details are sent: its title, description, deadline, status, progress, recent history, focus sessions, and reported obstacles, along with up to 12,000 characters of instructions and 8,000 of document text. Writing help also sends any selected text or source material. Other tasks aren't sent.
+
+**Consent:** the first request that includes instructions or a document asks first, and explains that the text goes to a third-party AI service. Cancelling sends nothing. Changing the instructions asks again. Demo Mode never asks, because nothing is sent.
 
 On the server:
 
@@ -33,6 +44,12 @@ On the server:
 - Logs of AI failures record only the error type, not the user's text.
 - Requests are rate limited. The limiter briefly holds the client's IP address in memory to count requests, and doesn't write it to storage.
 - The hosting platform, such as Vercel, may keep its own request logs under its own terms.
+
+### What's noticed about the user
+
+With Live AI, guesses from that log, such as "Empty documents seem to be a sticking point", are sent along with a task when the user asks for help. They describe behavior, so they could be sensitive. Switching learning off stops this. A preference the user states is still sent. Demo Mode sends nothing.
+
+The app doesn't diagnose anyone or infer health conditions, and its counts shouldn't be read that way.
 
 ## Third-party AI risks
 
@@ -60,9 +77,19 @@ On the server:
 - Demo content is labeled as prewritten, and AI failure isn't hidden by substituting it.
 - The summary lists a step as completed only if the user reported it. These are self-reports, and the app doesn't verify them.
 
+## Academic integrity
+
+The app helps students think and start, and they stay the author.
+
+- AI text is labeled as suggested, previewed, and only added when accepted. It's never silently written over the student's work.
+- Accepted text stays highlighted until the student clears it, and history records what was accepted and from where.
+- The model is told not to invent references, data, or results, and not to present anything as independently researched. Citations and links not found in the student's own text are rejected, although unusual formats could get through.
+- These measures don't guarantee a course's rules are met. Students should check what's allowed, and disclose AI help as required.
+
 ## User control and deletion
 
-- Settings has "Export my data", which downloads everything as JSON, and "Delete all my data", which removes it from the browser after a confirmation.
+- Settings has "Export my data", which downloads everything as JSON, "Import a backup", which replaces the data after a confirmation, and "Delete all my data", which removes it after a confirmation.
+- A document can be copied, or exported as Markdown or text.
 - Each task can be deleted separately.
 - AI suggestions change nothing until accepted, and each part can be left out or edited first.
 - In the guided check-in, the user can also copy or download a summary.

@@ -1,6 +1,6 @@
 import { clearSession, loadSession } from "@/lib/session"
 import type { Session } from "@/lib/session"
-import { withEvent } from "@/lib/workspace/reducer"
+import { inferEventKind, withEvent } from "@/lib/workspace/reducer"
 import {
   DEFAULT_SETTINGS,
   EMPTY_WORKSPACE,
@@ -9,10 +9,16 @@ import {
   SettingsSchema,
   TaskSchema,
   TimerSchema,
+  WORKSPACE_VERSION,
+  DEFAULT_LEARNING,
+  FrictionEventSchema,
+  LearningSchema,
+  DailyPlanSchema,
 } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
 
 const STORAGE_KEY = "backontrack.workspace.v1"
+const BACKUP_KEY = "backontrack.workspace.backup"
 
 function validItems<T>(
   items: unknown,
@@ -29,11 +35,15 @@ function validItems<T>(
 export function restoreWorkspace(raw: unknown): Workspace {
   if (!raw || typeof raw !== "object") return EMPTY_WORKSPACE
   const saved = raw as Record<string, unknown>
-  if (saved.version !== 1) return EMPTY_WORKSPACE
+  if (saved.version !== 1 && saved.version !== WORKSPACE_VERSION) {
+    return EMPTY_WORKSPACE
+  }
 
   const skipped = saved.skipped as Workspace["skipped"] | undefined
   const timer = TimerSchema.safeParse(saved.timer)
   const settings = SettingsSchema.safeParse(saved.settings)
+  const learning = LearningSchema.safeParse(saved.learning)
+  const dailyPlan = DailyPlanSchema.safeParse(saved.dailyPlan)
   const focusSessions = validItems(saved.focusSessions, (item) =>
     FocusSessionSchema.safeParse(item)
   )
@@ -41,9 +51,23 @@ export function restoreWorkspace(raw: unknown): Workspace {
     typeof saved.finishedSessionId === "string" &&
     focusSessions.some((item) => item.id === saved.finishedSessionId)
 
+  const tasks = validItems<Task>(saved.tasks, (item) =>
+    TaskSchema.safeParse(item)
+  )
+
   return {
-    version: 1,
-    tasks: validItems(saved.tasks, (item) => TaskSchema.safeParse(item)),
+    version: WORKSPACE_VERSION,
+    // Version 1 events had no kind, so it's worked out from what they recorded.
+    tasks:
+      saved.version === 1
+        ? tasks.map((task) => ({
+            ...task,
+            history: task.history.map((event) => ({
+              ...event,
+              kind: inferEventKind(event.type, event.text),
+            })),
+          }))
+        : tasks,
     focusSessions,
     planned: validItems(saved.planned, (item) =>
       PlannedSessionSchema.safeParse(item)
@@ -55,6 +79,13 @@ export function restoreWorkspace(raw: unknown): Workspace {
       ? skipped
       : EMPTY_WORKSPACE.skipped,
     legacyMigrated: saved.legacyMigrated === true,
+    lastOpenedAt:
+      typeof saved.lastOpenedAt === "string" ? saved.lastOpenedAt : null,
+    frictionLog: validItems(saved.frictionLog, (item) =>
+      FrictionEventSchema.safeParse(item)
+    ),
+    learning: learning.success ? learning.data : DEFAULT_LEARNING,
+    dailyPlan: dailyPlan.success ? dailyPlan.data : null,
   }
 }
 
@@ -80,7 +111,7 @@ export function taskFromSession(
       title: text.length > 80 ? `${text.slice(0, 77)}...` : text,
       description: text,
       status: completed.length ? "in-progress" : "needs-recovery",
-      priority: "medium",
+      priority: "none",
       deadline,
       originalDeadline: deadline,
       progress: 0,
@@ -88,11 +119,19 @@ export function taskFromSession(
       subtasks: [],
       documents: [],
       history: [],
+      estimateMinutes: null,
       createdAt: at,
       updatedAt: at,
       completedAt: null,
       recovery: null,
       rejectedPlans: [],
+      workDoc: null,
+      instructions: null,
+      aiConsentAt: null,
+      pendingBreakdown: null,
+      currentSubtaskId: null,
+      lastWorkedAt: null,
+      recoveryAttempts: [],
     },
     at,
     "created",
@@ -119,12 +158,29 @@ export function taskFromSession(
   return task
 }
 
+function needsBackup(raw: string) {
+  const version = (JSON.parse(raw) as { version?: unknown }).version
+  return version !== WORKSPACE_VERSION
+}
+
+function backUp(raw: string) {
+  try {
+    window.localStorage.setItem(BACKUP_KEY, raw)
+  } catch {
+    // Storage is full, so the original data is left in place until a save.
+  }
+}
+
 export function loadWorkspace(): Workspace {
   let workspace = EMPTY_WORKSPACE
+  let raw: string | null = null
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    raw = window.localStorage.getItem(STORAGE_KEY)
     if (raw) workspace = restoreWorkspace(JSON.parse(raw))
+    // Keeps a copy before migrating, or if the data can't be understood.
+    if (raw && needsBackup(raw)) backUp(raw)
   } catch {
+    if (raw) backUp(raw)
     workspace = EMPTY_WORKSPACE
   }
 
@@ -148,11 +204,36 @@ export function loadWorkspace(): Workspace {
   }
 }
 
+/** Returns false if the browser refused to save, so the user can be told. */
 export function saveWorkspace(workspace: Workspace) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace))
+    return true
   } catch {
-    // Storage may be full or blocked. The app still works for this visit.
+    return false
+  }
+}
+
+/** Browsers usually allow about 5 MB per site for localStorage. */
+export const STORAGE_LIMIT_BYTES = 5 * 1024 * 1024
+
+export function storageUsedBytes() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY) ?? ""
+    return new Blob([raw]).size
+  } catch {
+    return 0
+  }
+}
+
+/** Reads an exported file. Returns null if it isn't BackOnTrack data. */
+export function parseImport(text: string): Workspace | null {
+  try {
+    const parsed = JSON.parse(text) as { app?: unknown }
+    if (parsed.app !== "BackOnTrack") return null
+    return { ...restoreWorkspace(parsed), timer: null, legacyMigrated: true }
+  } catch {
+    return null
   }
 }
 
@@ -160,6 +241,7 @@ export function saveWorkspace(workspace: Workspace) {
 export function clearAllData() {
   try {
     window.localStorage.removeItem(STORAGE_KEY)
+    window.localStorage.removeItem(BACKUP_KEY)
   } catch {
     // Nothing to clear.
   }

@@ -1,15 +1,41 @@
+import { taskKindOf } from "@/lib/workspace/friction"
+import { guidanceFor } from "@/lib/workspace/patterns"
 import { EMPTY_INTAKE } from "@/lib/intake"
+import { LIMITS } from "@/lib/schemas"
+import { daysBetween } from "@/lib/workspace/dates"
 import type {
   Intake,
   RejectedPlan,
+  StepHelpRequest,
   Strategy,
+  TaskBreakdownRequest,
   TaskContext,
   TaskRecoveryRequest,
+  WorkspaceSetupRequest,
+  WritingAction,
+  WritingAssistRequest,
 } from "@/lib/schemas"
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
+import { currentSubtask } from "@/lib/workspace/selectors"
 
 const clip = (text: string) => text.slice(0, 400)
+
+/** Turns saved editor HTML into plain text, keeping paragraphs apart. */
+export function htmlToText(html: string) {
+  return html
+    .replace(/<\/(p|h[1-6]|li|blockquote)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
 
 /** Collects what the recovery engine may use: the task's own recorded data. */
 export function buildTaskContext(task: Task, state: Workspace): TaskContext {
@@ -19,7 +45,12 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
       .map((event) => clip(event.text))
       .slice(-15)
 
+  const guidance = guidanceFor(state, task, taskKindOf(task), Date.now())
+
   return {
+    learned: guidance.notes.map(clip),
+    preferredHelp: guidance.preferred ?? "",
+    avoidHelp: guidance.avoid,
     title: task.title.slice(0, 200),
     description: task.description.slice(0, 2000),
     deadline: task.deadline,
@@ -29,19 +60,32 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
     progress: task.progress,
     completedActions: texts(
       (event) =>
-        (event.type === "action" || event.type === "subtask") &&
-        event.text.startsWith("Completed")
+        event.kind === "completed" && event.text.startsWith("Completed")
     ),
     attempts: texts(
       (event) =>
         event.type === "recovery" ||
-        (event.type === "focus" && event.text.startsWith("Stopped"))
+        event.type === "stuck" ||
+        (event.type === "focus" && /^(Stopped|Interrupted)/.test(event.text))
     ),
     obstacles: texts((event) => event.type === "obstacle").slice(-10),
     openSteps: task.subtasks
       .filter((sub) => !sub.done)
       .map((sub) => clip(sub.title))
       .slice(0, 15),
+    instructions: (task.instructions?.text ?? "").slice(
+      0,
+      LIMITS.contextInstructions
+    ),
+    document: htmlToText(task.workDoc?.content ?? "").slice(
+      0,
+      LIMITS.contextDocument
+    ),
+    currentStep: clip(currentSubtask(task)?.title ?? ""),
+    stuckOnStep: task.recoveryAttempts.filter(
+      (attempt) =>
+        attempt.subtaskId && attempt.subtaskId === currentSubtask(task)?.id
+    ).length,
     focusSessions: state.focusSessions
       .filter((session) => session.taskId === task.id)
       .slice(-10)
@@ -52,6 +96,63 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
         outcome: session.outcome,
         note: clip(session.note),
       })),
+  }
+}
+
+export function buildBreakdownRequest(
+  task: Task,
+  state: Workspace,
+  today: string,
+  rejected: string[][] = []
+): TaskBreakdownRequest {
+  return {
+    stage: "task-breakdown",
+    task: buildTaskContext(task, state),
+    today,
+    rejected: rejected.slice(-3).map((steps) => steps.slice(0, 10).map(clip)),
+  }
+}
+
+export function buildStepHelpRequest(
+  task: Task,
+  state: Workspace,
+  today: string,
+  step: string
+): StepHelpRequest {
+  return {
+    stage: "step-help",
+    task: buildTaskContext(task, state),
+    today,
+    step: clip(step),
+  }
+}
+
+export function buildWorkspaceSetupRequest(
+  task: Task,
+  state: Workspace,
+  today: string
+): WorkspaceSetupRequest {
+  return {
+    stage: "workspace-setup",
+    task: buildTaskContext(task, state),
+    today,
+  }
+}
+
+export function buildWritingRequest(
+  task: Task,
+  state: Workspace,
+  today: string,
+  action: WritingAction,
+  options: { selection?: string; source?: string } = {}
+): WritingAssistRequest {
+  return {
+    stage: "writing-assist",
+    action,
+    task: buildTaskContext(task, state),
+    today,
+    selection: (options.selection ?? "").slice(0, LIMITS.contextDocument),
+    source: (options.source ?? "").slice(0, LIMITS.contextInstructions),
   }
 }
 
@@ -90,14 +191,16 @@ export function taskFacts({ task }: TaskRecoveryRequest, today: string) {
   const known = [`The task is “${task.title}”.`]
   const unknown: string[] = []
   if (task.deadline) {
+    const days = daysBetween(today, task.deadline)
     known.push(
-      task.deadline < today
+      days < 0
         ? `The deadline on record was ${task.deadline}, which has passed.`
-        : `The deadline on record is ${task.deadline}.`
+        : `The deadline on record is ${task.deadline}, ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"} away`}.`
     )
   } else {
     unknown.push("Whether this has a real deadline. None is recorded.")
   }
+  if (task.currentStep) known.push(`The current step is “${task.currentStep}”.`)
   known.push(`It is recorded as ${task.progress}% done.`)
   if (task.focusSessions.length) {
     const minutes = task.focusSessions.reduce(

@@ -42,7 +42,7 @@ describe("task tracker", () => {
     expect(created).toMatchObject({
       title: "Essay",
       status: "not-started",
-      priority: "medium",
+      priority: "none",
       progress: 0,
       deadline: null,
     })
