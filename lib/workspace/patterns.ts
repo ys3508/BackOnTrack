@@ -29,7 +29,27 @@ export type Pattern = {
   avoid?: boolean
 }
 
-const times = (count: number) => (count === 1 ? "once" : `${count} times`)
+const SAME_MOMENT_MS = 60 * 60 * 1000
+
+const occasions = (count: number) =>
+  count === 1 ? "one occasion" : `${count} separate occasions`
+
+/**
+ * Clicking "I'm stuck" three times in a minute is one bad moment, not a pattern,
+ * so events on one task within the hour count once.
+ */
+function distinctMoments(events: FrictionEvent[]) {
+  const kept: FrictionEvent[] = []
+  for (const item of [...events].sort((a, b) => a.at.localeCompare(b.at))) {
+    const repeat = kept.some(
+      (other) =>
+        other.taskId === item.taskId &&
+        Date.parse(item.at) - Date.parse(other.at) < SAME_MOMENT_MS
+    )
+    if (!repeat) kept.push(item)
+  }
+  return kept
+}
 
 const actionForHelp = (kind: HelpKind): HintAction =>
   PREPARED_KINDS.includes(kind) ? "setup" : "help"
@@ -37,24 +57,26 @@ const actionForHelp = (kind: HelpKind): HintAction =>
 function detectFrom(log: FrictionEvent[], state: Workspace): Pattern[] {
   const patterns: Pattern[] = []
 
-  const blank = log.filter(
-    (item) =>
-      item.blankDoc &&
-      (item.kind === "stuck" || (item.kind === "session" && item.interrupted))
+  const blank = distinctMoments(
+    log.filter(
+      (item) =>
+        item.blankDoc &&
+        (item.kind === "stuck" || (item.kind === "session" && item.interrupted))
+    )
   )
   if (blank.length >= MIN_EVIDENCE) {
     patterns.push({
       id: "blank-start",
       title: "Empty documents seem to be a sticking point",
-      evidence: `${times(blank.length)} recently, you got stuck or stopped early while the document was empty.`,
+      evidence: `On ${occasions(blank.length)} recently, you got stuck or stopped early while the document was empty.`,
       actionLabel: "Start from a prepared document",
       action: "setup",
     })
   }
 
-  const sessions = log
-    .filter((item) => item.kind === "session")
-    .slice(-RECENT_SESSIONS)
+  const sessions = distinctMoments(
+    log.filter((item) => item.kind === "session")
+  ).slice(-RECENT_SESSIONS)
   const early = sessions.filter((item) => item.interrupted).length
   if (early >= MIN_EVIDENCE) {
     patterns.push({
@@ -67,8 +89,8 @@ function detectFrom(log: FrictionEvent[], state: Workspace): Pattern[] {
   }
 
   for (const taskKind of ["writing", "code"] as const) {
-    const stuck = log.filter(
-      (item) => item.kind === "stuck" && item.taskKind === taskKind
+    const stuck = distinctMoments(
+      log.filter((item) => item.kind === "stuck" && item.taskKind === taskKind)
     )
     const tasks = new Set(stuck.map((item) => item.taskId)).size
     if (stuck.length >= MIN_EVIDENCE && tasks >= 2) {
@@ -78,7 +100,7 @@ function detectFrom(log: FrictionEvent[], state: Workspace): Pattern[] {
           taskKind === "writing"
             ? "Writing tasks seem harder to get going"
             : "Coding tasks seem harder to get going",
-        evidence: `You reported being stuck ${times(stuck.length)}, across ${tasks} ${taskKind === "writing" ? "writing" : "coding"} tasks.`,
+        evidence: `You reported being stuck on ${occasions(stuck.length)}, across ${tasks} ${taskKind === "writing" ? "writing" : "coding"} tasks.`,
         actionLabel:
           taskKind === "writing"
             ? "Start from a prepared document"
@@ -91,15 +113,19 @@ function detectFrom(log: FrictionEvent[], state: Workspace): Pattern[] {
 
   for (const task of state.tasks) {
     const progressAt = lastProgressAt(task)
-    const moved = log.filter(
-      (item) =>
-        item.kind === "moved" && item.taskId === task.id && item.at > progressAt
+    const moved = distinctMoments(
+      log.filter(
+        (item) =>
+          item.kind === "moved" &&
+          item.taskId === task.id &&
+          item.at > progressAt
+      )
     ).length
     if (moved >= MIN_EVIDENCE) {
       patterns.push({
         id: `moved:${task.id}`,
         title: "This task keeps moving",
-        evidence: `Its work session moved ${times(moved)} with no step finished in between.`,
+        evidence: `Its work session moved on ${occasions(moved)}, with no step finished in between.`,
         actionLabel: "Make it smaller",
         action: "recover",
         taskId: task.id,
@@ -130,7 +156,7 @@ function detectFrom(log: FrictionEvent[], state: Workspace): Pattern[] {
       patterns.push({
         id: `help-stalled:${helpKind}`,
         title: `${label} hasn’t seemed to help so far`,
-        evidence: `You were stuck again after it ${times(resolved.length)}, so other approaches will come first.`,
+        evidence: `You were stuck again after it on ${occasions(resolved.length)}, so other approaches will come first.`,
         actionLabel: "",
         action: "help",
         helpKind,

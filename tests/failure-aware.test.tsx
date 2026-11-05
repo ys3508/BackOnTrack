@@ -38,13 +38,18 @@ const button = (name: RegExp | string) => screen.findByRole("button", { name })
 const run = (actions: WorkspaceAction[], start: Workspace = EMPTY_WORKSPACE) =>
   actions.reduce(workspaceReducer, start)
 
+/** Each call is 90 minutes later than the last, so they're separate moments. */
+let tick = 0
+const later = () =>
+  new Date(NOW - (400 - ++tick) * 90 * 60 * 1000).toISOString()
+
 const create = (id: string, title = "Write my essay"): WorkspaceAction => ({
   type: "create-task",
   id,
   at: AT,
   title,
 })
-const stuck = (id = "a", at = AT): WorkspaceAction => ({
+const stuck = (id = "a", at: string = later()): WorkspaceAction => ({
   type: "report-stuck",
   id,
   at,
@@ -76,7 +81,7 @@ const session = (sessionId: string, seconds: number): WorkspaceAction[] => [
   {
     type: "timer-stop",
     now: seconds * 1000,
-    at: AT,
+    at: later(),
     outcome: "continue-later",
     note: "",
   },
@@ -121,6 +126,31 @@ describe("not claiming too much", () => {
     expect(MIN_EVIDENCE).toBe(3)
     expect(ids(run([create("a"), stuck(), stuck()]))).toEqual([])
     expect(ids(threeStuck())).toContain("blank-start")
+  })
+
+  it("treats repeated clicks in one moment as one", () => {
+    const at = later()
+    const state = run([
+      create("a"),
+      stuck("a", at),
+      stuck("a", at),
+      stuck("a", at),
+    ])
+    expect(state.frictionLog).toHaveLength(3)
+    expect(ids(state)).toEqual([])
+    // A different task at the same time is still a separate moment.
+    expect(
+      ids(
+        run([
+          create("a"),
+          create("b"),
+          create("c"),
+          stuck("a", at),
+          stuck("b", at),
+          stuck("c", at),
+        ])
+      )
+    ).toContain("blank-start")
   })
 
   it("forgets moments older than 60 days", () => {
@@ -251,7 +281,7 @@ describe("patterns", () => {
     const moves = (date: string, id: string): WorkspaceAction => ({
       type: "move-planned",
       id,
-      at: new Date(NOW + 1000).toISOString(),
+      at: later(),
       date,
       time: null,
     })
@@ -282,11 +312,17 @@ describe("patterns", () => {
       state.frictionLog.filter((item) => item.kind === "moved")
     ).toHaveLength(3)
 
-    const later = new Date(NOW + 5000).toISOString()
+    const afterMoves = new Date(NOW + 5000).toISOString()
     const progressed = run(
       [
-        { type: "add-subtask", id: "a", at: later, subId: "1", title: "One" },
-        { type: "toggle-subtask", id: "a", at: later, subId: "1" },
+        {
+          type: "add-subtask",
+          id: "a",
+          at: afterMoves,
+          subId: "1",
+          title: "One",
+        },
+        { type: "toggle-subtask", id: "a", at: afterMoves, subId: "1" },
       ],
       state
     )
@@ -367,7 +403,7 @@ describe("changing the approach", () => {
     expect(plan.headline).toBe("Start from a prepared document")
     expect(plan.artifact.body).toContain("## Questions to answer")
     expect(plan.adaptationNote).toContain("Based on your records")
-    expect(plan.adaptationNote).toContain("3 times")
+    expect(plan.adaptationNote).toContain("3 separate occasions")
   })
 
   it("doesn't change anything without evidence", () => {
@@ -470,7 +506,9 @@ describe("in the app", () => {
     const hint = await screen.findByRole("region", {
       name: "Something BackOnTrack noticed",
     })
-    expect(within(hint).getByText(/3 times recently/)).toBeInTheDocument()
+    expect(
+      within(hint).getByText(/3 separate occasions recently/)
+    ).toBeInTheDocument()
     expect(within(hint).getByText(/not AI and not a diagnosis/)).toBeTruthy()
     await user.click(
       within(hint).getByRole("button", {
@@ -522,7 +560,7 @@ describe("in the app", () => {
     window.location.hash = "#/settings"
     render(<WorkspaceApp />)
     expect(
-      await screen.findByText(/at least 3 similar moments/)
+      await screen.findByText(/at least 3 separate moments/)
     ).toBeInTheDocument()
   })
 

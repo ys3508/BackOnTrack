@@ -133,7 +133,7 @@ export function LearningCard() {
       ) : (
         <p className="text-sm">
           {learning.enabled
-            ? `Nothing yet. It takes at least ${MIN_EVIDENCE} similar moments before anything shows up here, so a few bad days don’t become a “pattern”.`
+            ? `Nothing yet. It takes at least ${MIN_EVIDENCE} separate moments before anything shows up here, so one bad afternoon doesn’t become a “pattern”.`
             : "Learning is off, so nothing new is being recorded or used."}
         </p>
       )}
