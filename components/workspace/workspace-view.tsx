@@ -21,6 +21,7 @@ import {
   ExpandableList,
   StatusBadge,
 } from "@/components/workspace/parts"
+import { DailyPlanner, TodayPlan } from "@/components/workspace/daily-plan"
 import { PatternHint } from "@/components/workspace/pattern-hint"
 import { QuickAdd } from "@/components/workspace/quick-add"
 import { ReturnView } from "@/components/workspace/return-view"
@@ -28,9 +29,11 @@ import { ReplanDialog } from "@/components/workspace/schedule"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { SAMPLE_TASKS } from "@/lib/demo/sample-tasks"
 import { deadlineText, formatDateTime } from "@/lib/workspace/dates"
+import { reasonsFor } from "@/lib/planning/priority"
 import { taskKindOf } from "@/lib/workspace/friction"
 import { hintFor } from "@/lib/workspace/patterns"
 import { returnSummary } from "@/lib/workspace/returning"
+import { isActive } from "@/lib/workspace/schemas"
 import type { Task } from "@/lib/workspace/schemas"
 import {
   deadlinePassed,
@@ -143,15 +146,25 @@ export function WorkspaceView() {
 
   if (coming) return <ReturnView summary={coming} />
 
+  const planToday =
+    state.dailyPlan?.date === today && state.dailyPlan.items.length
+      ? state.dailyPlan
+      : null
+  const plannable = state.tasks.filter(
+    (task) => isActive(task) && task.status !== "paused"
+  ).length
+
   return (
     <div className="space-y-6">
       <div>
         <ScreenHeading>
-          {resuming
-            ? "Continue where you left off"
-            : recommended
-              ? "Your next small step"
-              : "What’s on your plate?"}
+          {planToday
+            ? "Your plan for today"
+            : resuming
+              ? "Continue where you left off"
+              : recommended
+                ? "Your next small step"
+                : "What’s on your plate?"}
         </ScreenHeading>
         {!recommended && (
           <p className="mt-2 text-muted-foreground">
@@ -162,7 +175,9 @@ export function WorkspaceView() {
         )}
       </div>
 
-      {recommended && (
+      {planToday && <TodayPlan plan={planToday} />}
+
+      {recommended && !planToday && (
         <Card className="p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2.5">
             <button
@@ -177,6 +192,11 @@ export function WorkspaceView() {
           <p className="mt-2 font-heading text-[1.625rem] leading-tight sm:text-[2rem]">
             {nextActionFor(recommended)}
           </p>
+          {!resuming && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Why this one: {reasonsFor(recommended, state, today).join(". ")}.
+            </p>
+          )}
           <NextStepDetails task={recommended} />
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button
@@ -268,6 +288,8 @@ export function WorkspaceView() {
           </div>
         </Card>
       )}
+
+      {!planToday && plannable >= 2 && <DailyPlanner />}
 
       {recommended && hint && (
         <PatternHint

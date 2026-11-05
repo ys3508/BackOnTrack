@@ -62,10 +62,12 @@ import {
   progressSummary,
 } from "@/lib/workspace/selectors"
 import {
+  ESTIMATE_OPTIONS,
   PRIORITIES,
   PRIORITY_LABEL,
   STATUS_LABEL,
   TASK_STATUSES,
+  estimateLabel,
   isActive,
 } from "@/lib/workspace/schemas"
 import type {
@@ -564,6 +566,38 @@ function DetailsCard({
   return (
     <Card className="space-y-3">
       <SectionTitle>Details</SectionTitle>
+      <div>
+        <label
+          htmlFor="task-estimate"
+          className="mb-1 block text-sm font-medium"
+        >
+          Time the whole task needs (optional)
+        </label>
+        <select
+          id="task-estimate"
+          value={task.estimateMinutes ?? ""}
+          onChange={(event) =>
+            dispatch({
+              type: "edit-task",
+              id: task.id,
+              at: nowIso(),
+              patch: {
+                estimateMinutes: event.target.value
+                  ? Number(event.target.value)
+                  : null,
+              },
+            })
+          }
+          className={fieldClass}
+        >
+          <option value="">Not sure</option>
+          {ESTIMATE_OPTIONS.map((value) => (
+            <option key={value} value={value}>
+              {estimateLabel(value)}
+            </option>
+          ))}
+        </select>
+      </div>
       <div>
         <label htmlFor="task-title" className="mb-1 block text-sm font-medium">
           Title

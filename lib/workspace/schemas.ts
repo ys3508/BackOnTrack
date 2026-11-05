@@ -166,6 +166,8 @@ export const TaskSchema = z.object({
   currentSubtaskId: z.string().nullable().catch(null).default(null),
   lastWorkedAt: z.string().nullable().catch(null).default(null),
   recoveryAttempts: z.array(RecoveryAttemptSchema).catch([]).default([]),
+  /** The user's rough guess at the whole task, in minutes. Optional. */
+  estimateMinutes: z.number().positive().nullable().catch(null).default(null),
 })
 export type Task = z.infer<typeof TaskSchema>
 
@@ -225,6 +227,36 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultFocusMinutes: 5,
   homeListSize: 3,
 }
+
+export const ESTIMATE_OPTIONS = [5, 15, 30, 60, 120, 240]
+
+export const estimateLabel = (minutes: number) =>
+  minutes < 60
+    ? `About ${minutes} min`
+    : `About ${minutes / 60} ${minutes === 60 ? "hour" : "hours"}`
+
+export const DailyPlanItemSchema = z.object({
+  taskId: z.string(),
+  subtaskId: z.string().nullable().default(null),
+  title: z.string(),
+  action: z.string(),
+  minutes: z.number(),
+  reason: z.string().default(""),
+  done: z.boolean().default(false),
+})
+export type DailyPlanItem = z.infer<typeof DailyPlanItemSchema>
+
+export const ENERGY_LEVELS = ["low", "okay", "good"] as const
+export type Energy = (typeof ENERGY_LEVELS)[number]
+
+export const DailyPlanSchema = z.object({
+  date: z.string(),
+  minutes: z.number(),
+  energy: z.enum(ENERGY_LEVELS).nullable().default(null),
+  items: z.array(DailyPlanItemSchema),
+  createdAt: z.string(),
+})
+export type DailyPlan = z.infer<typeof DailyPlanSchema>
 
 export const HELP_KINDS = [
   "prepared",
@@ -310,6 +342,7 @@ export type Workspace = {
   lastOpenedAt: string | null
   frictionLog: FrictionEvent[]
   learning: Learning
+  dailyPlan: DailyPlan | null
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
@@ -325,6 +358,7 @@ export const EMPTY_WORKSPACE: Workspace = {
   lastOpenedAt: null,
   frictionLog: [],
   learning: DEFAULT_LEARNING,
+  dailyPlan: null,
 }
 
 export const ACTIVE_STATUSES: TaskStatus[] = [

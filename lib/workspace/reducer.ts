@@ -1,7 +1,7 @@
 import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
 import { shortDate } from "@/lib/workspace/dates"
 import { observeFriction } from "@/lib/workspace/friction"
-import type { HelpKind, Learning } from "@/lib/workspace/schemas"
+import type { DailyPlan, HelpKind, Learning } from "@/lib/workspace/schemas"
 import {
   STATUS_LABEL,
   PRIORITY_LABEL,
@@ -36,13 +36,21 @@ export type WorkspaceAction =
       description?: string
       deadline?: string | null
       priority?: Priority
+      estimateMinutes?: number | null
     }
   | {
       type: "edit-task"
       id: string
       at: string
       patch: Partial<
-        Pick<Task, "title" | "description" | "priority" | "nextAction">
+        Pick<
+          Task,
+          | "title"
+          | "description"
+          | "priority"
+          | "nextAction"
+          | "estimateMinutes"
+        >
       >
     }
   | {
@@ -200,6 +208,9 @@ export type WorkspaceAction =
   | { type: "report-stuck"; id: string; at: string; text: string }
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "mark-opened"; at: string }
+  | { type: "set-daily-plan"; plan: DailyPlan }
+  | { type: "toggle-daily-item"; taskId: string }
+  | { type: "move-daily-item"; taskId: string; by: -1 | 1 }
   | { type: "log-help"; id: string; at: string; helpKind: HelpKind }
   | { type: "learning"; patch: Partial<Learning> }
   | { type: "delete-friction"; id: string }
@@ -319,6 +330,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
           currentSubtaskId: null,
           lastWorkedAt: null,
           recoveryAttempts: [],
+          estimateMinutes: action.estimateMinutes ?? null,
         },
         action.at,
         "created",
@@ -429,6 +441,12 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
         ...state,
         tasks: state.tasks.filter((task) => task.id !== action.id),
         planned: state.planned.filter((item) => item.taskId !== action.id),
+        dailyPlan: state.dailyPlan && {
+          ...state.dailyPlan,
+          items: state.dailyPlan.items.filter(
+            (item) => item.taskId !== action.id
+          ),
+        },
       }
 
     case "add-subtask":
@@ -1119,6 +1137,35 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
         frictionLog: [],
         learning: { ...state.learning, dismissed: [] },
       }
+
+    case "set-daily-plan":
+      return { ...state, dailyPlan: action.plan }
+
+    case "toggle-daily-item":
+      return state.dailyPlan
+        ? {
+            ...state,
+            dailyPlan: {
+              ...state.dailyPlan,
+              items: state.dailyPlan.items.map((item) =>
+                item.taskId === action.taskId
+                  ? { ...item, done: !item.done }
+                  : item
+              ),
+            },
+          }
+        : state
+
+    case "move-daily-item": {
+      if (!state.dailyPlan) return state
+      const items = [...state.dailyPlan.items]
+      const from = items.findIndex((item) => item.taskId === action.taskId)
+      const to = from + action.by
+      if (from < 0 || to < 0 || to >= items.length) return state
+      const [moved] = items.splice(from, 1)
+      items.splice(to, 0, moved)
+      return { ...state, dailyPlan: { ...state.dailyPlan, items } }
+    }
 
     case "mark-opened":
       return { ...state, lastOpenedAt: action.at }

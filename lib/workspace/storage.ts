@@ -13,6 +13,7 @@ import {
   DEFAULT_LEARNING,
   FrictionEventSchema,
   LearningSchema,
+  DailyPlanSchema,
 } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
 
@@ -42,6 +43,7 @@ export function restoreWorkspace(raw: unknown): Workspace {
   const timer = TimerSchema.safeParse(saved.timer)
   const settings = SettingsSchema.safeParse(saved.settings)
   const learning = LearningSchema.safeParse(saved.learning)
+  const dailyPlan = DailyPlanSchema.safeParse(saved.dailyPlan)
   const focusSessions = validItems(saved.focusSessions, (item) =>
     FocusSessionSchema.safeParse(item)
   )
@@ -83,6 +85,7 @@ export function restoreWorkspace(raw: unknown): Workspace {
       FrictionEventSchema.safeParse(item)
     ),
     learning: learning.success ? learning.data : DEFAULT_LEARNING,
+    dailyPlan: dailyPlan.success ? dailyPlan.data : null,
   }
 }
 
@@ -116,6 +119,7 @@ export function taskFromSession(
       subtasks: [],
       documents: [],
       history: [],
+      estimateMinutes: null,
       createdAt: at,
       updatedAt: at,
       completedAt: null,

@@ -65,7 +65,7 @@ export function resumeTask(state: Workspace) {
   )
 }
 
-function score(task: Task, state: Workspace, today: string) {
+export function priorityScore(task: Task, state: Workspace, today: string) {
   let value = 0
   if (task.priority === "high") value += 20
   if (task.priority === "medium") value += 10
@@ -95,7 +95,7 @@ export function recommendTask(state: Workspace, today: string): Task | null {
   if (!candidates.length) return null
   return [...candidates].sort(
     (a, b) =>
-      score(b, state, today) - score(a, state, today) ||
+      priorityScore(b, state, today) - priorityScore(a, state, today) ||
       a.createdAt.localeCompare(b.createdAt)
   )[0]
 }
