@@ -163,6 +163,32 @@ describe("automated accessibility scan", () => {
     expect(await violations()).toEqual([])
   })
 
+  it("finds no violations with step help and the planner open", async () => {
+    window.location.hash = "#/tasks/a"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(
+      await screen.findByRole("button", { name: "Help me do this" })
+    )
+    await screen.findByLabelText(/Suggested, and not in your document/)
+    await user.click(
+      await screen.findByRole("button", { name: "Plan remaining work" })
+    )
+    await screen.findByRole("list", { name: "Suggested work sessions" })
+    expect(await violations()).toEqual([])
+  })
+
+  it("finds no violations with a new task's setup open", async () => {
+    window.location.hash = "#/tasks/b"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(
+      await screen.findByRole("button", { name: /Set up my workspace/ })
+    )
+    await screen.findByLabelText(/Suggested, and not in your document/)
+    expect(await violations()).toEqual([])
+  })
+
   it("moves focus to the heading on each new view", async () => {
     window.location.hash = "#/tasks"
     render(<WorkspaceApp />)

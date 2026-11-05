@@ -59,6 +59,10 @@ When asked to **break a task down**, it proposes small steps from the instructio
 
 When asked for **writing help**, it can generate an outline, explain a requirement, suggest starting paragraphs, split a section into steps, summarize source material, or improve selected text. All of these are previewed first.
 
+When asked for **help with a step**, it gives one concrete first action, why that comes first, something to start from, and optional smaller steps. "Think about how to train a classifier" gets rejected. "Open the dataset and identify the target column" is the standard.
+
+When **setting up a new task**, it lists the deliverables, dependencies, and unclear points found in the user's instructions, then proposes steps and a starter. Dates it reports must appear in the instructions, and it never changes the deadline.
+
 When the user is **stuck**:
 
 1. **Read the task's data.** The app assembles what's recorded, within fixed size limits.
@@ -66,7 +70,7 @@ When the user is **stuck**:
 3. **Recovery Decision:** suggest Finish, Reduce, or Release, with reasoning and uncertainty. The user can choose any option, and the plan is rewritten for it.
 4. **Plan:** give one next step and a usable draft, with optional steps and work sessions.
 5. **Preview:** the user edits the draft and chooses which parts to keep. Nothing changes until they accept.
-6. **Adapt:** "Still stuck" must produce a different plan. The server rejects a step that repeats an earlier one or asks for reflection. The model gets one corrected retry, and after that a clearly labeled built-in template is used.
+6. **Adapt:** The prompt includes how many plans were tried on the current step, and each one has to be smaller and different. It can offer smaller steps to replace the current one, leaving finished steps alone, or a code starting point that it says hasn't been run. "Still stuck" must produce a different plan. The server rejects a step that repeats an earlier one or asks for reflection. The model gets one corrected retry, and after that a clearly labeled built-in template is used.
 
 ## 8. How should it conclude?
 

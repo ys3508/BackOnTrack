@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 315 of 315 (also from a clean clone, and with the system set to Kiritimati time) |
+| Automated tests (`npm test`) | Pass, 368 of 368 (also from a clean clone. The earlier 315-test version also passed with the system set to Kiritimati time) |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
@@ -24,6 +24,26 @@ No real AI model has been called. The following were verified instead:
 - A manual test ran the production build with the real Anthropic SDK client over HTTP, against a throwaway local server returning canned answers.
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
+
+## Execution support (review of version 3)
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch, in Demo Mode unless marked otherwise.
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| "Start 5 minutes" opens the step's document | Browser, desktop and 375 px wide | Went to the task's document with the cursor in the editor, and a small timer naming the step | Pass |
+| "Help me do this" on "Train a classifier" | Browser | First action: "Open the dataset and identify the target column", with a code starter marked as not run. The document was unchanged until accepted. | Pass |
+| Accepting it | Browser | Code block in the editor. Steps went from 4 to 7. The finished step and the deadline were unchanged. | Pass |
+| "I'm stuck" repeatedly | Browser and automated | Failed at first, offering the same step back. After the fix: "Find where the dataset file is saved", then two different plans. | Pass after fix |
+| "Plan remaining work" | Browser and automated | Three 25-minute sessions were proposed. Nothing was saved until confirmed, then they appeared on the calendar. The deadline was unchanged. | Pass |
+| Steps that don't fit, weekends, past or missing deadlines | Automated | Reported as not fitting, and the deadline wasn't changed | Pass |
+| Interrupted session | Browser and automated | Stopped at 11 seconds: "Interrupted attempt, not counted as focus time". Not on the calendar. | Pass |
+| Optional priority | Browser and automated | New tasks default to "No priority". Saved priorities are kept. | Pass |
+| Accessibility scan with the new panels open | Automated (axe-core in jsdom) | No violations | Pass |
+| **Real model: step help and workspace setup** | **Not run: no API key was available.** Added to `npm run test:live`. | | **Not run** |
+| **Real-case test on a real assignment** | **Not run.** The protocol is in [DESIGN_THINKING.md](DESIGN_THINKING.md). | | **Not run** |
+
+Demo Mode matches wording, so these results show the workflow and the safeguards. They don't show that it understands a real assignment.
 
 ## AI-assisted task execution (version 3)
 

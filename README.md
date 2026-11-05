@@ -15,10 +15,11 @@ The public site runs in Demo Mode, with no account or API key. Its suggestions c
 | Area | What you can do |
 | --- | --- |
 | **Workspace** | See "Your next small step", or "Continue where you left off", with one click to the task, its document, or a short focus session. Lists stay short, with an option to expand. |
+| **Help starting** | Each step has "Help me do this", which gives one concrete first action and something to start from: an outline, a draft, a checklist, or code to copy. Code hasn't been run, and BackOnTrack can't run it. A new task can set up its first workspace from your instructions. "Start 5 minutes" opens the document for that step, with a small timer on top. |
 | **Task workspace** | Add instructions by pasting them or uploading a PDF, .txt, or .md file. Get an editable breakdown into small steps. Write in a rich-text document with autosave, and get writing help you preview, then accept or reject. Keep the timer beside your work. |
-| **Tasks** | Create, edit, delete, complete, pause, and resume tasks. Set deadlines and priority, track progress, add steps and notes, and view history. Use a list or a Kanban board with six states. |
-| **Focus** | Run 5, 10, or 25 minute sessions linked to a task, with pause, resume, reset, optional breaks, and history. Timing uses wall-clock timestamps, so it stays right in background tabs and after a reload. Finishing a session never completes the task. |
-| **Calendar** | See month and week views using FullCalendar's MIT packages. Deadlines look different from optional planned work. Work sessions move freely, but a deadline only moves after you confirm. "Replan" sets a new work day and leaves the deadline alone. |
+| **Tasks** | Create, edit, delete, complete, pause, and resume tasks. Set deadlines and, if you want, a priority, track progress, add steps and notes, and view history. Use a list or a Kanban board with six states. |
+| **Focus** | Run 5, 10, or 25 minute sessions linked to a task, with pause, resume, reset, optional breaks, and history. A session stopped in under a minute is an interrupted attempt, and doesn't count as focus time. Timing uses wall-clock timestamps, so it stays right in background tabs and after a reload. Finishing a session never completes the task. |
+| **Calendar** | See month and week views using FullCalendar's MIT packages. "Plan remaining work" suggests sessions for open steps, calculated from the time you say you have. You confirm them, and it can't change a deadline. Deadlines look different from optional planned work. Work sessions move freely, but a deadline only moves after you confirm. "Replan" sets a new work day and leaves the deadline alone. |
 | **Recovery** | When stuck, get a plan based on the task's real data: title, deadline, status, attempts, finished actions, focus sessions, and obstacles. It produces something usable, such as a draft email, worksheet, or schedule. You preview and edit it, and nothing changes unless you accept it. |
 
 Reality Check, Finish/Reduce/Release, and Plan B are all part of Recovery. The original step-by-step wizard is still available as a guided check-in.
@@ -124,6 +125,7 @@ This repository does not yet have its own license for the original BackOnTrack c
 
 ## Known limitations
 
+- BackOnTrack hasn't been tried on a real assignment yet. See the real-case test in [docs/DESIGN_THINKING.md](docs/DESIGN_THINKING.md).
 - The real AI model has not been tested, and the public site doesn't use it. See [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
 - No formal user testing has been done, and BackOnTrack's effect on procrastination has not been measured.
 - Data stays in one browser, within its storage limit of about 5 MB. Clearing browser data deletes it, so use Export in Settings to keep a backup. The app warns if storage fills up.

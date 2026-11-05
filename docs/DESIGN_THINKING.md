@@ -12,6 +12,14 @@ This document follows the five stages: Empathy → Define → Ideate → Prototy
 | 2. Productivity workspace | Persistent tasks, calendar, focus timer, and recovery plans | It could organize work, but the work itself still happened elsewhere. Suggestions stayed abstract. |
 | 3. AI-assisted task execution | Each task has instructions, editable steps, a working document, writing help, adaptive recovery, and honest progress history | Not yet tested with real users or a real AI model. |
 
+The review of version 3 led to a fourth stage of the same idea, on the same branch.
+
+| Stage | What the user gets | What was still missing |
+| --- | --- | --- |
+| Advice chatbot | Suggestions on what to do | The work still started from nothing |
+| Task manager | Tasks, a calendar, and a timer | It organized work, but didn't reduce the effort of starting |
+| Execution-supporting assistant | A workspace prepared for the step, which adapts when the user is stuck | Whether this really helps on real work is untested |
+
 ### Where the evidence comes from
 
 | Kind | What's here |
@@ -19,6 +27,29 @@ This document follows the five stages: Empathy → Define → Ideate → Prototy
 | **Actual user feedback** | None from other people has been recorded. **Student to complete:** add any test sessions or feedback you've collected. |
 | **Developer observations** | The project's author reported that "I haven't finished my homework for a long time" produced "Write the part of this that matters most, in a single line", which leaves the person to work out what to do. They also observed that version 2 could organize tasks without helping to perform them. Browser testing during development found the bugs listed in the development log. |
 | **Planned capabilities** | Testing with a real AI model and real users, sync between devices, importing Word files, and timer alerts. None of these exist yet. |
+
+### Review of version 3
+
+The project's author reviewed version 3 by using it. This is one person's review, not a user study.
+
+| Review point | Change | Kind of evidence |
+| --- | --- | --- |
+| The task page should be the core, and AI should reduce the work needed to start | Primary buttons now lead to a prepared workspace | Review |
+| Steps were still too abstract, so "train classifier" gives no way in | "Help me do this" gives a concrete first action, such as "Open the dataset and identify the target column" | Review |
+| The focus timer was separate from the work | "Start 5 minutes" opens the step's document, with a small timer on top | Review |
+| Plan B should use finished steps, failed attempts, and the deadline, and "think about how to train a classifier" counts as failure | Repeated "I'm stuck" makes the step smaller, or gives a code starting point. Finished steps and the deadline stay as they are. | Review |
+| The calendar should plan the work left | "Plan remaining work" proposes sessions, and adds them only once confirmed | Review |
+| A required-looking priority, and a 2-second session counted as focus | Priority is optional, and sessions under a minute are interrupted attempts | Review |
+
+### Real-case test (not run yet)
+
+**Student to complete.** Try BackOnTrack on one real, unfinished small assignment, and record the answers here:
+
+1. Did it correctly understand what has to be submitted?
+2. Did it give you a workspace you could act in straight away?
+3. When you clicked "I'm stuck", did it really make the work easier?
+
+Run this with Live AI if possible, because Demo Mode only uses wording rules. No results are claimed until this has been done.
 
 ### Version 3 design rationale
 

@@ -166,6 +166,31 @@ The `feat/task-execution` branch started from `main` at `4d58986`.
 - Icons squeezed the step text, so they moved behind an "Edit steps" toggle.
 - Demo text read badly, such as "This section is about Write the introduction", and was reworded.
 
+## From task manager to execution support
+
+This followed a review of version 3, on the same `feat/task-execution` branch.
+
+### Decisions
+
+- **Concrete steps in Demo Mode come from fixed wording rules.** They can be wrong, and the interface labels them. Real understanding needs Live AI.
+- **Code is for copying, not running.** Running Python in the browser would add a lot for a small gain. Code is labeled as not run.
+- **Smaller steps replace only the current step.** Finished work stays, and the user can uncheck the replacement.
+- **"Plan remaining work" is arithmetic, not AI.** It's predictable, costs nothing, and is labeled as calculated. It has no way to change a deadline.
+- **A step stays in one sitting if a day has room.** Steps that don't fit are reported, not squeezed in.
+- **Priority is optional.** Existing tasks keep the priority they have.
+- **Under 60 seconds and not finished counts as an interrupted attempt.** It's kept in the history, but left out of focused time and the calendar.
+
+### Problems found by testing
+
+All of these were found in a real browser after the automated tests had passed.
+
+- A second "I'm stuck" offered the same step back as its own next action, which is exactly what the review warned about. Steps that are already small now go smaller.
+- Smaller steps could repeat steps already on the list, or be added twice when a plan was accepted. Both are now filtered out.
+- A suggested session read "undefined", because that plan had no steps to name it after.
+- Splitting a step left the running timer pointing at a step that no longer existed.
+- After a code starter, a plan suggested adding "one more sentence" after a line of code.
+- The first version of the planner scattered a step across days in 5-minute pieces.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).
