@@ -425,3 +425,92 @@ describe("POST /api/recovery task-breakdown", () => {
     expect(response.status).toBe(400)
   })
 })
+
+describe("POST /api/recovery writing-assist", () => {
+  const context = {
+    title: "Essay",
+    description: "",
+    deadline: null,
+    originalDeadline: null,
+    status: "In Progress",
+    priority: "Medium",
+    progress: 0,
+    completedActions: [],
+    attempts: [],
+    obstacles: [],
+    openSteps: [],
+    instructions: "Discuss cells. Cite (Lee, 2019).",
+    document: "My draft text",
+    currentStep: "Write the opening",
+    focusSessions: [],
+  }
+  const request = {
+    stage: "writing-assist",
+    action: "starter",
+    task: context,
+    today: "2026-11-05",
+    selection: "picked words",
+    source: "",
+  }
+
+  it("sends the context and returns a suggestion", async () => {
+    const model = modelReturning({
+      title: "Starts",
+      content: "1. An opening",
+      note: "",
+    })
+    providerMock.model = model
+    const data = await (await post(request)).json()
+    expect(data.content).toBe("1. An opening")
+    const prompt = JSON.stringify(model.doGenerateCalls[0].prompt)
+    for (const expected of [
+      "Discuss cells",
+      "My draft text",
+      "Write the opening",
+      "picked words",
+      "three different possible",
+    ]) {
+      expect(prompt).toContain(expected)
+    }
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain(
+      "Never invent references"
+    )
+  })
+
+  it("rejects invented citations, and accepts ones from the user's own text", async () => {
+    const model = modelReturning(
+      { title: "T", content: "Cells matter (Smith, 2021).", note: "" },
+      {
+        title: "T",
+        content: "Cells matter [source needed], as in (Lee, 2019).",
+        note: "",
+      }
+    )
+    providerMock.model = model
+    const data = await (await post(request)).json()
+    expect(model.doGenerateCalls).toHaveLength(2)
+    expect(JSON.stringify(model.doGenerateCalls[1].prompt)).toContain(
+      "(Smith, 2021)"
+    )
+    expect(data.content).toContain("(Lee, 2019)")
+    expect(data.usedFallback).toBeUndefined()
+  })
+
+  it("falls back to a labeled template if it keeps inventing citations", async () => {
+    providerMock.model = modelReturning({
+      title: "T",
+      content: "See https://made.up/paper",
+      note: "",
+    })
+    const data = await (await post(request)).json()
+    expect(data.usedFallback).toBe(true)
+    expect(data.content).not.toContain("made.up")
+  })
+
+  it("rejects an unknown action", async () => {
+    providerMock.model = modelReturning({})
+    expect((await post({ ...request, action: "write-my-essay" })).status).toBe(
+      400
+    )
+  })
+})

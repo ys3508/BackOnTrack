@@ -134,6 +134,7 @@ export function BreakdownPanel({
 function StepList({ task }: { task: Task }) {
   const { dispatch } = useStore()
   const [title, setTitle] = useState("")
+  const [editingSteps, setEditingSteps] = useState(false)
   const current = currentSubtask(task)
 
   return (
@@ -147,9 +148,20 @@ function StepList({ task }: { task: Task }) {
               sub={sub}
               index={index}
               isCurrent={sub.id === current?.id}
+              showControls={editingSteps}
             />
           ))}
         </ol>
+      )}
+      {task.subtasks.length > 0 && (
+        <button
+          type="button"
+          aria-pressed={editingSteps}
+          onClick={() => setEditingSteps(!editingSteps)}
+          className="min-h-11 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+        >
+          {editingSteps ? "Done editing steps" : "Edit steps"}
+        </button>
       )}
       <form
         className="flex gap-2"
@@ -196,11 +208,13 @@ function StepRow({
   sub,
   index,
   isCurrent,
+  showControls,
 }: {
   task: Task
   sub: Subtask
   index: number
   isCurrent: boolean
+  showControls: boolean
 }) {
   const { dispatch } = useStore()
   const [editing, setEditing] = useState(false)
@@ -280,72 +294,17 @@ function StepRow({
             </span>
           </label>
         )}
-        {!editing && (
-          <div className="flex shrink-0">
-            {!sub.done && !isCurrent && (
-              <button
-                type="button"
-                aria-label={`Work on ${sub.title} next`}
-                title="Work on this next"
-                onClick={() =>
-                  dispatch({
-                    type: "set-current-subtask",
-                    id: task.id,
-                    at: nowIso(),
-                    subId: sub.id,
-                  })
-                }
-                className={iconButton}
-              >
-                <Sparkles className="size-4" aria-hidden />
-              </button>
-            )}
+      </div>
+      {!editing && showControls && (
+        <div className="flex flex-wrap justify-end pb-1">
+          {!sub.done && !isCurrent && (
             <button
               type="button"
-              aria-label={`Edit ${sub.title}`}
-              onClick={() => setEditing(true)}
-              className={iconButton}
-            >
-              <Pencil className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              aria-label={`Move ${sub.title} up`}
-              disabled={index === 0}
+              aria-label={`Work on ${sub.title} next`}
+              title="Work on this next"
               onClick={() =>
                 dispatch({
-                  type: "move-subtask",
-                  id: task.id,
-                  subId: sub.id,
-                  direction: -1,
-                })
-              }
-              className={cn(iconButton, "hidden sm:grid")}
-            >
-              <ArrowUp className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              aria-label={`Move ${sub.title} down`}
-              disabled={index === task.subtasks.length - 1}
-              onClick={() =>
-                dispatch({
-                  type: "move-subtask",
-                  id: task.id,
-                  subId: sub.id,
-                  direction: 1,
-                })
-              }
-              className={cn(iconButton, "hidden sm:grid")}
-            >
-              <ArrowDown className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              aria-label={`Delete ${sub.title}`}
-              onClick={() =>
-                dispatch({
-                  type: "remove-subtask",
+                  type: "set-current-subtask",
                   id: task.id,
                   at: nowIso(),
                   subId: sub.id,
@@ -353,11 +312,66 @@ function StepRow({
               }
               className={iconButton}
             >
-              <X className="size-4" aria-hidden />
+              <Sparkles className="size-4" aria-hidden />
             </button>
-          </div>
-        )}
-      </div>
+          )}
+          <button
+            type="button"
+            aria-label={`Edit ${sub.title}`}
+            onClick={() => setEditing(true)}
+            className={iconButton}
+          >
+            <Pencil className="size-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label={`Move ${sub.title} up`}
+            disabled={index === 0}
+            onClick={() =>
+              dispatch({
+                type: "move-subtask",
+                id: task.id,
+                subId: sub.id,
+                direction: -1,
+              })
+            }
+            className={iconButton}
+          >
+            <ArrowUp className="size-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label={`Move ${sub.title} down`}
+            disabled={index === task.subtasks.length - 1}
+            onClick={() =>
+              dispatch({
+                type: "move-subtask",
+                id: task.id,
+                subId: sub.id,
+                direction: 1,
+              })
+            }
+            className={iconButton}
+          >
+            <ArrowDown className="size-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label={`Delete ${sub.title}`}
+            onClick={() =>
+              dispatch({
+                type: "remove-subtask",
+                id: task.id,
+                at: nowIso(),
+                subId: sub.id,
+              })
+            }
+            className={iconButton}
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+      )}
     </li>
   )
 }

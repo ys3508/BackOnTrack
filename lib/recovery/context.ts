@@ -7,6 +7,8 @@ import type {
   TaskBreakdownRequest,
   TaskContext,
   TaskRecoveryRequest,
+  WritingAction,
+  WritingAssistRequest,
 } from "@/lib/schemas"
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
@@ -94,6 +96,23 @@ export function buildBreakdownRequest(
     task: buildTaskContext(task, state),
     today,
     rejected: rejected.slice(-3).map((steps) => steps.slice(0, 10).map(clip)),
+  }
+}
+
+export function buildWritingRequest(
+  task: Task,
+  state: Workspace,
+  today: string,
+  action: WritingAction,
+  options: { selection?: string; source?: string } = {}
+): WritingAssistRequest {
+  return {
+    stage: "writing-assist",
+    action,
+    task: buildTaskContext(task, state),
+    today,
+    selection: (options.selection ?? "").slice(0, LIMITS.contextDocument),
+    source: (options.source ?? "").slice(0, LIMITS.contextInstructions),
   }
 }
 

@@ -235,6 +235,19 @@ export function WorkingEditor({
           <Download aria-hidden />
           Text
         </Button>
+        {editor && task.workDoc?.content.includes("data-suggested") && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            className="text-muted-foreground"
+            onClick={() =>
+              editor.chain().selectAll().unsetMark("suggestion").run()
+            }
+          >
+            Clear suggestion highlights
+          </Button>
+        )}
         {task.workDoc?.previous !== null &&
           task.workDoc?.previous !== undefined && (
             <Button

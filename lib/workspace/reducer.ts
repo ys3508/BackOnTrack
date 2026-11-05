@@ -3,6 +3,7 @@ import { shortDate } from "@/lib/workspace/dates"
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
 import type {
   FocusSession,
+  Instructions,
   PendingBreakdown,
   PlannedSession,
   Priority,
@@ -110,6 +111,13 @@ export type WorkspaceAction =
       previous: string
     }
   | { type: "log-doc-suggestion"; id: string; at: string; text: string }
+  | {
+      type: "set-instructions"
+      id: string
+      at: string
+      instructions: Instructions | null
+    }
+  | { type: "set-ai-consent"; id: string; at: string }
   | { type: "log-obstacle"; id: string; at: string; text: string }
   | { type: "add-planned"; at: string; session: PlannedSession }
   | {
@@ -629,6 +637,29 @@ export function workspaceReducer(
           `Accepted a suggestion into the document: ${action.label}`
         )
       )
+
+    case "set-instructions":
+      return mapTask(state, action.id, (task) =>
+        withEvent(
+          {
+            ...task,
+            instructions: action.instructions,
+            // Agreeing to send old text doesn't cover new text.
+            aiConsentAt: null,
+          },
+          action.at,
+          "instructions",
+          action.instructions
+            ? `Added instructions${action.instructions.sourceName ? ` from ${action.instructions.sourceName}` : ""}`
+            : "Removed the instructions"
+        )
+      )
+
+    case "set-ai-consent":
+      return mapTask(state, action.id, (task) => ({
+        ...task,
+        aiConsentAt: action.at,
+      }))
 
     case "log-doc-suggestion":
       return mapTask(state, action.id, (task) =>

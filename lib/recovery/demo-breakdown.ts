@@ -25,7 +25,7 @@ export function extractRequirements(text: string, limit = 6) {
     .replace(/\s+/g, " ")
     .split(/(?<=[.!?])\s+/)
     .filter((sentence) =>
-      /\b(must|should|required|requirement|submit|include|due|deliverables?|graded|write|create|answer|complete)\b/i.test(
+      /\b(must|should|required|requirement|submit|include|due|deliverables?|graded|write|create|answer|complete|train|build|implement|design|analy[sz]e|discuss|explain|compare|report)\b/i.test(
         sentence
       )
     )

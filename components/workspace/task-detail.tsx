@@ -13,7 +13,10 @@ import {
   Trash2,
 } from "lucide-react"
 
+import { useAiConsent } from "@/components/workspace/ai-consent"
 import { BreakdownPanel } from "@/components/workspace/breakdown-panel"
+import { InstructionsPanel } from "@/components/workspace/instructions-panel"
+import { WritingAssist } from "@/components/workspace/writing-assist"
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -108,6 +111,7 @@ function TaskBody({
   const statusChange = useStatusChange()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { editor, dirty } = useWorkingEditor(task, focusDocument)
+  const consent = useAiConsent(task)
 
   const setStatus = (status: TaskStatus) => statusChange.request(task, status)
 
@@ -170,11 +174,13 @@ function TaskBody({
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="space-y-4">
           {isActive(task) && <CurrentStepCard task={task} />}
-          <BreakdownPanel task={task} guard={(action) => action()} />
+          <InstructionsPanel task={task} />
+          <BreakdownPanel task={task} guard={consent.guard} />
         </div>
         <div className="space-y-4">
           {isActive(task) && <FocusCard task={task} />}
           <WorkingEditor task={task} editor={editor} dirty={dirty} />
+          <WritingAssist task={task} editor={editor} guard={consent.guard} />
         </div>
       </div>
 
@@ -217,6 +223,7 @@ function TaskBody({
         sessions. It can’t be undone.
       </ConfirmDialog>
       <ReleaseDialog {...statusChange.dialog} />
+      {consent.dialog}
     </div>
   )
 }

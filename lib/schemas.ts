@@ -346,9 +346,45 @@ export type TaskBreakdownResult = TaskBreakdownOutput & {
   usedFallback?: boolean
 }
 
+/* ---------- Writing assistance ---------- */
+
+export const WRITING_ACTIONS = [
+  "outline",
+  "explain",
+  "starter",
+  "split",
+  "summarize",
+  "improve",
+] as const
+export type WritingAction = (typeof WRITING_ACTIONS)[number]
+
+export const WritingAssistOutputSchema = z.object({
+  title: z.string().describe("A few words saying what this suggestion is."),
+  content: z
+    .string()
+    .describe("Markdown to preview. Use [brackets] for missing details."),
+  note: z.string().describe("A short caveat for the user, or empty."),
+})
+export type WritingAssistOutput = z.infer<typeof WritingAssistOutputSchema>
+
+export const WritingAssistRequestSchema = z.object({
+  stage: z.literal("writing-assist"),
+  action: z.enum(WRITING_ACTIONS),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+  selection: z.string().max(LIMITS.contextDocument).default(""),
+  source: z.string().max(LIMITS.contextInstructions).default(""),
+})
+export type WritingAssistRequest = z.infer<typeof WritingAssistRequestSchema>
+
+export type WritingAssistResult = WritingAssistOutput & {
+  usedFallback?: boolean
+}
+
 export const RecoveryRequestSchema = z.discriminatedUnion("stage", [
   AnalyzeRequestSchema,
   NextStepRequestSchema,
   TaskRecoveryRequestSchema,
   TaskBreakdownRequestSchema,
+  WritingAssistRequestSchema,
 ])

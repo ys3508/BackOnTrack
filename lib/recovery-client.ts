@@ -1,4 +1,5 @@
 import { demoAnalysis, demoNextStep } from "@/lib/demo/engine"
+import { demoWritingAssist } from "@/lib/recovery/demo-assist"
 import { demoBreakdown } from "@/lib/recovery/demo-breakdown"
 import { demoTaskRecovery } from "@/lib/recovery/demo-plan"
 import type {
@@ -10,6 +11,8 @@ import type {
   TaskBreakdownResult,
   TaskRecoveryRequest,
   TaskRecoveryResult,
+  WritingAssistRequest,
+  WritingAssistResult,
 } from "@/lib/schemas"
 import type { Source } from "@/lib/session"
 
@@ -73,6 +76,14 @@ export async function requestBreakdown(
 ): Promise<TaskBreakdownResult> {
   if (mode === "demo") return demoBreakdown(request)
   return postRecovery<TaskBreakdownResult>(request)
+}
+
+export async function requestWritingAssist(
+  mode: Source,
+  request: WritingAssistRequest
+): Promise<WritingAssistResult> {
+  if (mode === "demo") return demoWritingAssist(request)
+  return postRecovery<WritingAssistResult>(request)
 }
 
 export async function fetchLiveStatus(): Promise<{

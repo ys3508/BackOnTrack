@@ -461,6 +461,7 @@ describe("task screen and home", () => {
     window.location.hash = "#/tasks/a"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
+    await user.click(await button("Edit steps"))
     await user.click(await button("Edit One"))
     await user.clear(screen.getByLabelText("Edit step"))
     await user.type(screen.getByLabelText("Edit step"), "One better{Enter}")
