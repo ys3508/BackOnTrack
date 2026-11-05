@@ -22,7 +22,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  ActiveTimer,
   FOCUS_OPTIONS,
+  FinishedPanel,
   SessionList,
   useStartFocus,
 } from "@/components/workspace/focus-view"
@@ -337,37 +339,53 @@ function NextActionCard({ task }: { task: Task }) {
 
 function FocusCard({ task }: { task: Task }) {
   const { state, navigate } = useStore()
-  const start = useStartFocus()
-  const running = state.timer?.taskId === task.id
-  return (
-    <Card>
-      <SectionTitle>Focus on this</SectionTitle>
-      {running ? (
+  const start = useStartFocus({ stay: true })
+  const { timer } = state
+  const finished = state.focusSessions.find(
+    (session) =>
+      session.id === state.finishedSessionId && session.taskId === task.id
+  )
+
+  // Keeps the timer beside the document, without taking over the page.
+  if (timer?.taskId === task.id) return <ActiveTimer timer={timer} compact />
+  if (finished) return <FinishedPanel session={finished} onTask />
+  if (timer) {
+    return (
+      <Card>
+        <SectionTitle>Focus on this</SectionTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A session is already running on something else.
+        </p>
         <Button
           type="button"
           size="xl"
+          variant="outline"
           className="mt-2"
           onClick={() => navigate({ view: "focus" })}
         >
           <Timer aria-hidden />
           Open the running timer
         </Button>
-      ) : (
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {FOCUS_OPTIONS.map((option, index) => (
-            <Button
-              key={option.minutes}
-              type="button"
-              size="xl"
-              variant={index === 0 ? "default" : "outline"}
-              className="h-auto min-h-12 py-2 whitespace-normal"
-              onClick={() => start(task.id, option.minutes)}
-            >
-              {option.label}
-            </Button>
-          ))}
-        </div>
-      )}
+      </Card>
+    )
+  }
+  return (
+    <Card>
+      <SectionTitle>Focus on this</SectionTitle>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {FOCUS_OPTIONS.map((option, index) => (
+          <Button
+            key={option.minutes}
+            type="button"
+            size="xl"
+            variant={index === 0 ? "default" : "outline"}
+            className="h-auto min-h-12 py-2 whitespace-normal"
+            onClick={() => start(task.id, option.minutes)}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
     </Card>
   )
 }

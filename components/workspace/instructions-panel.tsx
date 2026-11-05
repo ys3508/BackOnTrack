@@ -90,7 +90,7 @@ export function InstructionsPanel({ task }: { task: Task }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
       >
         <span className="font-sans text-[15px] font-semibold tracking-normal">
           Instructions

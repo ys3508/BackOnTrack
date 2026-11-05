@@ -70,7 +70,7 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
     task.currentStep
   )
   if (writing) {
-    const subject = requirements[0] ?? task.currentStep ?? task.title
+    const subject = requirements[0] ?? "[your topic]"
     list.push({
       headline: "Pick an opening, and change it",
       instruction:
@@ -84,8 +84,8 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
 [what you want to say]`,
       steps: ["Insert one opening", "Fill in its brackets"],
       choices: [
-        `This section is about ${subject.replace(/\.$/, "")}, and my main point is [your main point].`,
-        `To address ${task.title}, I first looked at [what you looked at], and found [what you found].`,
+        `This section covers: ${subject.replace(/\.$/, "")}. My main point is [your main point].`,
+        `I first looked at [what you looked at], and found [what you found].`,
         `The question here is [your question], and my answer is [your answer] because [your reason].`,
       ],
     })
@@ -470,14 +470,17 @@ export function demoTaskRecovery(
   const lowEnergy = /energy|overwhelm|too big/i.test(obstacle)
   const offset = justStuck || lowEnergy ? 1 : 0
 
+  const adaptive = strategy === "RELEASE" ? [] : adaptiveTemplates(request)
   const list =
     strategy === "RELEASE"
       ? [releaseTemplate(request)]
-      : [...adaptiveTemplates(request), ...templates(request, category)]
+      : [...adaptive, ...templates(request, category)]
   const used = new Set(rejected.map((item) => item.artifactTitle))
   const available = list.filter((item) => !used.has(item.artifactTitle))
+  // A plan built from this task's own progress already fits, so it comes first.
+  const stillTailored = adaptive.some((item) => !used.has(item.artifactTitle))
   const template =
-    available[Math.min(offset, available.length - 1)] ??
+    available[stillTailored ? 0 : Math.min(offset, available.length - 1)] ??
     PAUSE_TEMPLATE(task.title)
   const exhausted = available.length === 0
 

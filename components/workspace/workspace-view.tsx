@@ -22,7 +22,8 @@ import {
 } from "@/components/workspace/parts"
 import { QuickAdd } from "@/components/workspace/quick-add"
 import { ReplanDialog } from "@/components/workspace/schedule"
-import { nowIso, useStore } from "@/components/workspace/store"
+import { newId, nowIso, useStore } from "@/components/workspace/store"
+import { SAMPLE_TASKS } from "@/lib/demo/sample-tasks"
 import { deadlineText, formatDateTime } from "@/lib/workspace/dates"
 import type { Task } from "@/lib/workspace/schemas"
 import {
@@ -149,7 +150,7 @@ export function WorkspaceView() {
             <button
               type="button"
               onClick={() => navigate({ view: "task", id: recommended.id })}
-              className="min-h-8 rounded-md text-left text-sm font-medium text-sage underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
+              className="min-h-11 rounded-md text-left text-sm font-medium text-sage underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
             >
               {recommended.title}
             </button>
@@ -235,6 +236,31 @@ export function WorkspaceView() {
           Quick add
         </h2>
         <QuickAdd />
+        {!hasTasks && (
+          <div className="mt-3">
+            <p className="mb-2 text-sm text-muted-foreground">
+              Or try an example:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {SAMPLE_TASKS.map((sample) => (
+                <button
+                  key={sample.label}
+                  type="button"
+                  onClick={() => {
+                    const id = newId()
+                    sample
+                      .build(id, nowIso(), today)
+                      .forEach((action) => dispatch(action))
+                    navigate({ view: "task", id })
+                  }}
+                  className="min-h-11 rounded-full border border-border bg-card px-3.5 py-2 text-left text-sm transition-colors outline-none hover:border-primary/50 hover:bg-sage-soft focus-visible:ring-3 focus-visible:ring-ring/30"
+                >
+                  {sample.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
             type="button"

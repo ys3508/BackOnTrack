@@ -144,6 +144,25 @@ describe("automated accessibility scan", () => {
     expect(await violations()).toEqual([])
   })
 
+  it("finds no violations with the timer, a breakdown, and a suggestion open", async () => {
+    window.location.hash = "#/tasks/b"
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(
+      await screen.findByRole("button", { name: "Break this down" })
+    )
+    await screen.findByLabelText("Suggested step 1")
+    await user.click(
+      await screen.findByRole("button", { name: "Generate an outline" })
+    )
+    await screen.findByLabelText(/Suggested text/)
+    await user.click(
+      await screen.findByRole("button", { name: "5-minute Quick Start" })
+    )
+    await screen.findByRole("timer")
+    expect(await violations()).toEqual([])
+  })
+
   it("moves focus to the heading on each new view", async () => {
     window.location.hash = "#/tasks"
     render(<WorkspaceApp />)

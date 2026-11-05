@@ -246,6 +246,10 @@ describe("focus screen", () => {
     ).toBeInTheDocument()
     expect(saved().tasks[0].status).toBe("in-progress")
     expect(saved().focusSessions).toHaveLength(1)
+    expect(screen.getByText("Did you make progress?")).toBeInTheDocument()
+    click("A little")
+    expect(saved().focusSessions[0].progressReport).toBe("a-little")
+    expect(saved().tasks[0].progress).toBe(5)
     expect(
       screen.getByRole("button", { name: /5-minute break/ })
     ).toBeInTheDocument()

@@ -86,9 +86,9 @@ describe("definition of done", () => {
     expect(saved().tasks[0].status).toBe("in-progress")
 
     // 5. Pause and resume work.
-    await user.click(await button("Pause"))
+    await user.click(await button("Pause timer"))
     expect(saved().timer.runningSince).toBeNull()
-    await user.click(await button("Resume"))
+    await user.click(await button("Resume timer"))
     expect(saved().timer.runningSince).not.toBeNull()
 
     // Stop early, and report getting stuck.

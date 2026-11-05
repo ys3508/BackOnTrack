@@ -17,8 +17,6 @@ function outline(request: WritingAssistRequest): WritingAssistResult {
       title: "Outline from your instructions",
       note: "Demo Mode: pulled from your instructions with simple text rules, not AI. Check that nothing is missing.",
       content: [
-        `# ${task.title}`,
-        "",
         ...requirements.flatMap((item) => [`## ${item}`, "- [your notes]", ""]),
       ]
         .join("\n")
@@ -51,8 +49,6 @@ function outline(request: WritingAssistRequest): WritingAssistResult {
     title: "A starting outline",
     note: DEMO_NOTE,
     content: [
-      `# ${task.title}`,
-      "",
       ...sections[categorize(`${task.title} ${task.description}`)].flatMap(
         (heading) => [`## ${heading}`, "- [your notes]", ""]
       ),
@@ -86,14 +82,14 @@ function explain(request: WritingAssistRequest): WritingAssistResult {
 
 function starter(request: WritingAssistRequest): WritingAssistResult {
   const { task } = request
-  const topic = task.currentStep || task.title
+  const topic = extractRequirements(task.instructions, 1)[0] ?? "[your topic]"
   return {
     title: "Three ways to start",
     note: `${DEMO_NOTE} Fill in the brackets, and change anything.`,
     content: [
-      `1. This section covers ${topic}, and focuses on [the main point you want to make].`,
+      `1. This section covers: ${topic.replace(/\.$/, "")}. It focuses on [the main point you want to make].`,
       `2. The main question here is [your question]. To answer it, I [what you did or will do].`,
-      `3. [One specific fact or example you already know] shows why ${topic} needs [what it needs].`,
+      `3. [One specific fact or example you already know] shows why [your point].`,
     ].join("\n"),
   }
 }

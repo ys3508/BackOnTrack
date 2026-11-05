@@ -171,7 +171,11 @@ function TimerPill() {
     document.title = timer ? `${clock} · BackOnTrack` : "BackOnTrack AI"
   }, [timer, clock])
 
-  if (!timer || route.view === "focus") return null
+  // These views already show the timer.
+  const shownHere =
+    route.view === "focus" ||
+    (route.view === "task" && route.id === timer?.taskId)
+  if (!timer || shownHere) return null
   return (
     <button
       type="button"

@@ -531,3 +531,17 @@ describe("task screen and home", () => {
     ).not.toBeInTheDocument()
   })
 })
+
+describe("requirement extraction", () => {
+  it("doesn't read a list back as one long line", () => {
+    const found = extractRequirements(
+      "Assignment 3: Classification\n- Train a classifier\n- Report the accuracy\nYou must submit a PDF. Graded on clarity."
+    )
+    expect(found).toEqual([
+      "Train a classifier",
+      "Report the accuracy",
+      "You must submit a PDF.",
+      "Graded on clarity.",
+    ])
+  })
+})

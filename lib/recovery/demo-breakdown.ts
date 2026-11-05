@@ -18,12 +18,13 @@ export function extractRequirements(text: string, limit = 6) {
       .replace(/\s+/g, " ")
       .trim()
   const lines = text.split(/\r?\n/)
-  const listed = lines
-    .filter((line) => /^\s*(?:[-*•]|\d+[.)]|\[[ x]\])\s+\S/i.test(line))
-    .map(clean)
-  const sentences = text
-    .replace(/\s+/g, " ")
-    .split(/(?<=[.!?])\s+/)
+  const isListItem = (line: string) =>
+    /^\s*(?:[-*•]|\d+[.)]|\[[ x]\])\s+\S/i.test(line)
+  const listed = lines.filter(isListItem).map(clean)
+  // Sentences come only from prose, so a list isn't read back as one long line.
+  const sentences = lines
+    .filter((line) => !isListItem(line))
+    .flatMap((line) => line.trim().split(/(?<=[.!?])\s+/))
     .filter((sentence) =>
       /\b(must|should|required|requirement|submit|include|due|deliverables?|graded|write|create|answer|complete|train|build|implement|design|analy[sz]e|discuss|explain|compare|report)\b/i.test(
         sentence
