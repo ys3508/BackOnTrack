@@ -1,17 +1,19 @@
-import { Geist, Geist_Mono } from "next/font/google"
+import type { Metadata } from "next"
+import { Geist, Newsreader } from "next/font/google"
 
 import "./globals.css"
-import { SiteHeader } from "@/components/site-header"
-import { ThemeProvider } from "@/components/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const fontSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
-
-const fontMono = Geist_Mono({
+const fontHeading = Newsreader({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-heading-serif",
 })
+
+export const metadata: Metadata = {
+  title: "BackOnTrack AI",
+  description: "When plans fall apart, find your way forward.",
+}
 
 export default function RootLayout({
   children,
@@ -21,24 +23,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      suppressHydrationWarning
       className={cn(
-        "antialiased",
-        fontMono.variable,
-        "font-sans",
-        fontSans.variable
+        "font-sans antialiased",
+        fontSans.variable,
+        fontHeading.variable
       )}
     >
-      <body>
-        <ThemeProvider>
-          <TooltipProvider>
-            <div className="flex h-svh flex-col">
-              <SiteHeader />
-              {children}
-            </div>
-          </TooltipProvider>
-        </ThemeProvider>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }
