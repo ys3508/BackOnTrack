@@ -346,6 +346,11 @@ describe("Zero-Start: the work is prepared before the user begins", () => {
     const { from, to } = editor.state.selection
     expect(editor.state.doc.textBetween(from, to)).toBe("[your answer]")
     expect(editor.state.selection.$from.parent.isTextblock).toBe(true)
+    // What they type over it is theirs, and isn't marked as suggested.
+    editor.view.someProp("handleTextInput", (handler) =>
+      handler(editor.view, from, to, "Mine", () => editor.state.tr)
+    )
+    expect(editor.getHTML()).toMatch(/<\/span>Mine/)
     expect(saved().tasks[0].nextAction).toBe(
       "Answer: What question is this answering?"
     )
