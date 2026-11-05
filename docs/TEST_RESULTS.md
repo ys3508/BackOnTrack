@@ -79,6 +79,16 @@ These tests were run on 2026-11-05 on the `feat/recovery-workspace` branch. "Aut
 | Accessibility scan (automated, axe-core) | Each view, the board, a running timer, and a plan preview | No violations | None, after one fix. Color contrast can't be checked this way. | Pass | Nested `main` fixed |
 | Phone width (browser, 375 px emulation) | All 9 views | No sideways scrolling | No overflow, and no console errors. Most targets were at least 32 px; the complete button was 28 px, and was enlarged to 44 px. | Pass | Complete button enlarged |
 
+Final checks on the committed build:
+
+| Scenario | Input | Expected behavior | Actual observed behavior | Pass/Fail | Fixes or iterations |
+| --- | --- | --- | --- | --- | --- |
+| Old session (browser) | Earlier free-text session in storage | Becomes a task; no crash | Became one task, with status Needs Recovery. | Pass | None |
+| Fixes applied (browser, 375 px) | Task list, guided check-in, stopped session | Fixes work | Complete button measured 44 px. Each view had one `main`. The plan quoted the reported obstacle. | Pass | None |
+| Back button (browser) | Go to Tasks, then back | Returns to the previous view | Returned to the workspace. | Pass | None |
+| Color contrast of new text pairs (browser, computed) | Text on the sand, sage, indigo, and secondary backgrounds | At least 4.5:1 | Lowest was 6.06:1. | Pass | None |
+| Clean clone (automated) | Fresh clone and `npm ci` | All checks pass | 226 of 226 tests, typecheck, lint, and build passed. Tests also passed with the system set to Kiritimati and Los Angeles time. | Pass | None |
+
 ### Not tested for the workspace
 
 - The real AI model, including the quality, cost, and speed of recovery plans. `npm run test:live` now includes three recovery scenarios for this.
