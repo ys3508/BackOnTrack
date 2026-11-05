@@ -226,6 +226,58 @@ export const DEFAULT_SETTINGS: Settings = {
   homeListSize: 3,
 }
 
+export const HELP_KINDS = [
+  "prepared",
+  "outline",
+  "draft",
+  "checklist",
+  "code",
+  "smaller-steps",
+  "recovery-plan",
+] as const
+export type HelpKind = (typeof HELP_KINDS)[number]
+
+export const HELP_LABEL: Record<HelpKind, string> = {
+  prepared: "A prepared document",
+  outline: "An outline",
+  draft: "A rough draft to edit",
+  checklist: "A checklist",
+  code: "A code starting point",
+  "smaller-steps": "Smaller steps",
+  "recovery-plan": "A recovery plan",
+}
+
+export type TaskKind = "writing" | "code" | "other"
+
+/** One moment that shows whether work is moving. Never holds the user's text. */
+export const FrictionEventSchema = z.object({
+  id: z.string(),
+  at: z.string(),
+  kind: z.enum(["stuck", "session", "moved", "help"]),
+  taskId: z.string(),
+  taskKind: z.enum(["writing", "code", "other"]),
+  blankDoc: z.boolean(),
+  interrupted: z.boolean().default(false),
+  helpKind: z.enum(HELP_KINDS).nullable().default(null),
+  /** The user's own word count when help was accepted. */
+  baselineWords: z.number().default(0),
+  outcome: z.enum(["progress", "stuck"]).nullable().default(null),
+})
+export type FrictionEvent = z.infer<typeof FrictionEventSchema>
+
+export const LearningSchema = z.object({
+  enabled: z.boolean().default(true),
+  dismissed: z.array(z.string()).default([]),
+  preferred: z.enum(HELP_KINDS).nullable().default(null),
+})
+export type Learning = z.infer<typeof LearningSchema>
+
+export const DEFAULT_LEARNING: Learning = {
+  enabled: true,
+  dismissed: [],
+  preferred: null,
+}
+
 /** Under a minute and stopped early: an interrupted attempt, not focus time. */
 export const INTERRUPTED_UNDER_SECONDS = 60
 
@@ -256,6 +308,8 @@ export type Workspace = {
   legacyMigrated: boolean
   /** When the app was last opened, kept only in this browser. */
   lastOpenedAt: string | null
+  frictionLog: FrictionEvent[]
+  learning: Learning
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
@@ -269,6 +323,8 @@ export const EMPTY_WORKSPACE: Workspace = {
   skipped: { date: "", taskIds: [] },
   legacyMigrated: false,
   lastOpenedAt: null,
+  frictionLog: [],
+  learning: DEFAULT_LEARNING,
 }
 
 export const ACTIVE_STATUSES: TaskStatus[] = [

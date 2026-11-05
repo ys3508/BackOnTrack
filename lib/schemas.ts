@@ -295,6 +295,10 @@ export const TaskContextSchema = z.object({
   currentStep: shortText.default(""),
   /** How many recovery plans have already been tried on the current step. */
   stuckOnStep: z.number().min(0).default(0),
+  /** Guesses from the user's own records, only if learning is switched on. */
+  learned: z.array(shortText).max(6).default([]),
+  preferredHelp: z.string().max(40).default(""),
+  avoidHelp: z.array(z.string().max(40)).max(7).default([]),
   focusSessions: z
     .array(
       z.object({

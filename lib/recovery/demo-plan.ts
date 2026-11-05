@@ -2,6 +2,9 @@ import { applySafetyGuards } from "@/lib/guards"
 import { similarity } from "@/lib/guards"
 import { categorize } from "@/lib/recovery/categorize"
 import { concreteStep } from "@/lib/recovery/concrete"
+import { preparedParts } from "@/lib/recovery/demo-setup"
+import { preparedDocument } from "@/lib/recovery/prepared"
+import { startsPrepared } from "@/lib/workspace/patterns"
 import type { Category } from "@/lib/recovery/categorize"
 import { extractRequirements } from "@/lib/recovery/demo-breakdown"
 import { contextIntake, taskFacts } from "@/lib/recovery/context"
@@ -21,6 +24,7 @@ import { addDays, shortDate } from "@/lib/workspace/dates"
  */
 
 type Template = {
+  adapted?: string
   smallerSteps?: string[]
   choices?: string[]
   headline: string
@@ -69,13 +73,43 @@ function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
     })
   }
 
+  // What their records suggest comes before the other approaches.
+  const avoids = (kind: string) => task.avoidHelp.includes(kind)
+  if (
+    startsPrepared(task.preferredHelp) &&
+    !task.document.trim() &&
+    !avoids("prepared")
+  ) {
+    const parts = preparedParts(task, requirements)
+    list.push({
+      headline: "Start from a prepared document",
+      instruction: `Fill in the first [bracket] under “${parts.firstSection.title}”`,
+      why: "There’s no blank page to face, because you’d be editing something that’s already there.",
+      minutes: 5,
+      approach: "shrink-scope",
+      kind: "outline",
+      artifactTitle: "A prepared document",
+      body: preparedDocument({
+        ...parts,
+        deliverables: requirements,
+        starter: { kind: "draft", title: "", content: "" },
+        firstAction: "",
+      }),
+      steps: [],
+      adapted: task.learned[0] ?? "",
+    })
+  }
+
   // A coding step, or one that's already resisted a plan, gets made smaller.
   if (task.currentStep) {
     const concrete = concreteStep(task.currentStep)
     const different = similarity(concrete.firstAction, task.currentStep) < 0.8
     if (
       different &&
-      (concrete.starter.kind === "code" || task.stuckOnStep > 0)
+      (concrete.starter.kind === "code" ||
+        task.stuckOnStep > 0 ||
+        task.preferredHelp === "smaller-steps") &&
+      !(avoids("smaller-steps") && concrete.starter.kind !== "code")
     ) {
       list.push({
         headline: `Make “${task.currentStep}” smaller`,
@@ -525,6 +559,7 @@ export function demoTaskRecovery(
       ? `Your last focus session stopped early${lastNote ? ` (“${lastNote}”)` : ""}, so this is smaller.`
       : "",
     obstacle ? `You said: “${obstacle}”.` : "",
+    template.adapted ? `Based on your records: ${template.adapted}` : "",
   ]
     .filter(Boolean)
     .join(" ")

@@ -187,6 +187,18 @@ function HelpPreview({
 
   function accept(entry?: EntryPoint) {
     const at = nowIso()
+    const splitting = type === "step" && split && current && smaller.length
+    commitNow({
+      type: "log-help",
+      id: task.id,
+      at,
+      helpKind:
+        type === "setup"
+          ? "prepared"
+          : splitting
+            ? "smaller-steps"
+            : result.starter.kind,
+    })
     if (editor && draft.trim()) {
       commitNow({
         type: "accept-doc-suggestion",
@@ -213,7 +225,8 @@ function HelpPreview({
         steps: smaller.map((title) => ({ id: newId(), title })),
       })
     }
-    if (type === "setup") {
+    // A task that already has steps keeps them.
+    if (type === "setup" && !task.subtasks.length) {
       // These stay editable, in the Steps panel, until the user adds them.
       dispatch({
         type: "set-breakdown",

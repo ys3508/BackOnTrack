@@ -1,3 +1,5 @@
+import { taskKindOf } from "@/lib/workspace/friction"
+import { guidanceFor } from "@/lib/workspace/patterns"
 import { EMPTY_INTAKE } from "@/lib/intake"
 import { LIMITS } from "@/lib/schemas"
 import { daysBetween } from "@/lib/workspace/dates"
@@ -43,7 +45,12 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
       .map((event) => clip(event.text))
       .slice(-15)
 
+  const guidance = guidanceFor(state, task, taskKindOf(task), Date.now())
+
   return {
+    learned: guidance.notes.map(clip),
+    preferredHelp: guidance.preferred ?? "",
+    avoidHelp: guidance.avoid,
     title: task.title.slice(0, 200),
     description: task.description.slice(0, 2000),
     deadline: task.deadline,

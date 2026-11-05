@@ -17,6 +17,7 @@ import {
 import { useAiConsent } from "@/components/workspace/ai-consent"
 import { BreakdownPanel } from "@/components/workspace/breakdown-panel"
 import { InstructionsPanel } from "@/components/workspace/instructions-panel"
+import { PatternHint } from "@/components/workspace/pattern-hint"
 import { PlanRemaining } from "@/components/workspace/plan-remaining"
 import { WritingAssist } from "@/components/workspace/writing-assist"
 import { Card, ScreenHeading } from "@/components/shared"
@@ -52,6 +53,8 @@ import { newId, nowIso, useStore } from "@/components/workspace/store"
 import type { TaskSection } from "@/components/workspace/store"
 import { cn } from "@/lib/utils"
 import { formatDateTime, shortDate } from "@/lib/workspace/dates"
+import { taskKindOf } from "@/lib/workspace/friction"
+import { hintFor } from "@/lib/workspace/patterns"
 import {
   currentSubtask,
   deadlinePassed,
@@ -124,6 +127,14 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
     !task.subtasks.length &&
     !task.workDoc?.content &&
     !task.pendingBreakdown
+
+  const [now] = useState(() => Date.now())
+  const noticed =
+    isActive(task) && !timerHere
+      ? hintFor(state, task, taskKindOf(task), now)
+      : null
+  // A new task already offers to set itself up, so that isn't said twice.
+  const hint = brandNew && noticed?.action === "setup" ? null : noticed
 
   // Help asked for on the home page starts as soon as the editor is ready.
   const started = useRef(false)
@@ -214,6 +225,17 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
             task={task}
             startOpen={working && Boolean(task.instructions)}
           />
+          {hint && (
+            <PatternHint
+              hint={hint}
+              onAct={() => {
+                if (hint.action === "setup") help.requestSetup()
+                else if (hint.action === "help") help.requestStep()
+                else if (hint.action === "editor") editor?.commands.focus()
+                else navigate({ view: "recover", taskId: task.id })
+              }}
+            />
+          )}
           {brandNew && (
             <Card className="space-y-2">
               <h2 className="font-sans text-[15px] font-semibold tracking-normal">

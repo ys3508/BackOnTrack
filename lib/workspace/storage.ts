@@ -10,6 +10,9 @@ import {
   TaskSchema,
   TimerSchema,
   WORKSPACE_VERSION,
+  DEFAULT_LEARNING,
+  FrictionEventSchema,
+  LearningSchema,
 } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
 
@@ -38,6 +41,7 @@ export function restoreWorkspace(raw: unknown): Workspace {
   const skipped = saved.skipped as Workspace["skipped"] | undefined
   const timer = TimerSchema.safeParse(saved.timer)
   const settings = SettingsSchema.safeParse(saved.settings)
+  const learning = LearningSchema.safeParse(saved.learning)
   const focusSessions = validItems(saved.focusSessions, (item) =>
     FocusSessionSchema.safeParse(item)
   )
@@ -75,6 +79,10 @@ export function restoreWorkspace(raw: unknown): Workspace {
     legacyMigrated: saved.legacyMigrated === true,
     lastOpenedAt:
       typeof saved.lastOpenedAt === "string" ? saved.lastOpenedAt : null,
+    frictionLog: validItems(saved.frictionLog, (item) =>
+      FrictionEventSchema.safeParse(item)
+    ),
+    learning: learning.success ? learning.data : DEFAULT_LEARNING,
   }
 }
 

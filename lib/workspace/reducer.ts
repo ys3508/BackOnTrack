@@ -1,5 +1,7 @@
 import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
 import { shortDate } from "@/lib/workspace/dates"
+import { observeFriction } from "@/lib/workspace/friction"
+import type { HelpKind, Learning } from "@/lib/workspace/schemas"
 import {
   STATUS_LABEL,
   PRIORITY_LABEL,
@@ -198,6 +200,10 @@ export type WorkspaceAction =
   | { type: "report-stuck"; id: string; at: string; text: string }
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "mark-opened"; at: string }
+  | { type: "log-help"; id: string; at: string; helpKind: HelpKind }
+  | { type: "learning"; patch: Partial<Learning> }
+  | { type: "delete-friction"; id: string }
+  | { type: "clear-friction" }
   | { type: "skip-recommendation"; taskId: string; date: string }
   | { type: "replace"; state: Workspace }
 
@@ -280,6 +286,10 @@ export function workspaceReducer(
   state: Workspace,
   action: WorkspaceAction
 ): Workspace {
+  return observeFriction(state, applyAction(state, action), action)
+}
+
+function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
   switch (action.type) {
     case "create-task": {
       const deadline = action.deadline ?? null
@@ -1090,6 +1100,25 @@ export function workspaceReducer(
 
     case "timer-acknowledge":
       return { ...state, finishedSessionId: null }
+
+    case "log-help":
+      return state
+
+    case "learning":
+      return { ...state, learning: { ...state.learning, ...action.patch } }
+
+    case "delete-friction":
+      return {
+        ...state,
+        frictionLog: state.frictionLog.filter((item) => item.id !== action.id),
+      }
+
+    case "clear-friction":
+      return {
+        ...state,
+        frictionLog: [],
+        learning: { ...state.learning, dismissed: [] },
+      }
 
     case "mark-opened":
       return { ...state, lastOpenedAt: action.at }

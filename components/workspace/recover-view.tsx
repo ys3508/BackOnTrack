@@ -308,6 +308,15 @@ function PlanPreview({
 
   function accept() {
     dispatch({
+      type: "log-help",
+      id: task.id,
+      at: nowIso(),
+      helpKind:
+        splitStep && current && smaller.length
+          ? "smaller-steps"
+          : "recovery-plan",
+    })
+    dispatch({
       type: "apply-recovery",
       id: task.id,
       at: nowIso(),

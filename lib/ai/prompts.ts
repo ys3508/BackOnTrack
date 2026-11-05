@@ -97,6 +97,7 @@ Use the data:
 - If they don't understand what's being asked and there are instructions, make the artifact a checklist of the deliverables, and mark anything ambiguous as a question to ask.
 - Use the time left until the deadline, if known, to size the plan. Don't create urgency.
 - If focus sessions stopped early or the user reported an obstacle, respond to that directly, and make the step smaller or different.
+- Guesses from their records are hypotheses. Use them to choose what kind of help comes first, such as a prepared template rather than a blank page, and avoid help that hasn't worked. If this changes the plan, say so plainly in adaptationNote. Never diagnose, label them, mention ADHD, or make the guesses sound like a failing.
 - The more plans that have been tried on this step, the smaller and more different the next one must be. Change the method, not the wording. Rewording the same action, or asking them to think about it, doesn't count.
 - Never repeat anything listed under earlier attempts or rejected plans. In adaptationNote, say in one sentence what's different and why, without blame. Leave it empty if nothing has been tried.
 - If a strategy is given, the user chose it. Write the plan for that strategy, even if you would have recommended another. Otherwise, recommend one and write the plan for that.
@@ -203,6 +204,10 @@ Priority: ${task.priority}
 Progress: ${task.progress}%
 Current step: ${task.currentStep || "None."}
 Recovery plans already tried on this step: ${task.stuckOnStep}
+Help they're likely to prefer: ${task.preferredHelp || "Unknown."}
+Help that hasn't seemed to work: ${task.avoidHelp.join(", ") || "None recorded."}
+Guesses from their own records:
+${list(task.learned)}
 
 Completed actions:
 ${list(task.completedActions)}

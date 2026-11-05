@@ -21,12 +21,15 @@ import {
   ExpandableList,
   StatusBadge,
 } from "@/components/workspace/parts"
+import { PatternHint } from "@/components/workspace/pattern-hint"
 import { QuickAdd } from "@/components/workspace/quick-add"
 import { ReturnView } from "@/components/workspace/return-view"
 import { ReplanDialog } from "@/components/workspace/schedule"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { SAMPLE_TASKS } from "@/lib/demo/sample-tasks"
 import { deadlineText, formatDateTime } from "@/lib/workspace/dates"
+import { taskKindOf } from "@/lib/workspace/friction"
+import { hintFor } from "@/lib/workspace/patterns"
 import { returnSummary } from "@/lib/workspace/returning"
 import type { Task } from "@/lib/workspace/schemas"
 import {
@@ -128,6 +131,15 @@ export function WorkspaceView() {
   const hasTasks = state.tasks.length > 0
   const [replanning, setReplanning] = useState<Task | null>(null)
   const coming = returning ? returnSummary(state, today) : null
+  const [now] = useState(() => Date.now())
+  const noticed = recommended
+    ? hintFor(state, recommended, taskKindOf(recommended), now)
+    : null
+  // The main button already offers this for a brand-new task.
+  const hint =
+    noticed?.action === "setup" && recommended && !recommended.subtasks.length
+      ? null
+      : noticed
 
   if (coming) return <ReturnView summary={coming} />
 
@@ -255,6 +267,28 @@ export function WorkspaceView() {
             </Button>
           </div>
         </Card>
+      )}
+
+      {recommended && hint && (
+        <PatternHint
+          hint={hint}
+          onAct={() =>
+            navigate(
+              hint.action === "recover"
+                ? { view: "recover", taskId: recommended.id }
+                : {
+                    view: "task",
+                    id: recommended.id,
+                    section:
+                      hint.action === "setup"
+                        ? "setup"
+                        : hint.action === "help"
+                          ? "help"
+                          : "doc",
+                  }
+            )
+          }
+        />
       )}
 
       <Card>

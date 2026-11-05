@@ -33,7 +33,7 @@ function findDependencies(text: string) {
 }
 
 /** Fixed structures chosen by wording. They hold no facts about the topic. */
-function preparedParts(
+export function preparedParts(
   task: WorkspaceSetupRequest["task"],
   requirements: string[]
 ) {

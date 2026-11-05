@@ -5,6 +5,7 @@ import { Download, Trash2, Upload } from "lucide-react"
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
+import { LearningCard } from "@/components/workspace/learning-card"
 import { ConfirmDialog, fieldClass } from "@/components/workspace/parts"
 import { useStore } from "@/components/workspace/store"
 import {
@@ -100,6 +101,8 @@ export function SettingsView() {
           </div>
         </div>
       </Card>
+
+      <LearningCard />
 
       <Card className="space-y-3">
         <h2 className="font-sans text-[15px] font-semibold tracking-normal">

@@ -37,9 +37,10 @@ export function useAiConsent(task: Task) {
         }}
       >
         To help with this task, its details,{" "}
-        {task.instructions ? "instructions, " : ""}and working document text
-        will be sent to the third-party AI service. Please leave out private
-        details you don’t want to share.
+        {task.instructions ? "instructions, " : ""}working document text, and
+        anything BackOnTrack has noticed about what helps you will be sent to
+        the third-party AI service. Please leave out private details you don’t
+        want to share.
       </ConfirmDialog>
     ),
   }

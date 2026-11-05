@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Check, X } from "lucide-react"
 import type { Editor } from "@tiptap/react"
+import type { HelpKind } from "@/lib/workspace/schemas"
 
 import {
   Card,
@@ -46,6 +47,14 @@ type Pending = WritingAssistResult & {
 function selectedRange(editor: Editor) {
   const { from, to, empty } = editor.state.selection
   return empty ? null : { from, to }
+}
+
+/** Which of these are ways to start, and so worth learning about. */
+const WRITING_HELP: Partial<Record<WritingAction, HelpKind>> = {
+  outline: "outline",
+  code: "code",
+  starter: "draft",
+  split: "smaller-steps",
 }
 
 export function insertSuggestion(
@@ -150,6 +159,10 @@ export function WritingAssist({
   function accept(position: "end" | "cursor" | "replace") {
     if (!editor || !pending) return
     const previous = editor.getHTML()
+    const helpKind = WRITING_HELP[pending.action]
+    if (helpKind) {
+      commitNow({ type: "log-help", id: task.id, at: nowIso(), helpKind })
+    }
     commitNow({
       type: "accept-doc-suggestion",
       id: task.id,
