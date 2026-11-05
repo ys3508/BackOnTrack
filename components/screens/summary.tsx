@@ -69,10 +69,12 @@ export function SummaryScreen({
   session,
   onBack,
   onReset,
+  onSaveAsTask,
 }: {
   session: Session
   onBack?: () => void
   onReset: () => void
+  onSaveAsTask?: () => void
 }) {
   const summary = buildSummary(session)
   const markdown = summaryToMarkdown(summary)
@@ -193,6 +195,11 @@ export function SummaryScreen({
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
+        {onSaveAsTask && (
+          <Button type="button" size="xl" onClick={onSaveAsTask}>
+            Save as a task
+          </Button>
+        )}
         {onBack && (
           <Button type="button" variant="ghost" size="xl" onClick={onBack}>
             <ArrowLeft aria-hidden />

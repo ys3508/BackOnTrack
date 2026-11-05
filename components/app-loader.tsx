@@ -4,7 +4,10 @@ import dynamic from "next/dynamic"
 
 // The session is restored from localStorage, which only exists in the browser.
 export const AppLoader = dynamic(
-  () => import("@/components/recovery-app").then((mod) => mod.RecoveryApp),
+  () =>
+    import("@/components/workspace/workspace-app").then(
+      (mod) => mod.WorkspaceApp
+    ),
   {
     ssr: false,
     loading: () => (

@@ -32,7 +32,16 @@ const STAGES: { screen: Screen; label: string }[] = [
   { screen: "summary", label: "Summary" },
 ]
 
-export function RecoveryApp() {
+export function RecoveryApp({
+  embedded = false,
+  modeOverride,
+  onSaveAsTask,
+}: {
+  /** Hides the page frame when shown inside the workspace. */
+  embedded?: boolean
+  modeOverride?: Source
+  onSaveAsTask?: (session: Session) => void
+} = {}) {
   const [session, dispatch] = useReducer(sessionReducer, undefined, loadSession)
   const [status, setStatus] = useState<{
     checked: boolean
@@ -57,7 +66,8 @@ export function RecoveryApp() {
   }, [session])
 
   const mode: Source =
-    status.live && session.modePreference !== "demo" ? "live" : "demo"
+    modeOverride ??
+    (status.live && session.modePreference !== "demo" ? "live" : "demo")
 
   const analyze = useCallback(
     async (intake: Intake, useMode: Source = mode) => {
@@ -185,36 +195,38 @@ export function RecoveryApp() {
   const hasData = Boolean(session.intake.responsibility)
 
   return (
-    <div className="flex min-h-svh flex-col">
-      <header className="border-b border-border/70">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <Logo />
-            <span className="font-heading text-xl">BackOnTrack</span>
+    <div className={embedded ? "flex flex-col" : "flex min-h-svh flex-col"}>
+      {!embedded && (
+        <header className="border-b border-border/70">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
+            <div className="flex items-center gap-2.5">
+              <Logo />
+              <span className="font-heading text-xl">BackOnTrack</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ModeSwitch
+                mode={mode}
+                liveAvailable={status.live}
+                checked={status.checked}
+                onChange={(next) => dispatch({ type: "set-mode", mode: next })}
+              />
+              {hasData && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="lg"
+                  onClick={reset}
+                  className="px-2.5 text-muted-foreground sm:px-4"
+                  aria-label="Delete my data and start over"
+                >
+                  <Trash2 aria-hidden />
+                  <span className="hidden sm:inline">Delete my data</span>
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <ModeSwitch
-              mode={mode}
-              liveAvailable={status.live}
-              checked={status.checked}
-              onChange={(next) => dispatch({ type: "set-mode", mode: next })}
-            />
-            {hasData && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="lg"
-                onClick={reset}
-                className="px-2.5 text-muted-foreground sm:px-4"
-                aria-label="Delete my data and start over"
-              >
-                <Trash2 aria-hidden />
-                <span className="hidden sm:inline">Delete my data</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <nav
         aria-label="Progress"
@@ -317,15 +329,20 @@ export function RecoveryApp() {
                   : undefined
               }
               onReset={reset}
+              onSaveAsTask={
+                onSaveAsTask ? () => onSaveAsTask(session) : undefined
+              }
             />
           )}
         </div>
       </main>
 
-      <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">
-        BackOnTrack offers suggestions and can be wrong. It is not medical,
-        legal, or financial advice.
-      </footer>
+      {!embedded && (
+        <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">
+          BackOnTrack offers suggestions and can be wrong. It is not medical,
+          legal, or financial advice.
+        </footer>
+      )}
     </div>
   )
 }

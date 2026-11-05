@@ -639,10 +639,10 @@ export function customScenario(responsibility: string): DemoScenario {
         [
           step(
             "shrink-scope",
-            "Write the part of this that matters most, in a single line.",
-            "What's most important is what you will keep when the rest gets smaller.",
-            "What matters most",
-            "What matters most is..."
+            "Write the first piece of this you could actually finish today.",
+            "One finished piece is easier to start than the whole thing.",
+            "First piece",
+            "Today I could finish..."
           ),
           step(
             "name-the-obstacle",
