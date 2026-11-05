@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 368 of 368 (also from a clean clone. The earlier 315-test version also passed with the system set to Kiritimati time) |
+| Automated tests (`npm test`) | Pass, 368 of 368 (also from a clean clone, and with the system set to Kiritimati time) |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
