@@ -1,5 +1,6 @@
 import { EMPTY_INTAKE } from "@/lib/intake"
 import { LIMITS } from "@/lib/schemas"
+import { daysBetween } from "@/lib/workspace/dates"
 import type {
   Intake,
   RejectedPlan,
@@ -151,14 +152,16 @@ export function taskFacts({ task }: TaskRecoveryRequest, today: string) {
   const known = [`The task is “${task.title}”.`]
   const unknown: string[] = []
   if (task.deadline) {
+    const days = daysBetween(today, task.deadline)
     known.push(
-      task.deadline < today
+      days < 0
         ? `The deadline on record was ${task.deadline}, which has passed.`
-        : `The deadline on record is ${task.deadline}.`
+        : `The deadline on record is ${task.deadline}, ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"} away`}.`
     )
   } else {
     unknown.push("Whether this has a real deadline. None is recorded.")
   }
+  if (task.currentStep) known.push(`The current step is “${task.currentStep}”.`)
   known.push(`It is recorded as ${task.progress}% done.`)
   if (task.focusSessions.length) {
     const minutes = task.focusSessions.reduce(

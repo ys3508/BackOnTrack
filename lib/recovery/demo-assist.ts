@@ -1,4 +1,4 @@
-import { categorize } from "@/lib/recovery/demo-plan"
+import { categorize } from "@/lib/recovery/categorize"
 import { extractRequirements } from "@/lib/recovery/demo-breakdown"
 import type {
   WritingAction,

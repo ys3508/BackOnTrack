@@ -1,5 +1,5 @@
 import { similarity } from "@/lib/guards"
-import { categorize } from "@/lib/recovery/demo-plan"
+import { categorize } from "@/lib/recovery/categorize"
 import type {
   TaskBreakdownRequest,
   TaskBreakdownResult,

@@ -52,6 +52,10 @@ export function normalizePlan(plan: RecoveryPlan, today: string): RecoveryPlan {
       .map((step) => step.trim().slice(0, 200))
       .filter(Boolean)
       .slice(0, 6),
+    choices: plan.choices
+      .map((choice) => choice.trim().slice(0, 500))
+      .filter(Boolean)
+      .slice(0, 3),
     schedule: plan.schedule
       .filter((item) => isCalendarDate(item.date) && item.date >= today)
       .slice(0, 4)

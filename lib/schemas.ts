@@ -247,6 +247,11 @@ export const RecoveryPlanSchema = z.object({
       .describe("A usable draft. Use [brackets] for details you don't have."),
   }),
   steps: z.array(z.string()).describe("Up to 6 small, concrete steps."),
+  choices: z
+    .array(z.string())
+    .describe(
+      "Up to 3 short options the user can insert into their document, such as opening sentences. Empty if not useful."
+    ),
   schedule: z
     .array(
       z.object({

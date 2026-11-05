@@ -130,6 +130,16 @@ export function useWorkingEditor(task: Task, focusOnLoad: boolean) {
     }
   }, [editor, flush])
 
+  // Picks up text added from elsewhere, such as a saved draft, without clobbering
+  // anything the user is in the middle of typing.
+  const savedContent = task.workDoc?.content
+  useEffect(() => {
+    if (!editor || savedContent === undefined) return
+    if (timer.current === null && savedContent !== editor.getHTML()) {
+      editor.commands.setContent(savedContent, { emitUpdate: false })
+    }
+  }, [editor, savedContent])
+
   return { editor, dirty, flush }
 }
 

@@ -1,12 +1,14 @@
 import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
 import { shortDate } from "@/lib/workspace/dates"
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
+import { currentSubtask } from "@/lib/workspace/selectors"
 import type {
   FocusSession,
   Instructions,
   PendingBreakdown,
   PlannedSession,
   Priority,
+  RecoveryAttempt,
   StoredRecovery,
   Settings,
   Subtask,
@@ -129,7 +131,19 @@ export type WorkspaceAction =
     }
   | { type: "remove-planned"; at: string; id: string }
   | { type: "toggle-planned"; id: string }
-  | { type: "set-recovery"; id: string; recovery: StoredRecovery | null }
+  | {
+      type: "set-recovery"
+      id: string
+      recovery: StoredRecovery | null
+      obstacle?: string
+    }
+  | {
+      type: "append-to-doc"
+      id: string
+      at: string
+      text: string
+      label: string
+    }
   | { type: "decline-recovery"; id: string; at: string }
   | {
       type: "apply-recovery"
@@ -729,10 +743,49 @@ export function workspaceReducer(
       }
 
     case "set-recovery":
-      return mapTask(state, action.id, (task) => ({
-        ...task,
-        recovery: action.recovery,
-      }))
+      return mapTask(state, action.id, (task) => {
+        const recovery = action.recovery
+        if (!recovery) return { ...task, recovery: null }
+        const attempt: RecoveryAttempt = {
+          id: `${recovery.createdAt}-${task.recoveryAttempts.length}`,
+          at: recovery.createdAt,
+          subtaskId: currentSubtask(task)?.id ?? null,
+          obstacle: action.obstacle ?? "",
+          suggestion: recovery.plan.nextStep.instruction,
+          source: recovery.source,
+          outcome: "suggested",
+        }
+        return withEvent(
+          {
+            ...task,
+            recovery,
+            recoveryAttempts: [...task.recoveryAttempts, attempt].slice(-50),
+          },
+          recovery.createdAt,
+          "recovery",
+          `Suggested a recovery plan (${sourceName(recovery)}): ${recovery.plan.nextStep.instruction}`
+        )
+      })
+
+    case "append-to-doc":
+      return mapTask(state, action.id, (task) => {
+        const previous = task.workDoc?.content ?? ""
+        return withEvent(
+          {
+            ...task,
+            lastWorkedAt: action.at,
+            workDoc: {
+              content: `${previous}<p><span data-suggested="true">${escapeHtml(action.text)}</span></p>`,
+              cursor: task.workDoc?.cursor ?? 0,
+              previous,
+              updatedAt: action.at,
+            },
+          },
+          action.at,
+          "document",
+          `Accepted a suggestion into the document: ${action.label}`
+        )
+      })
 
     case "decline-recovery":
       return mapTask(state, action.id, (task) => {
@@ -742,6 +795,7 @@ export function workspaceReducer(
           {
             ...task,
             recovery: null,
+            recoveryAttempts: markLastAttempt(task, "declined"),
             rejectedPlans: [
               ...task.rejectedPlans,
               {
@@ -775,6 +829,7 @@ export function workspaceReducer(
         let updated: Task = {
           ...task,
           recovery: null,
+          recoveryAttempts: markLastAttempt(task, "accepted"),
           nextAction: action.nextAction ?? task.nextAction,
           subtasks: [
             ...task.subtasks,
@@ -971,18 +1026,17 @@ export function workspaceReducer(
     }
 
     case "report-stuck":
-      return mapTask(state, action.id, (task) =>
-        setTaskStatus(
-          withEvent(
-            task,
-            action.at,
-            "stuck",
-            `Reported being stuck${action.text ? `: ${action.text}` : ""}`
-          ),
-          "needs-recovery",
-          action.at
+      return mapTask(state, action.id, (task) => {
+        const reported = withEvent(
+          task,
+          action.at,
+          "stuck",
+          "Reported being stuck"
         )
-      )
+        return action.text
+          ? withEvent(reported, action.at, "obstacle", action.text)
+          : reported
+      })
 
     case "timer-acknowledge":
       return { ...state, finishedSessionId: null }
@@ -1043,6 +1097,24 @@ function recordSession(
       ? withEvent(logged, result.endedAt, "obstacle", result.note)
       : logged
   })
+}
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
+/** The most recent suggestion is the one the user has just decided about. */
+function markLastAttempt(task: Task, outcome: RecoveryAttempt["outcome"]) {
+  const attempts = [...task.recoveryAttempts]
+  const last = attempts.at(-1)
+  if (last?.outcome === "suggested") {
+    attempts[attempts.length - 1] = { ...last, outcome }
+  }
+  return attempts
 }
 
 function stepProgress(subtasks: Task["subtasks"], fallback: number) {

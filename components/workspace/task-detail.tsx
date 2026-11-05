@@ -49,6 +49,7 @@ import {
   currentSubtask,
   deadlinePassed,
   nextActionFor,
+  progressSummary,
 } from "@/lib/workspace/selectors"
 import {
   PRIORITIES,
@@ -61,6 +62,7 @@ import type {
   Priority,
   Task,
   TaskDocument,
+  TaskEvent,
   TaskStatus,
 } from "@/lib/workspace/schemas"
 
@@ -631,6 +633,7 @@ function DocumentEditor({ task, doc }: { task: Task; doc: TaskDocument }) {
   const [title, setTitle] = useState(doc.title)
   const [body, setBody] = useState(doc.body)
   const [copied, setCopied] = useState(false)
+  const [added, setAdded] = useState(false)
 
   const save = () => {
     if (title !== doc.title || body !== doc.body) {
@@ -690,6 +693,24 @@ function DocumentEditor({ task, doc }: { task: Task; doc: TaskDocument }) {
           type="button"
           variant="ghost"
           size="lg"
+          disabled={added || !body.trim()}
+          onClick={() => {
+            dispatch({
+              type: "append-to-doc",
+              id: task.id,
+              at: nowIso(),
+              text: body,
+              label: title,
+            })
+            setAdded(true)
+          }}
+        >
+          {added ? "Added to working document" : "Add to working document"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="lg"
           className="text-muted-foreground"
           onClick={() =>
             dispatch({
@@ -715,16 +736,42 @@ function DocumentEditor({ task, doc }: { task: Task; doc: TaskDocument }) {
   )
 }
 
+const KIND_LABEL: Partial<Record<TaskEvent["kind"], string>> = {
+  suggested: "Suggested",
+  accepted: "Accepted",
+  attempted: "Tried",
+  completed: "Done",
+}
+
+const KIND_STYLE: Partial<Record<TaskEvent["kind"], string>> = {
+  suggested: "bg-indigo-soft text-indigo",
+  accepted: "bg-secondary text-foreground",
+  attempted: "bg-sand-soft text-sand",
+  completed: "bg-sage-soft text-sage",
+}
+
 function HistoryCard({ task }: { task: Task }) {
+  const { state } = useStore()
   const [expanded, setExpanded] = useState(false)
-  const events = [...task.history].reverse()
+  const events = [...task.history].sort((a, b) => b.at.localeCompare(a.at))
   const shown = expanded ? events : events.slice(0, 5)
+  const summary = progressSummary(task, state)
   return (
     <Card>
       <SectionTitle>History</SectionTitle>
+      {summary && (
+        <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
+      )}
       <ol className="mt-2 space-y-2 text-sm">
         {shown.map((event) => (
           <li key={event.id}>
+            {KIND_LABEL[event.kind] && (
+              <span
+                className={`mr-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${KIND_STYLE[event.kind]}`}
+              >
+                {KIND_LABEL[event.kind]}
+              </span>
+            )}
             <span className="break-words">{event.text}</span>
             <span className="block text-xs text-muted-foreground">
               {formatDateTime(event.at)}

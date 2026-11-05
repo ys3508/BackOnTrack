@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useAiConsent } from "@/components/workspace/ai-consent"
 import { ExpandableList, StatusBadge } from "@/components/workspace/parts"
 import { QuickAdd } from "@/components/workspace/quick-add"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
@@ -126,6 +127,7 @@ function useRecoveryRequest(task: Task) {
       dispatch({
         type: "set-recovery",
         id: task.id,
+        obstacle: options.obstacle ?? "",
         recovery: {
           analysis: result.analysis,
           plan: result.plan,
@@ -150,6 +152,7 @@ function useRecoveryRequest(task: Task) {
 function RecoverTask({ task }: { task: Task }) {
   const { navigate, mode, dispatch } = useStore()
   const recovery = useRecoveryRequest(task)
+  const consent = useAiConsent(task)
 
   const useDemoLink =
     mode === "live" && recovery.error
@@ -185,11 +188,15 @@ function RecoverTask({ task }: { task: Task }) {
           key={task.recovery.createdAt}
           task={task}
           pending={task.recovery}
-          onRequest={recovery.run}
+          onRequest={(options) => consent.guard(() => recovery.run(options))}
         />
       ) : (
-        <StartRecovery task={task} onRequest={recovery.run} />
+        <StartRecovery
+          task={task}
+          onRequest={(options) => consent.guard(() => recovery.run(options))}
+        />
       )}
+      {consent.dialog}
     </div>
   )
 }
@@ -216,9 +223,7 @@ function StartRecovery({
         : obstacle && obstacle !== "unsure"
           ? OBSTACLE_LABEL[obstacle]
           : ""
-    if (text) {
-      dispatch({ type: "log-obstacle", id: task.id, at: nowIso(), text })
-    }
+    dispatch({ type: "report-stuck", id: task.id, at: nowIso(), text })
     onRequest({ obstacle: text })
   }
 
@@ -429,6 +434,43 @@ function PlanPreview({
           </p>
         )}
       </Card>
+
+      {plan.choices.length > 0 && (
+        <Card className="space-y-2">
+          <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+            Pick one to put in your document
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Suggested text for you to change. It’s marked as suggested until you
+            clear the highlight.
+          </p>
+          <ul className="space-y-2">
+            {plan.choices.map((choice) => (
+              <li key={choice}>
+                <Button
+                  type="button"
+                  size="xl"
+                  variant="outline"
+                  className="h-auto min-h-11 w-full justify-start py-2 text-left font-normal whitespace-normal"
+                  onClick={() => {
+                    dispatch({
+                      type: "append-to-doc",
+                      id: task.id,
+                      at: nowIso(),
+                      text: choice,
+                      label: plan.headline,
+                    })
+                    accept()
+                    navigate({ view: "task", id: task.id, section: "doc" })
+                  }}
+                >
+                  {choice}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {plan.steps.length > 0 && (
         <Card>

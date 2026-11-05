@@ -124,3 +124,30 @@ export function recentActions(state: Workspace, limit = 5) {
     .sort((a, b) => b.event.at.localeCompare(a.event.at))
     .slice(0, limit)
 }
+
+/** A plain summary from recorded facts. Time on a timer is reported as time only. */
+export function progressSummary(task: Task, state: Workspace) {
+  const { done, total } = stepCounts(task)
+  const sessions = state.focusSessions.filter(
+    (session) => session.taskId === task.id
+  )
+  const minutes = Math.round(
+    sessions.reduce((sum, session) => sum + session.actualSeconds, 0) / 60
+  )
+  const parts = []
+  if (total) parts.push(`${done} of ${total} steps finished`)
+  if (sessions.length) {
+    parts.push(
+      `${minutes} min on the timer over ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`
+    )
+  }
+  if (task.recoveryAttempts.length) {
+    const accepted = task.recoveryAttempts.filter(
+      (attempt) => attempt.outcome === "accepted"
+    ).length
+    parts.push(
+      `${accepted} of ${task.recoveryAttempts.length} recovery ${task.recoveryAttempts.length === 1 ? "plan" : "plans"} accepted`
+    )
+  }
+  return parts.join(" · ")
+}

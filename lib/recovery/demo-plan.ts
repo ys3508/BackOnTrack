@@ -1,4 +1,7 @@
 import { applySafetyGuards } from "@/lib/guards"
+import { categorize } from "@/lib/recovery/categorize"
+import type { Category } from "@/lib/recovery/categorize"
+import { extractRequirements } from "@/lib/recovery/demo-breakdown"
 import { contextIntake, taskFacts } from "@/lib/recovery/context"
 import type {
   Analysis,
@@ -15,40 +18,8 @@ import { addDays, shortDate } from "@/lib/workspace/dates"
  * data, so it's useful without an API key, but it isn't AI and doesn't claim to be.
  */
 
-type Category = "academic" | "job" | "message" | "admin" | "general"
-
-export function categorize(text: string): Category {
-  const value = text.toLowerCase()
-  if (
-    /\b(homework|assignment|essay|paper|thesis|exams?|class|course|professor|study|lab report|syllabus|quiz|midterm|final)\b/.test(
-      value
-    )
-  ) {
-    return "academic"
-  }
-  if (
-    /\b(jobs?|appl(y|ying|ication|ications)|resume|résumé|cover letter|interview)\b/.test(
-      value
-    )
-  ) {
-    return "job"
-  }
-  if (
-    /\b(email|e-mail|reply|respond|message|call back|text back)\b/.test(value)
-  ) {
-    return "message"
-  }
-  if (
-    /\b(tax(es)?|bills?|forms?|insurance|rent|appointment|visa|paperwork|renew)\b/.test(
-      value
-    )
-  ) {
-    return "admin"
-  }
-  return "general"
-}
-
 type Template = {
+  choices?: string[]
   headline: string
   instruction: string
   why: string
@@ -58,6 +29,89 @@ type Template = {
   artifactTitle: string
   body: string
   steps: string[]
+}
+
+/** Plans built from the user's real progress, tried before the general ones. */
+function adaptiveTemplates(request: TaskRecoveryRequest): Template[] {
+  const { task, obstacle } = request
+  const list: Template[] = []
+  const reported = [obstacle, ...task.obstacles].join(" ")
+  const requirements = extractRequirements(task.instructions, 8)
+
+  const confused =
+    /understand|unclear|confus|not sure what|don.t know what|what .* wants/i.test(
+      reported
+    ) || /review|read .*instructions/i.test(task.currentStep)
+  if (requirements.length && confused) {
+    list.push({
+      headline: "Pull out what’s actually being asked",
+      instruction:
+        "Read this checklist of what your instructions ask for, and mark anything unclear with a question mark.",
+      why: "It turns the instructions into a short list. These lines were pulled out with simple text rules, so check them against the original.",
+      minutes: 5,
+      approach: "gather-information",
+      kind: "checklist",
+      artifactTitle: "What the instructions ask for",
+      body: [
+        "What's being asked:",
+        ...requirements.map((item) => `- [ ] ${item}`),
+        "",
+        "What I'd ask about:",
+        "- [anything unclear]",
+      ].join("\n"),
+      steps: [
+        "Mark anything unclear",
+        "Choose the checklist item you understand best",
+      ],
+    })
+  }
+
+  const writing = /writ|draft|introduc|paragraph|outline|section/i.test(
+    task.currentStep
+  )
+  if (writing) {
+    const subject = requirements[0] ?? task.currentStep ?? task.title
+    list.push({
+      headline: "Pick an opening, and change it",
+      instruction:
+        "Choose one of these openings to put in your document, then change anything you like.",
+      why: "Editing something on the page is easier than facing a blank one. These are templates for you to finish, and you stay the author.",
+      minutes: 5,
+      approach: "write-in-app",
+      kind: "note",
+      artifactTitle: `Openings: ${task.title}`,
+      body: `Notes for this section of ${task.title}:
+[what you want to say]`,
+      steps: ["Insert one opening", "Fill in its brackets"],
+      choices: [
+        `This section is about ${subject.replace(/\.$/, "")}, and my main point is [your main point].`,
+        `To address ${task.title}, I first looked at [what you looked at], and found [what you found].`,
+        `The question here is [your question], and my answer is [your answer] because [your reason].`,
+      ],
+    })
+  }
+
+  const lastLine = task.document.trim().split("\n").filter(Boolean).at(-1)
+  if (lastLine) {
+    const quote =
+      lastLine.length > 90 ? `${lastLine.slice(0, 87)}...` : lastLine
+    list.push({
+      headline: "Pick up where your document stops",
+      instruction: `Add one more sentence after “${quote}”`,
+      why: "You've already started, so this uses what's there instead of beginning again.",
+      minutes: 5,
+      approach: "write-in-app",
+      kind: "note",
+      artifactTitle: `Where my document stops: ${task.title}`,
+      body: `My document stops at:
+${lastLine}
+
+What comes next, roughly:
+[one line]`,
+      steps: ["Add one sentence to your document"],
+    })
+  }
+  return list
 }
 
 function templates(
@@ -419,7 +473,7 @@ export function demoTaskRecovery(
   const list =
     strategy === "RELEASE"
       ? [releaseTemplate(request)]
-      : templates(request, category)
+      : [...adaptiveTemplates(request), ...templates(request, category)]
   const used = new Set(rejected.map((item) => item.artifactTitle))
   const available = list.filter((item) => !used.has(item.artifactTitle))
   const template =
@@ -458,6 +512,7 @@ export function demoTaskRecovery(
         body: template.body,
       },
       steps,
+      choices: template.choices ?? [],
       schedule: [
         { date: today, minutes: 10, label: template.steps[0] },
         ...(strategy === "RELEASE"
