@@ -981,3 +981,36 @@ describe("repeated stuck, after accepting code", () => {
     expect(second.nextStep.instruction).not.toContain("print(data.columns)")
   })
 })
+
+describe("planning keeps steps whole", () => {
+  const base = {
+    today: "2026-11-02",
+    deadline: "2026-11-08",
+    skipWeekends: false,
+    existing: [] as PlannedSession[],
+  }
+
+  it("doesn't scatter a step across days when one day can hold it", () => {
+    const { sessions } = planRemaining({
+      ...base,
+      minutesPerDay: 30,
+      steps: ["A", "B", "C"],
+    })
+    expect(
+      sessions.map((item) => [item.date, item.minutes, item.label])
+    ).toEqual([
+      ["2026-11-02", 25, "A"],
+      ["2026-11-03", 25, "B"],
+      ["2026-11-04", 25, "C"],
+    ])
+  })
+
+  it("only splits a step when the time per day is shorter than the step", () => {
+    const { sessions } = planRemaining({
+      ...base,
+      minutesPerDay: 15,
+      steps: ["A"],
+    })
+    expect(sessions.map((item) => item.minutes)).toEqual([15, 10])
+  })
+})

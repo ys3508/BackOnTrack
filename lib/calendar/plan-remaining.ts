@@ -70,6 +70,22 @@ export function planRemaining({
 
   for (const step of steps) {
     if (alreadyPlanned.has(step)) continue
+    // A step stays in one sitting whenever a day has room for it.
+    const whole = days.find((day) => day.free >= MINUTES_PER_STEP)
+    if (whole) {
+      sessions.push({
+        date: whole.date,
+        minutes: MINUTES_PER_STEP,
+        label: step,
+      })
+      whole.free -= MINUTES_PER_STEP
+      continue
+    }
+    // Five-minute scraps of a step aren't a plan, so it's reported as not fitting.
+    if (minutesPerDay >= MINUTES_PER_STEP) {
+      unscheduled.push(step)
+      continue
+    }
     let needed = MINUTES_PER_STEP
     const placed: ProposedSession[] = []
     for (const day of days) {
