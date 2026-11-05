@@ -25,7 +25,7 @@ It was built as a prototype for the AI Lab in AIML-500: Machine Learning Fundame
 
 ## Run it locally
 
-Requires Node.js 20 or newer.
+Tested on Node.js 24. Next.js itself requires Node.js 20.9 or newer.
 
 ```bash
 git clone https://github.com/ys3508/BackOnTrack.git
