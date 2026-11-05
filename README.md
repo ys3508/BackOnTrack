@@ -8,7 +8,7 @@ It was built as a prototype for the AI Lab in AIML-500: Machine Learning Fundame
 
 **Try it:** https://backontrack-peach.vercel.app
 
-The public site runs in Demo Mode with no account or API key. It currently shows the earlier wizard version until the `feat/recovery-workspace` branch is merged into `main`.
+The public site runs in Demo Mode, with no account or API key. Its suggestions come from prewritten templates, not AI, and each one is labeled that way.
 
 ## What it does
 

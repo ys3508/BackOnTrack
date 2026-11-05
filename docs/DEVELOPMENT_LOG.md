@@ -105,6 +105,8 @@ The `feat/recovery-workspace` branch started from `feat/low-friction-intake`, so
 
 Phases 3 and 4 share a commit, because the calendar was finished while its browser check was running, and the files overlapped by the time it passed. That commit also went in with one test failing, because of a mistake in my command, which committed regardless of the result. The failure was a duplicate "Progress" label for screen readers. It was fixed in the next commit, and tests were confirmed passing before work continued.
 
+`main` was fast-forwarded to `c6e2747` on 2026-11-05, and Vercel deployed it to the public site. The results are in [TEST_RESULTS.md](TEST_RESULTS.md).
+
 ### Decisions
 
 - **Reused existing logic.** Reality Check, the decision cards, safety guards, repeat detection, and the option groups were reused. The wizard stays available at `#/guided`.
@@ -128,7 +130,7 @@ See [TEST_RESULTS.md](TEST_RESULTS.md).
 ## Known limitations
 
 - **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.
-- The workspace isn't on the public site until this branch is merged.
+- The public site runs in Demo Mode, with no API key, so its suggestions are templates.
 - The timer can't alert the user when it ends, beyond the screen and tab title.
 - Importing an exported file isn't supported.
 - On a phone-width month view, calendar titles are cut off, although tapping a day lists them in full.

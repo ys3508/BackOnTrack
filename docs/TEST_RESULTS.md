@@ -14,7 +14,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
 | Deployment to Vercel, in Demo Mode | Pass, publicly reachable at https://backontrack-peach.vercel.app |
-| Workflow on the public URL | Pass, except that Copy and Download are unconfirmed there |
+| Workflow on the public URL | Pass for the workspace, in Demo Mode. Copy and file downloads are unconfirmed there. |
 
 ## What "live" testing does and doesn't show
 
@@ -27,7 +27,7 @@ These show that requests, validation, safety rules, retries, and error handling 
 
 ## Functional recovery workspace
 
-These tests were run on 2026-11-05 on the `feat/recovery-workspace` branch. "Automated" means the Vitest suites in `tests/`. "Browser" means a production build run locally in Chromium with no API key. No real AI model was involved, so these results don't show the quality of real AI suggestions.
+These tests were run on 2026-11-05 on the `feat/recovery-workspace` branch, which is now merged. "Automated" means the Vitest suites in `tests/`. "Browser" means a production build run locally in Chromium with no API key. No real AI model was involved, so these results don't show the quality of real AI suggestions.
 
 ### Definition of Done
 
@@ -89,13 +89,27 @@ Final checks on the committed build:
 | Color contrast of new text pairs (browser, computed) | Text on the sand, sage, indigo, and secondary backgrounds | At least 4.5:1 | Lowest was 6.06:1. | Pass | None |
 | Clean clone (automated) | Fresh clone and `npm ci` | All checks pass | 226 of 226 tests, typecheck, lint, and build passed. Tests also passed with the system set to Kiritimati and Los Angeles time. | Pass | None |
 
+### On the public site
+
+These tests were run on 2026-11-05 at https://backontrack-peach.vercel.app, after `main` was fast-forwarded to commit `c6e2747`, with no API key configured. The task was typed with real key presses, and the calendar was dragged with real mouse actions. Other steps used scripted clicks.
+
+| Scenario | Actual observed behavior | Pass/Fail |
+| --- | --- | --- |
+| Access | Returned 200 to a logged-out request. The status endpoint reported `live: false`, and Demo was selected. | Pass |
+| Definition of Done, steps 1 to 10 | A homework task went from quick add through a deadline, focus, pause and resume, getting stuck, an edited plan, progress, and history. All of it remained after a real reload. | Pass |
+| Preview before change | Before accepting, the task had no documents and no planned sessions. The deadline stayed Nov 12 after accepting. | Pass |
+| Moving planned work | A real drag moved it to Nov 20, and the deadline stayed Nov 12. | Pass |
+| Moving a deadline | A real drag to Nov 19 didn't change it. The app asked first, and "Keep the deadline" kept Nov 12. | Pass |
+| Demo privacy | The network log showed only GET status requests to `/api/recovery`, with no task data sent. No console errors. | Pass |
+| Phone width (375 px emulation) | No sideways scrolling on the 8 views checked. | Pass |
+
 ### Not tested for the workspace
 
 - The real AI model, including the quality, cost, and speed of recovery plans. `npm run test:live` now includes three recovery scenarios for this.
 - Whether this helps real users. No user testing has been done.
 - Real phones, Safari, Firefox, and screen readers.
 - A person dragging by hand, on a mouse or a touch screen.
-- The deployed version of this branch.
+- Copy and file downloads on the public site, in a normal browser.
 
 ## Low-friction intake
 
@@ -117,9 +131,9 @@ These tests were run on 2026-11-05 on the `feat/low-friction-intake` branch. "Au
 | Keyboard (browser) | Tab, arrow keys, Space, digits | Everything works without a mouse | Tab reached the groups with nothing selected. Space selected, arrow keys moved, and typing filled the date and text fields. | Pass | Space didn't clear a selected option at first, although the automated test passed. Fixed and rechecked in the browser. |
 | Delete my data on the intake screen (automated) | Saved text, then delete | Form is emptied | Text and selections were cleared, and the section collapsed. | Pass | Old text stayed visible before this fix |
 
-The live public site runs the earlier wizard until these branches are merged into `main`. The results under "Public deployment" below describe that earlier version, including the old heading and validation wording.
+This intake is now on the public site, as part of the guided check-in. The results under "First public deployment" below describe the earlier wizard, including its old heading and validation wording.
 
-## Public deployment
+## First public deployment
 
 These tests were run on 2026-11-05 at https://backontrack-peach.vercel.app, with scripted clicks in a browser and with no API key configured. The full set ran on the first deployment, of commit `c657c09`. After `main` was updated to the same commit, Vercel redeployed it and the job application path and basic access checks were run again.
 
