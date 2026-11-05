@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest"
 
+import { EMPTY_INTAKE } from "@/lib/intake"
 import { demoAnalysis, demoNextStep } from "@/lib/demo/engine"
 import { DEMO_SCENARIOS, customScenario } from "@/lib/demo/scenarios"
 import { STRATEGIES } from "@/lib/schemas"
 import type { Intake, NextStepRequest, Strategy } from "@/lib/schemas"
 
 const intake = (responsibility: string): Intake => ({
+  ...EMPTY_INTAKE,
   responsibility,
-  deadline: "",
-  status: "",
-  obstacle: "",
 })
 
 function request(

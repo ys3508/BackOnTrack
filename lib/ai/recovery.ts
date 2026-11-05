@@ -15,6 +15,7 @@ import {
   normalizeNextStep,
   pickFallbackStep,
 } from "@/lib/guards"
+import { applyIntakeDetails } from "@/lib/intake"
 import { AnalysisSchema, NextStepOutputSchema } from "@/lib/schemas"
 import type {
   Analysis,
@@ -47,7 +48,10 @@ export async function generateAnalysis(
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
-    return applySafetyGuards(normalizeAnalysis(output), intake)
+    return applyIntakeDetails(
+      applySafetyGuards(normalizeAnalysis(output), intake),
+      intake
+    )
   }
 
   try {

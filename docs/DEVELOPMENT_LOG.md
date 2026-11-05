@@ -64,6 +64,22 @@ The prototype was deployed on 2026-11-05 at https://backontrack-peach.vercel.app
 - **First deployment:** this was made with the Vercel CLI after the student signed in, because `main` didn't contain the app yet. Vercel rejected the folder name for having capital letters, so the project was named `backontrack`.
 - **Updating `main`:** the CLI also connected the GitHub repository to the project. Once `main` was fast-forwarded to commit `c657c09`, Vercel redeployed automatically. Commits on `main` now redeploy the site.
 
+## Low-friction intake
+
+The intake was changed on the `feat/low-friction-intake` branch, to reduce the thinking and typing needed before starting.
+
+- **Inputs:** the three free-text details became a date option (with a native date input), and two single-select groups. They stay in a collapsed section, and none is required.
+- **Data:** skipped questions are stored as `null`. "No deadline" and "I'm not sure" are separate, explicit answers. Dates are stored as `YYYY-MM-DD` strings and displayed in UTC, so they don't shift by time zone.
+- **Reality Check:** `applyIntakeDetails` adds real answers as facts, and "not sure" answers as unknowns, in both Live AI and Demo Mode. A missing deadline becomes an unknown if the analysis doesn't already mention one.
+- **Minimum length:** lowered from 10 characters to 3, because the screen now says a few words are enough. "my taxes" was previously rejected.
+- **Saved sessions:** `restoreSession` and `migrateIntake` load older sessions and recover from damaged data. Old free text is kept in the user's own words instead of being guessed into an option.
+
+Problems found while testing:
+
+- Space didn't clear a selected option in a real browser, although the automated test passed, because browsers send no click for Space on a checked radio. A key handler now clears it.
+- The "Add details" toggle (28 px) and example buttons (38 px) were too small to tap easily, and are now 44 px.
+- "Delete my data" cleared storage but left the old text visible when pressed on the intake screen. The form now resets.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).
@@ -78,6 +94,8 @@ See [TEST_RESULTS.md](TEST_RESULTS.md).
 - Keyword-based high-stakes and crisis detection will have false positives and false negatives. For example, it recognizes "exam" and "bill", but not every phrasing.
 - Rate limits are stored in memory per server instance and reset on restart.
 - Saved sessions are not encrypted, and they are readable by anyone using the same browser profile.
-- Demo Mode can't respond to the specifics of custom text.
+- Demo Mode can't respond to the specifics of custom text. It records and displays intake details, but its prewritten decision and steps don't change based on them, and it says so.
+- Live AI could restate an intake answer that the app also adds to the Reality Check. The prompt tells it not to, but this hasn't been tested with a real model.
+- Text typed on the intake screen is saved only after submitting, so an unsubmitted draft is lost on reload.
 - A full automated accessibility audit and a screen-reader test have not been done. Color contrast, labels, and focus handling were considered, and the contrast of the main color pairs was measured.
 - No testing with real users has been done.

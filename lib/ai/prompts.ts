@@ -1,3 +1,4 @@
+import { describeDetails } from "@/lib/intake"
 import type { Intake, NextStepRequest } from "@/lib/schemas"
 
 const SHARED_RULES = `You are BackOnTrack AI, a failure-aware recovery assistant. You help someone who has been avoiding a responsibility understand what is actually true, decide what to do about it, and restart with one realistic action.
@@ -39,6 +40,8 @@ Set highStakes to true for legal, financial, medical, or academic obligations. I
 
 Set supportConcern to true if the user mentions self-harm, suicide, or being in crisis. Do not offer treatment advice.
 
+Optional details: the deadline, status, and obstacle may be marked "not answered". That means the user skipped the question. It is not an answer, so never treat it as "no deadline" or infer a value for it. Use the details they did answer when you reason and recommend. The app adds their answers to the known facts and unknowns itself, so do not list those answers again.
+
 If the user says an earlier suggestion did not work but does not say what it was, treat what the suggestion was as an unknown. Do not pretend to remember it.`
 
 export const NEXT_STEP_SYSTEM = `${SHARED_RULES}
@@ -63,10 +66,27 @@ How to respond to what just happened:
 For a RELEASE strategy, steps should help them let go deliberately, such as naming what they are dropping and who needs to know, not push them back into the task.`
 
 function formatIntake(intake: Intake) {
+  const { deadline } = intake
+  const details = describeDetails(intake)
   const lines = [`What they have been putting off: ${intake.responsibility}`]
-  if (intake.deadline) lines.push(`Original deadline: ${intake.deadline}`)
-  if (intake.status) lines.push(`Current status: ${intake.status}`)
-  if (intake.obstacle) lines.push(`Main obstacle: ${intake.obstacle}`)
+
+  if (deadline?.type === "date") {
+    // Only the server's date is available, which can differ by a day from the user's.
+    const today = new Date().toISOString().slice(0, 10)
+    lines.push(
+      `Original deadline: ${deadline.date} (${details.deadline}). Today is about ${today}, give or take a day.`
+    )
+  } else if (deadline?.type === "none") {
+    lines.push("Original deadline: the user said there is no deadline.")
+  } else if (deadline?.type === "unsure") {
+    lines.push("Original deadline: the user said they are not sure (unknown).")
+  } else {
+    lines.push("Original deadline: not answered (unknown).")
+  }
+  lines.push(`Current status: ${details.status ?? "not answered (unknown)"}.`)
+  lines.push(`Main obstacle: ${details.obstacle ?? "not answered (unknown)"}.`)
+  if (intake.legacyNotes) lines.push(`Earlier details: ${intake.legacyNotes}`)
+
   return `<user_situation>\n${lines.join("\n")}\n</user_situation>`
 }
 

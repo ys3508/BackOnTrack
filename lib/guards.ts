@@ -19,12 +19,9 @@ export const DEFAULT_CAUTION =
   "This looks like it may involve a legal, financial, medical or academic obligation. Before dropping it, check with the person or office responsible what stopping would actually mean."
 
 function intakeText(intake: Intake) {
-  return [
-    intake.responsibility,
-    intake.deadline,
-    intake.status,
-    intake.obstacle,
-  ].join(" ")
+  return [intake.responsibility, intake.obstacleOther, intake.legacyNotes].join(
+    " "
+  )
 }
 
 export function detectHighStakes(intake: Intake) {

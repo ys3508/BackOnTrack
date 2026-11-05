@@ -54,7 +54,7 @@ A structured workspace turns the product principles into constraints. Showing on
 
 The prototype is a working Next.js web application with:
 
-- A Recovery Intake with three samples and no sign-up.
+- A Recovery Intake with three samples and no sign-up. Optional details are one-click choices in a collapsed section, intended to reduce typing and decisions before starting. This design goal hasn't been tested with users, including people with ADHD.
 - A Reality Check with known facts, assumptions, unknowns, and consequences.
 - A Recovery Decision (Finish, Reduce, or Release) with reasoning, uncertainty, and override. Releasing a high-stakes obligation requires an explicit acknowledgement.
 - A One-Step Workspace with a text box and three actions.

@@ -258,6 +258,7 @@ export function RecoveryApp() {
         >
           {session.screen === "intake" && (
             <IntakeScreen
+              key={JSON.stringify(session.intake)}
               initial={session.intake}
               mode={mode}
               modelReady={status.checked}

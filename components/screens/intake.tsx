@@ -8,27 +8,99 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { DEMO_SCENARIOS } from "@/lib/demo/scenarios"
-import { IntakeSchema, LIMITS } from "@/lib/schemas"
-import type { Intake } from "@/lib/schemas"
+import { OBSTACLE_LABEL, STATUS_LABEL } from "@/lib/intake"
+import { IntakeSchema, LIMITS, isCalendarDate } from "@/lib/schemas"
+import type { Deadline, Intake } from "@/lib/schemas"
 import type { Source } from "@/lib/session"
+import { cn } from "@/lib/utils"
 
-const DETAIL_FIELDS = [
-  {
-    key: "deadline",
-    label: "Original deadline",
-    placeholder: "e.g. last Friday, or none",
-  },
-  {
-    key: "status",
-    label: "Current status",
-    placeholder: "e.g. started, then stopped",
-  },
-  {
-    key: "obstacle",
-    label: "Main obstacle",
-    placeholder: "e.g. I don't know where to begin",
-  },
-] as const
+type DeadlineChoice = Deadline["type"]
+
+const DEADLINE_OPTIONS: { value: DeadlineChoice; label: string }[] = [
+  { value: "date", label: "Pick a date" },
+  { value: "none", label: "No deadline" },
+  { value: "unsure", label: "I’m not sure" },
+]
+
+const toOptions = <T extends string>(labels: Record<T, string>) =>
+  (Object.entries(labels) as [T, string][]).map(([value, label]) => ({
+    value,
+    label,
+  }))
+
+/**
+ * A single-select group built on native radio buttons, so arrow keys and screen
+ * readers work as expected. Nothing starts selected, and choosing the selected
+ * option again clears it, because every one of these questions is optional.
+ */
+function ChoiceGroup<T extends string>({
+  legend,
+  name,
+  options,
+  value,
+  onChange,
+  className,
+}: {
+  legend: string
+  name: string
+  options: { value: T; label: string }[]
+  value: T | null
+  onChange: (value: T | null) => void
+  className?: string
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-2 text-sm font-medium">{legend}</legend>
+      <div className={cn("grid grid-cols-1 gap-2", className)}>
+        {options.map((option) => {
+          const selected = value === option.value
+          return (
+            <label
+              key={option.value}
+              className={cn(
+                "flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-[15px] leading-snug transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/30",
+                selected
+                  ? "border-primary bg-sage-soft"
+                  : "border-border bg-card hover:border-primary/40"
+              )}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={option.value}
+                checked={selected}
+                onChange={() => onChange(option.value)}
+                onClick={() => {
+                  if (selected) onChange(null)
+                }}
+                onKeyUp={(event) => {
+                  // Browsers send no click for Space on a checked radio.
+                  if (event.key === " " && selected) {
+                    event.preventDefault()
+                    onChange(null)
+                  }
+                }}
+                className="sr-only"
+              />
+              <span
+                aria-hidden
+                className={cn(
+                  "grid size-4 shrink-0 place-items-center rounded-full border",
+                  selected ? "border-primary" : "border-input"
+                )}
+              >
+                {selected && (
+                  <span className="size-2 rounded-full bg-primary" />
+                )}
+              </span>
+              {option.label}
+            </label>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
 
 export function IntakeScreen({
   initial,
@@ -49,15 +121,44 @@ export function IntakeScreen({
   onSubmit: (intake: Intake) => void
   onUseDemo?: () => void
 }) {
-  const [form, setForm] = useState<Intake>(initial)
+  const [responsibility, setResponsibility] = useState(initial.responsibility)
+  const [deadlineChoice, setDeadlineChoice] = useState<DeadlineChoice | null>(
+    initial.deadline?.type ?? null
+  )
+  const [deadlineDate, setDeadlineDate] = useState(
+    initial.deadline?.type === "date" ? initial.deadline.date : ""
+  )
+  const [status, setStatus] = useState(initial.status)
+  const [obstacle, setObstacle] = useState(initial.obstacle)
+  const [obstacleOther, setObstacleOther] = useState(initial.obstacleOther)
   const [validation, setValidation] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(
     Boolean(initial.deadline || initial.status || initial.obstacle)
   )
 
+  function buildIntake() {
+    // "Pick a date" with no date chosen is not an answer, so it stays unanswered.
+    let deadline: Intake["deadline"] = null
+    if (deadlineChoice === "date") {
+      if (isCalendarDate(deadlineDate)) {
+        deadline = { type: "date", date: deadlineDate }
+      }
+    } else if (deadlineChoice) {
+      deadline = { type: deadlineChoice }
+    }
+    return IntakeSchema.safeParse({
+      responsibility,
+      deadline,
+      status,
+      obstacle,
+      obstacleOther: obstacle === "something-else" ? obstacleOther : "",
+      legacyNotes: initial.legacyNotes,
+    })
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault()
-    const parsed = IntakeSchema.safeParse(form)
+    const parsed = buildIntake()
     if (!parsed.success) {
       setValidation(
         parsed.error.issues[0]?.message ?? "Please check your input."
@@ -73,10 +174,9 @@ export function IntakeScreen({
       <p className="mb-3 text-sm font-medium text-sage">
         When plans fall apart, find your way forward.
       </p>
-      <ScreenHeading>What have you been putting off?</ScreenHeading>
+      <ScreenHeading>What&rsquo;s been weighing on you?</ScreenHeading>
       <p className="mt-3 text-muted-foreground">
-        No judgment and no overdue list. We&rsquo;ll separate what&rsquo;s true
-        from what it feels like, then find one realistic next step.
+        A few words are enough. You can figure out the rest as you go.
       </p>
 
       {mode === "demo" && modelReady && (
@@ -92,19 +192,19 @@ export function IntakeScreen({
       <form onSubmit={submit} noValidate className="mt-6 space-y-4">
         <div>
           <label htmlFor="responsibility" className="sr-only">
-            What have you been putting off?
+            What&rsquo;s been weighing on you?
           </label>
           <Textarea
             id="responsibility"
-            value={form.responsibility}
+            value={responsibility}
             onChange={(event) => {
-              setForm({ ...form, responsibility: event.target.value })
+              setResponsibility(event.target.value)
               setValidation(null)
             }}
             maxLength={LIMITS.responsibility}
             aria-invalid={Boolean(validation)}
             aria-describedby={validation ? "intake-error" : undefined}
-            placeholder="I haven't applied for jobs in two weeks, and I don't know how to restart."
+            placeholder="e.g. I haven't replied to an important email..."
             className="min-h-36 p-4 text-[17px] leading-relaxed"
           />
           {validation && (
@@ -128,10 +228,10 @@ export function IntakeScreen({
                 key={scenario.id}
                 type="button"
                 onClick={() => {
-                  setForm({ ...form, responsibility: scenario.input })
+                  setResponsibility(scenario.input)
                   setValidation(null)
                 }}
-                className="rounded-full border border-border bg-card px-3.5 py-2 text-left text-sm transition-colors outline-none hover:border-primary/50 hover:bg-sage-soft focus-visible:ring-3 focus-visible:ring-ring/30"
+                className="min-h-11 rounded-full border border-border bg-card px-3.5 py-2 text-left text-sm transition-colors outline-none hover:border-primary/50 hover:bg-sage-soft focus-visible:ring-3 focus-visible:ring-ring/30"
               >
                 {scenario.label}
               </button>
@@ -143,8 +243,9 @@ export function IntakeScreen({
           <button
             type="button"
             aria-expanded={showDetails}
+            aria-controls="intake-details"
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-1.5 rounded-md py-1 text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+            className="flex min-h-11 items-center gap-1.5 rounded-md py-1 text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
           >
             <ChevronDown
               aria-hidden
@@ -153,26 +254,75 @@ export function IntakeScreen({
             Add details (optional)
           </button>
           {showDetails && (
-            <div className="mt-3 grid animate-in gap-3 duration-200 fade-in sm:grid-cols-3">
-              {DETAIL_FIELDS.map((field) => (
-                <div key={field.key}>
-                  <label
-                    htmlFor={field.key}
-                    className="mb-1.5 block text-sm font-medium"
-                  >
-                    {field.label}
-                  </label>
-                  <Input
-                    id={field.key}
-                    value={form[field.key]}
-                    maxLength={LIMITS.detail}
-                    placeholder={field.placeholder}
-                    onChange={(event) =>
-                      setForm({ ...form, [field.key]: event.target.value })
-                    }
-                  />
-                </div>
-              ))}
+            <div
+              id="intake-details"
+              className="mt-3 animate-in space-y-5 duration-200 fade-in"
+            >
+              <div>
+                <ChoiceGroup
+                  legend="Original deadline"
+                  name="deadline"
+                  options={DEADLINE_OPTIONS}
+                  value={deadlineChoice}
+                  onChange={setDeadlineChoice}
+                  className="sm:grid-cols-3"
+                />
+                {deadlineChoice === "date" && (
+                  <div className="mt-2 animate-in duration-200 fade-in">
+                    <label
+                      htmlFor="deadline-date"
+                      className="mb-1.5 block text-sm font-medium"
+                    >
+                      Deadline date
+                    </label>
+                    <Input
+                      id="deadline-date"
+                      type="date"
+                      max="9999-12-31"
+                      value={deadlineDate}
+                      onChange={(event) => setDeadlineDate(event.target.value)}
+                      className="h-12 sm:max-w-64"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <ChoiceGroup
+                legend="Current status"
+                name="status"
+                options={toOptions(STATUS_LABEL)}
+                value={status}
+                onChange={setStatus}
+                className="sm:grid-cols-2"
+              />
+
+              <div>
+                <ChoiceGroup
+                  legend="Main obstacle"
+                  name="obstacle"
+                  options={toOptions(OBSTACLE_LABEL)}
+                  value={obstacle}
+                  onChange={setObstacle}
+                  className="sm:grid-cols-2"
+                />
+                {obstacle === "something-else" && (
+                  <div className="mt-2 animate-in duration-200 fade-in">
+                    <label
+                      htmlFor="obstacle-other"
+                      className="mb-1.5 block text-sm font-medium"
+                    >
+                      What is it? (optional)
+                    </label>
+                    <Input
+                      id="obstacle-other"
+                      value={obstacleOther}
+                      maxLength={LIMITS.detail}
+                      onChange={(event) => setObstacleOther(event.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -180,14 +330,17 @@ export function IntakeScreen({
         {error && (
           <ErrorNotice
             message={error}
-            onRetry={() => onSubmit(IntakeSchema.parse(form))}
+            onRetry={() => {
+              const parsed = buildIntake()
+              if (parsed.success) onSubmit(parsed.data)
+            }}
             onUseDemo={onUseDemo}
           />
         )}
 
         <div className="flex flex-col items-start gap-4 pt-2 sm:flex-row sm:items-center">
           <Button type="submit" size="xl" disabled={busy || !modelReady}>
-            Check the reality
+            Help me restart
             <ArrowRight aria-hidden />
           </Button>
           {busy && <LoadingNotice>Looking at what you wrote...</LoadingNotice>}

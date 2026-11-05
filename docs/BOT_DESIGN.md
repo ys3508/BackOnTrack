@@ -10,7 +10,8 @@ It is a structured recovery workspace, not a general-purpose chatbot.
 
 ## 2. What information should it use?
 
-- What the user types: the responsibility, and optionally the original deadline, current status, and main obstacle.
+- What the user types: the responsibility.
+- Optional answers, chosen with one click: the original deadline (a date, no deadline, or not sure), current status, and main obstacle. A skipped question is treated as unknown, and never as an answer.
 - The strategy the user selected.
 - The session's step history: each suggested step, its outcome, what the user wrote, and any obstacle they explained.
 
@@ -38,7 +39,7 @@ No. The bot works only with text. Interface icons are decorative. Uploads are no
 
 ## 6. How should it start?
 
-With one question, "What have you been putting off?", and a large text box, optional details, and three clickable examples. No registration is needed. A note explains where the data goes.
+With one question, "What's been weighing on you?", and a large text box, three clickable examples, and a collapsed "Add details (optional)" section. A few words are enough, and nothing else is required before the Reality Check. No registration is needed. A note explains where the data goes.
 
 ## 7. What steps should it follow?
 

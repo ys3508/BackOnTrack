@@ -132,6 +132,16 @@ export function SummaryScreen({
         <Block title="Original responsibility">
           <p className="break-words">{summary.responsibility}</p>
         </Block>
+        <Block title="Details you chose">
+          <dl className="space-y-1">
+            {summary.details.map(({ label, value }) => (
+              <div key={label} className="sm:flex sm:gap-2">
+                <dt className="text-muted-foreground">{label}:</dt>
+                <dd className="break-words">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </Block>
         <Block title="What was known">
           <BulletList items={summary.knownFacts} empty="Nothing recorded." />
         </Block>

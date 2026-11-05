@@ -9,13 +9,12 @@ import {
   similarity,
 } from "@/lib/guards"
 import { DEMO_SCENARIOS } from "@/lib/demo/scenarios"
+import { EMPTY_INTAKE } from "@/lib/intake"
 import type { ActionStep, Analysis, HistoryEntry, Intake } from "@/lib/schemas"
 
 const intake = (responsibility: string): Intake => ({
+  ...EMPTY_INTAKE,
   responsibility,
-  deadline: "",
-  status: "",
-  obstacle: "",
 })
 
 const analysis: Analysis = {
@@ -85,7 +84,8 @@ describe("safety guards", () => {
     expect(
       detectSupportConcern({
         ...intake("my taxes"),
-        obstacle: "thinking about suicide",
+        obstacle: "something-else",
+        obstacleOther: "thinking about suicide",
       })
     ).toBe(true)
     expect(detectSupportConcern(intake("this deadline is killing me"))).toBe(

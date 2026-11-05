@@ -14,7 +14,7 @@ The public site runs in Demo Mode, so its responses are prewritten and not AI-ge
 
 | Stage | What happens |
 | --- | --- |
-| 1. Recovery Intake | "What have you been putting off?" Three samples are available, and no account is needed. |
+| 1. Recovery Intake | "What's been weighing on you?" A few words are enough. Three samples are available, no account is needed, and optional details are one click each. |
 | 2. Reality Check | Separates known facts, assumptions, unknowns, and potential consequences (confirmed or uncertain). |
 | 3. Recovery Decision | Suggests **Finish**, **Reduce**, or **Release**, with reasoning and uncertainty. The user can choose any of them. |
 | 4. One-Step Workspace | Shows exactly one small action, with a text box and **Completed**, **I'm Still Stuck**, and **Change This Step**. |
@@ -23,7 +23,8 @@ The public site runs in Demo Mode, so its responses are prewritten and not AI-ge
 
 | | |
 | --- | --- |
-| ![Recovery Intake](docs/screenshots/1-intake.jpg) | ![Reality Check](docs/screenshots/2-reality-check.jpg) |
+| ![Recovery Intake](docs/screenshots/1-intake.jpg) | ![Optional details](docs/screenshots/1b-intake-details.jpg) |
+| ![Reality Check](docs/screenshots/2-reality-check.jpg) | |
 | ![Recovery Decision](docs/screenshots/3-decision.jpg) | ![One-Step Workspace](docs/screenshots/4-one-step.jpg) |
 | ![Plan B](docs/screenshots/5-plan-b.jpg) | ![Recovery Summary](docs/screenshots/6-summary.jpg) |
 

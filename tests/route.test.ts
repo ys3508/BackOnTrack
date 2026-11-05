@@ -141,7 +141,7 @@ describe("POST /api/recovery validation", () => {
     ],
     [
       "too-short text",
-      { stage: "analyze", intake: { responsibility: "help" } },
+      { stage: "analyze", intake: { responsibility: "hi" } },
       false,
     ],
     [
@@ -224,6 +224,80 @@ describe("POST /api/recovery analyze", () => {
     const logged = JSON.stringify(vi.mocked(console.error).mock.calls)
     expect(logged).not.toContain("secret-key")
     expect(logged).not.toContain("job applications")
+  })
+})
+
+describe("POST /api/recovery optional details", () => {
+  const promptFor = async (extra: object) => {
+    const model = modelReturning(analysis)
+    providerMock.model = model
+    const response = await post({
+      stage: "analyze",
+      intake: { ...intake, ...extra },
+    })
+    return {
+      response,
+      data: await response.json(),
+      prompt: JSON.stringify(model.doGenerateCalls[0]?.prompt),
+    }
+  }
+
+  it("labels skipped questions as unknown, not as answers", async () => {
+    const { prompt, data } = await promptFor({})
+    expect(prompt).toContain("Original deadline: not answered (unknown)")
+    expect(prompt).toContain("Current status: not answered (unknown)")
+    expect(prompt).toContain("Main obstacle: not answered (unknown)")
+    expect(prompt).not.toContain("the user said there is no deadline")
+    expect(data.analysis.realityCheck.knownFacts).toEqual(
+      analysis.realityCheck.knownFacts
+    )
+  })
+
+  it("passes selected answers to the model and the Reality Check", async () => {
+    const { prompt, data } = await promptFor({
+      deadline: { type: "date", date: "2026-03-01" },
+      status: "started-stopped",
+      obstacle: "something-else",
+      obstacleOther: "My laptop is broken",
+    })
+    expect(prompt).toContain("Original deadline: 2026-03-01")
+    expect(prompt).toContain("Started, then stopped")
+    expect(prompt).toContain("Something else: My laptop is broken")
+    const facts = data.analysis.realityCheck.knownFacts.join(" ")
+    expect(facts).toContain("Sunday, March 1, 2026")
+    expect(facts).toContain("Started, then stopped")
+    expect(facts).toContain("My laptop is broken")
+  })
+
+  it("tells the model when the user says there is no deadline or isn't sure", async () => {
+    expect((await promptFor({ deadline: { type: "none" } })).prompt).toContain(
+      "the user said there is no deadline"
+    )
+    expect(
+      (await promptFor({ deadline: { type: "unsure" } })).prompt
+    ).toContain("the user said they are not sure")
+  })
+
+  it("checks crisis language in the Something else text", async () => {
+    const { data } = await promptFor({
+      obstacle: "something-else",
+      obstacleOther: "I want to die",
+    })
+    expect(data.analysis.supportConcern).toBe(true)
+  })
+
+  it.each([
+    ["an impossible date", { deadline: { type: "date", date: "2026-02-31" } }],
+    [
+      "a wrongly formatted date",
+      { deadline: { type: "date", date: "3/1/26" } },
+    ],
+    ["old free-text deadline", { deadline: "last Friday" }],
+    ["an unknown status", { status: "finished" }],
+    ["an unknown obstacle", { obstacle: "lazy" }],
+    ["over-long other text", { obstacleOther: "a".repeat(301) }],
+  ])("rejects %s with 400", async (_name, extra) => {
+    expect((await promptFor(extra)).response.status).toBe(400)
   })
 })
 

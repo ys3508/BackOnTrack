@@ -5,6 +5,7 @@ import {
   findRepeatReason,
   pickFallbackStep,
 } from "@/lib/guards"
+import { applyIntakeDetails, describeDetails } from "@/lib/intake"
 import type {
   Analysis,
   HistoryEntry,
@@ -22,7 +23,19 @@ function scenarioFor(intake: Intake): DemoScenario {
 }
 
 export function demoAnalysis(intake: Intake): Analysis {
-  return applySafetyGuards(scenarioFor(intake).analysis, intake)
+  const analysis = applyIntakeDetails(
+    applySafetyGuards(scenarioFor(intake).analysis, intake),
+    intake
+  )
+  const details = describeDetails(intake)
+  if (!details.deadline && !details.status && !details.obstacle) return analysis
+  return {
+    ...analysis,
+    decision: {
+      ...analysis.decision,
+      uncertainty: `${analysis.decision.uncertainty} Demo Mode records the details you chose, but this prewritten suggestion doesn't change based on them.`,
+    },
+  }
 }
 
 function adaptationNote(request: NextStepRequest) {

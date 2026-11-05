@@ -3,6 +3,7 @@ import { z } from "zod"
 export const LIMITS = {
   responsibility: 2000,
   detail: 300,
+  legacyNotes: 700,
   stepText: 1000,
   note: 500,
   history: 30,
@@ -11,19 +12,66 @@ export const LIMITS = {
 
 /* ---------- User input ---------- */
 
+/** True for a real calendar date written as YYYY-MM-DD. */
+export function isCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split("-").map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+/**
+ * Optional answers are `null` until the user gives one. "No deadline" and
+ * "I'm not sure" are real answers, so they are stored separately from `null`.
+ */
+const DeadlineSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("date"),
+    date: z.string().refine(isCalendarDate, "Please choose a valid date."),
+  }),
+  z.object({ type: z.literal("none") }),
+  z.object({ type: z.literal("unsure") }),
+])
+export type Deadline = z.infer<typeof DeadlineSchema>
+
+export const STATUS_CHOICES = [
+  "not-started",
+  "started-stopped",
+  "missed-deadline",
+  "unsure",
+] as const
+export type StatusChoice = (typeof STATUS_CHOICES)[number]
+
+export const OBSTACLE_CHOICES = [
+  "overwhelming",
+  "where-to-start",
+  "worried-outcome",
+  "no-energy",
+  "unsure",
+  "something-else",
+] as const
+export type ObstacleChoice = (typeof OBSTACLE_CHOICES)[number]
+
 export const IntakeSchema = z.object({
   responsibility: z
     .string()
     .trim()
-    .min(10, "Please describe it in at least a few words.")
+    .min(3, "Please add a few words.")
     .max(
       LIMITS.responsibility,
       `Please keep this under ${LIMITS.responsibility} characters.`
     )
-    .refine((value) => /\p{L}/u.test(value), "Please describe it in words."),
-  deadline: z.string().trim().max(LIMITS.detail).default(""),
-  status: z.string().trim().max(LIMITS.detail).default(""),
-  obstacle: z.string().trim().max(LIMITS.detail).default(""),
+    .refine((value) => /\p{L}/u.test(value), "Please add a few words."),
+  deadline: DeadlineSchema.nullable().default(null),
+  status: z.enum(STATUS_CHOICES).nullable().default(null),
+  obstacle: z.enum(OBSTACLE_CHOICES).nullable().default(null),
+  obstacleOther: z.string().trim().max(LIMITS.detail).default(""),
+  /** Free-text details from sessions saved before the clickable options. */
+  legacyNotes: z.string().trim().max(LIMITS.legacyNotes).default(""),
 })
 export type Intake = z.infer<typeof IntakeSchema>
 

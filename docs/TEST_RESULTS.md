@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 58 of 58 |
+| Automated tests (`npm test`) | Pass, 114 of 114 |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
@@ -24,6 +24,28 @@ No real AI model has been called. The following were verified instead:
 - A manual test ran the production build with the real Anthropic SDK client over HTTP, against a throwaway local server returning canned answers.
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
+
+## Low-friction intake
+
+These tests were run on 2026-11-05 on the `feat/low-friction-intake` branch. "Automated" means `tests/intake.test.ts`, `tests/intake-screen.test.tsx`, and `tests/route.test.ts`. "Browser" means a production build run locally in Chromium with real key presses and clicks, with no API key. The AI model was mocked or not involved.
+
+| Scenario | Input | Expected behavior | Actual observed behavior | Pass/Fail | Fixes or iterations |
+| --- | --- | --- | --- | --- | --- |
+| Selecting a date (automated and browser) | Pick a date, then type 03/01/2026 | Calendar appears only after choosing; stored without a shift | Stored `{type: "date", date: "2026-03-01"}`, and displayed Sunday, March 1, 2026. Automated tests passed with the system time zone set to Kiritimati and Los Angeles. | Pass | None |
+| Past and future dates (automated) | 1999 and 2099 dates | Both accepted; impossible dates rejected | Accepted. The field has no minimum date. 2026-02-29 and 2026-02-31 were rejected. | Pass | None |
+| No deadline (automated) | Choose No deadline | Explicit answer, shown as a fact | Stored `{type: "none"}`, and the Reality Check showed "You said there is no deadline." | Pass | None |
+| Unknown deadline (automated) | Choose I'm not sure | Explicit answer, shown as an unknown | Stored `{type: "unsure"}`, and listed under Unknowns, not as a fact. | Pass | None |
+| Optional fields left blank (automated and browser) | Submit without opening details | Nothing required; missing answers aren't treated as answers | Section was collapsed by default, and nothing was preselected. Values stayed `null`. Live prompts said "not answered (unknown)". The summary showed "Not answered". | Pass | None |
+| Clickable status (automated and browser) | Click options | One at a time; clearable | One stayed selected, and clicking it again cleared it. | Pass | None |
+| Clickable obstacle (automated and browser) | Click options | One at a time; passed on | Reached the Reality Check, summary, and Live AI request body. | Pass | None |
+| Something else (automated and browser) | Choose it, with and without text | Optional text field; blank allowed | Field appeared only for this option. Blank became an unknown. Text became a fact, and was discarded if another option was chosen. Crisis wording in it was detected. | Pass | None |
+| Restoring the intake (automated and browser) | Go back; reload | All answers restored | Text, date, options, and other text were restored, with the section open. | Pass | None |
+| Old and damaged sessions (automated and browser) | Old free-text session; invalid JSON | No crash; no guessing | Old obstacle became Something else with its text. Old deadline and status were kept as "Earlier details". Invalid JSON gave a fresh start with no console errors. | Pass | New in this change |
+| Mobile layout (browser, 375 px emulation) | Open details with all fields showing | One column; large targets; no sideways scrolling | One column, with no overflow. Options and inputs measured 48 px; toggle, examples, and submit 44 px. | Pass | Toggle and examples enlarged from 28 px and 38 px |
+| Keyboard (browser) | Tab, arrow keys, Space, digits | Everything works without a mouse | Tab reached the groups with nothing selected. Space selected, arrow keys moved, and typing filled the date and text fields. | Pass | Space didn't clear a selected option at first, although the automated test passed. Fixed and rechecked in the browser. |
+| Delete my data on the intake screen (automated) | Saved text, then delete | Form is emptied | Text and selections were cleared, and the section collapsed. | Pass | Old text stayed visible before this fix |
+
+The live public site runs the previous intake until this branch is merged into `main`. The results under "Public deployment" below describe that earlier version, including the old heading and validation wording.
 
 ## Public deployment
 
@@ -94,6 +116,9 @@ These results come from automated tests (`tests/demo.test.ts`, `tests/workflow.t
 - Live AI on the public deployment, which has no API key.
 - Real users.
 - Screen readers, and browsers other than the one built into the development tool.
+- The native calendar popup itself. The date field was tested by typing, and the popup's look varies by browser.
+- Real phones. The mobile layout was tested with an emulated phone width.
+- Whether the new intake actually helps people with ADHD or task-initiation difficulty.
 
 ## How to reproduce
 

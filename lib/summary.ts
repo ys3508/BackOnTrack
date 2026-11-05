@@ -1,3 +1,4 @@
+import { describeDetails } from "@/lib/intake"
 import type { Session, Source } from "@/lib/session"
 import type { Strategy } from "@/lib/schemas"
 
@@ -13,8 +14,11 @@ export type SummaryStep = {
   note: string
 }
 
+export const NOT_ANSWERED = "Not answered"
+
 export type RecoverySummary = {
   responsibility: string
+  details: { label: string; value: string }[]
   knownFacts: string[]
   uncertain: string[]
   unresolvedQuestions: string[]
@@ -45,8 +49,18 @@ export function buildSummary(session: Session): RecoverySummary {
   steps.forEach((step) => sources.add(step.source))
   if (current) sources.add(current.source)
 
+  const details = describeDetails(session.intake)
+
   return {
     responsibility: session.intake.responsibility,
+    details: [
+      { label: "Original deadline", value: details.deadline ?? NOT_ANSWERED },
+      { label: "Current status", value: details.status ?? NOT_ANSWERED },
+      { label: "Main obstacle", value: details.obstacle ?? NOT_ANSWERED },
+      ...(session.intake.legacyNotes
+        ? [{ label: "Earlier details", value: session.intake.legacyNotes }]
+        : []),
+    ],
     knownFacts: analysis?.realityCheck.knownFacts ?? [],
     uncertain: [
       ...(analysis?.realityCheck.assumptions ?? []),
@@ -102,6 +116,12 @@ export function summaryToMarkdown(summary: RecoverySummary) {
 
 ## Original responsibility
 ${summary.responsibility}
+
+## Details you chose
+${bullets(
+  summary.details.map(({ label, value }) => `${label}: ${value}`),
+  "None"
+)}
 
 ## What was known
 ${bullets(summary.knownFacts, "Nothing recorded")}

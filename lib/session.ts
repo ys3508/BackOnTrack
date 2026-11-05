@@ -1,3 +1,5 @@
+import { EMPTY_INTAKE, migrateIntake } from "@/lib/intake"
+import { ActionStepSchema, AnalysisSchema } from "@/lib/schemas"
 import type {
   ActionStep,
   Analysis,
@@ -38,13 +40,6 @@ export type Session = {
   /** The latest resolved event, so a failed request can be retried. */
   lastEvent: StepEvent | null
   lastNote: string
-}
-
-export const EMPTY_INTAKE: Intake = {
-  responsibility: "",
-  deadline: "",
-  status: "",
-  obstacle: "",
 }
 
 export const initialSession: Session = {
@@ -150,6 +145,47 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
 
 /* ---------- Browser storage ---------- */
 
+const SCREENS: Screen[] = ["intake", "reality", "decision", "action", "summary"]
+
+/**
+ * Turns whatever was saved into a usable session. Older intake formats are
+ * migrated, and anything unusable falls back to a safe screen instead of crashing.
+ */
+export function restoreSession(raw: unknown): Session {
+  if (!raw || typeof raw !== "object") return initialSession
+  const saved = raw as Partial<Session> & { version?: unknown }
+  if (saved.version !== 1) return initialSession
+
+  const analysis = AnalysisSchema.safeParse(saved.analysis).success
+    ? (saved.analysis as Analysis)
+    : null
+  const current =
+    saved.current && ActionStepSchema.safeParse(saved.current.action).success
+      ? saved.current
+      : null
+  const strategy = saved.strategy ?? null
+
+  let screen: Screen = SCREENS.includes(saved.screen as Screen)
+    ? (saved.screen as Screen)
+    : "intake"
+  if (!analysis) screen = "intake"
+  else if (!strategy && (screen === "action" || screen === "summary")) {
+    screen = "decision"
+  }
+
+  return {
+    ...initialSession,
+    ...saved,
+    version: 1,
+    screen,
+    intake: migrateIntake(saved.intake),
+    analysis,
+    strategy: analysis ? strategy : null,
+    steps: analysis && Array.isArray(saved.steps) ? saved.steps : [],
+    current: analysis ? current : null,
+  }
+}
+
 const STORAGE_KEY = "backontrack.session.v1"
 
 export function loadSession(): Session {
@@ -157,8 +193,7 @@ export function loadSession(): Session {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return initialSession
-    const parsed = JSON.parse(raw) as Session
-    return parsed.version === 1 ? parsed : initialSession
+    return restoreSession(JSON.parse(raw))
   } catch {
     return initialSession
   }
