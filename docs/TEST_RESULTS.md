@@ -9,7 +9,7 @@ Tests were run on 2026-11-05 on macOS with Node.js 24. This document lists only 
 | TypeScript (`npm run typecheck`) | Pass, no errors |
 | ESLint (`npm run lint`) | Pass, no errors or warnings |
 | Production build (`npm run build`) | Pass |
-| Automated tests (`npm test`) | Pass, 368 of 368 (also from a clean clone, and with the system set to Kiritimati time) |
+| Automated tests (`npm test`) | Pass, 385 of 385 (also from a clean clone, and with the system set to Kiritimati time) |
 | Demo Mode in a real browser, without an API key | Pass |
 | Live code path against a **local fake API server** | Pass (wiring only) |
 | **Tests A, B, C against the real AI model** | **Not run: no API key was available** |
@@ -24,6 +24,24 @@ No real AI model has been called. The following were verified instead:
 - A manual test ran the production build with the real Anthropic SDK client over HTTP, against a throwaway local server returning canned answers.
 
 These show that requests, validation, safety rules, retries, and error handling work. **They don't show how good the real model's answers are.** To complete this evidence, add an API key, run `npm run test:live`, read `docs/live-eval-output.json`, and fill in the table below.
+
+## Easy return and Zero-Start
+
+These tests were run on 2026-11-05 on the `feat/task-execution` branch, in Demo Mode. Time away was simulated by setting the saved last-opened time to 14 days ago. Nobody actually left for two weeks.
+
+| Scenario | How it was tested | Observed | Result |
+| --- | --- | --- | --- |
+| Return screen after time away | Browser, desktop and 375 px wide | One "Continue working" button, the steps done, where the document stops, and the next step. No overdue tasks, counts, or time-away figure. The button was visible without scrolling on both. | Pass |
+| Honest about deadlines | Browser and automated | Stated the missed deadline for this task, and one bill due tomorrow. Old overdue tasks weren't listed. No deadline changed. | Pass |
+| Continue working | Browser and automated | Opened the document with its text intact. Home was normal afterwards. | Pass |
+| Editor focus after Continue working | Browser | **Not confirmed.** The pane was in the background, where the browser pauses the animation frame that focusing relies on. The same mechanism worked earlier in a visible pane. | Not confirmed |
+| Not shown on first use, or after a 1-day gap | Automated | The normal home appeared | Pass |
+| "I haven't started my research paper" | Browser and automated | Prepared what's being asked, questions, an outline, and an introduction. It invented no requirements or sources, and nothing was written until an entry was chosen. | Pass |
+| Choosing an entry, then typing | Browser, real typing | The cursor selected "[topic]", typing replaced it, and the text was saved | Pass after fix |
+| Accessibility scan of the return screen | Automated (axe-core in jsdom, with color contrast off) | No violations | Pass |
+| **Real model: prepared workspace** | **Not run: no API key was available.** Added to `npm run test:live`. | | **Not run** |
+| **Time to First Action, Recovery Success, Return-to-Action** | **Not measured.** The plan is in [DESIGN_THINKING.md](DESIGN_THINKING.md). | | **Not run** |
+| **Real users, including adults with ADHD** | **Not run** | | **Not run** |
 
 ## Execution support (review of version 3)
 

@@ -20,6 +20,39 @@ The review of version 3 led to a fourth stage of the same idea, on the same bran
 | Task manager | Tasks, a calendar, and a timer | It organized work, but didn't reduce the effort of starting |
 | Execution-supporting assistant | A workspace prepared for the step, which adapts when the user is stuck | Whether this really helps on real work is untested |
 
+### Positioning
+
+A later review argued that calendars, timers, Kanban boards, and task breakdown aren't enough to set BackOnTrack apart, since other apps offer them. It named Goblin Tools, Tiimo, Focusmate, and Llama Life as examples. Those comparisons come from the review, and weren't checked independently for this document.
+
+The loop BackOnTrack targets is: plan → don't do it → feel pressure → avoid the app → tasks pile up → harder to restart.
+
+| Idea from the review | Status | Note |
+| --- | --- | --- |
+| **Return Without Catching Up** | Built | One way back in, using only recorded facts |
+| **Zero-Start Mode** | Built | Prepared requirements, questions, outline, and first section |
+| Failure-Aware Engine | Partly built | Plan B adapts within one task. It doesn't yet learn across tasks. |
+| Personal Friction Map | Not built | Needs real records, and must be viewable, editable, and deletable. It shouldn't claim a pattern from too little data. |
+| Avoidance Debt Radar | Not built | Sorting by consequence must rest on verifiable information, not AI guesses |
+| Plan B Simulator | Not built | Paths to switch to, decided before anything fails |
+
+Decisions on the return screen, all aimed at not adding pressure:
+
+- It shows no overdue count, no time-away figure, and no streak. It's based on when the app was last opened.
+- It doesn't hide consequences entirely. It states the deadline of the task being resumed, and one other deadline if it's due today or tomorrow. Leaving those out could cost someone a real deadline.
+- Nothing about deadlines or tasks changes because someone was away.
+
+### What success means, and how to test it
+
+Completed tasks, focus minutes, and streaks measure activity, not whether someone got unstuck. These measures come from the review. **None has been measured yet**, and the app doesn't collect them.
+
+| Measure | Question | How to test it |
+| --- | --- | --- |
+| Time to First Action | How long from opening the app to starting real work? | Time testers on the guided check-in and on Zero-Start, using the same task |
+| Recovery Success Rate | After reporting being stuck, do they start again? | Note whether they do something real after accepting a plan, and how many plans it took |
+| Return-to-Action Rate | After a break, can they continue existing work? | Set up a task with progress, leave it for several days, and note whether they continue |
+
+Compare the original advice flow with Zero-Start, looking at actual progress rather than clicks. **Student to complete:** run this with testers, ideally including adults with lived experience of ADHD. Results shouldn't be described as clinical effects.
+
 ### Where the evidence comes from
 
 | Kind | What's here |

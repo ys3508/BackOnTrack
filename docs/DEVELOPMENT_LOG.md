@@ -191,6 +191,25 @@ All of these were found in a real browser after the automated tests had passed.
 - After a code starter, a plan suggested adding "one more sentence" after a line of code.
 - The first version of the planner scattered a step across days in 5-minute pieces.
 
+## Easy return and Zero-Start
+
+This followed a product review, on the same branch. The review recommended building these two first. The Failure-Aware Engine and Personal Friction Map are longer-term, and weren't started.
+
+### Decisions
+
+- **"Away" is based on when the app was last opened, for 3 days or more.** Basing it on task activity would treat someone who opens the app daily as absent. The threshold is a judgment call, and hasn't been tested.
+- **Old data and first use never trigger the return screen,** because no last-opened time exists yet.
+- **The return screen doesn't call AI.** Opening the app shouldn't send anything anywhere, so its small suggestion uses a labeled built-in rule.
+- **Choosing an entry point counts as accepting.** It replaces "Use this", and the document can still be edited first. Suggested steps still wait for their own approval.
+
+### Problems found by testing
+
+All of these were found in a real browser after the automated tests had passed.
+
+- After choosing an entry, the cursor landed on the list rather than in its text. It now selects the first placeholder.
+- A new paper's first action was "Find the submission page", from whichever step came first.
+- Text typed over a placeholder kept the "suggested" highlight, so the user's own words looked like a suggestion. Typed text is now never marked, anywhere in suggested text.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

@@ -15,6 +15,7 @@ This content can be sensitive, because people may describe their work, health, o
 - The data stays until the user deletes it or clears the browser's data, and it isn't backed up.
 - It isn't encrypted, so anyone using the same browser profile could read it. Use a private window on a shared computer.
 - API keys are never stored in the browser.
+- The time the app was last opened is saved too, only in this browser, and is included in backups. It's used to offer an easier return after time away. It isn't sent anywhere, and there's no streak or usage tracking.
 - Browsers usually allow about 5 MB for this. Settings shows the amount used, and the app warns if a save fails.
 - Before moving saved data to a new format, or if it can't be read, a copy is kept under `backontrack.workspace.backup`. Deleting all data removes this too.
 

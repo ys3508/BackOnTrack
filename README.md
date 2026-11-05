@@ -10,11 +10,25 @@ It was built as a prototype for the AI Lab in AIML-500: Machine Learning Fundame
 
 The public site runs in Demo Mode, with no account or API key. Its suggestions come from prewritten templates, not AI, and each one is labeled that way. The site currently runs the previous version, until the `feat/task-execution` branch is merged into `main`.
 
+## The idea
+
+**A productivity system designed for the moments when productivity systems fail.**
+
+Most tools assume you plan, then do, then finish. BackOnTrack is built for what often happens instead: you plan, don't do it, feel pressure, avoid the app, and find it harder to restart. It focuses on three things:
+
+- **Zero-Start:** the work is prepared, so you never begin from a blank page.
+- **Failure-aware:** when an approach doesn't work, the next one is different and smaller.
+- **Easy return:** you can come back after weeks away without catching up on anything.
+
+BackOnTrack isn't a treatment for ADHD or anything else, and its effect hasn't been measured.
+
 ## What it does
 
 | Area | What you can do |
 | --- | --- |
 | **Workspace** | See "Your next small step", or "Continue where you left off", with one click to the task, its document, or a short focus session. Lists stay short, with an option to expand. |
+| **Coming back** | After a few days away, home shows one way back in: where you stopped, and a "Continue working" button. It shows no overdue counts, backlog, or streaks. |
+| **Zero-Start** | "Set up my workspace" prepares a document with what's being asked, questions to answer, an outline, and an editable first section. Choose where to begin, and the first [placeholder] is selected so you can type over it. It's structure, not research. |
 | **Help starting** | Each step has "Help me do this", which gives one concrete first action and something to start from: an outline, a draft, a checklist, or code to copy. Code hasn't been run, and BackOnTrack can't run it. A new task can set up its first workspace from your instructions. "Start 5 minutes" opens the document for that step, with a small timer on top. |
 | **Task workspace** | Add instructions by pasting them or uploading a PDF, .txt, or .md file. Get an editable breakdown into small steps. Write in a rich-text document with autosave, and get writing help you preview, then accept or reject. Keep the timer beside your work. |
 | **Tasks** | Create, edit, delete, complete, pause, and resume tasks. Set deadlines and, if you want, a priority, track progress, add steps and notes, and view history. Use a list or a Kanban board with six states. |
