@@ -1,6 +1,8 @@
 import { z } from "zod"
 
 export const LIMITS = {
+  contextInstructions: 12000,
+  contextDocument: 8000,
   responsibility: 2000,
   detail: 300,
   legacyNotes: 700,
@@ -275,6 +277,11 @@ export const TaskContextSchema = z.object({
   attempts: z.array(shortText).max(15),
   obstacles: z.array(shortText).max(10),
   openSteps: z.array(shortText).max(15),
+  /** Task instructions the user provided, shortened to a safe length. */
+  instructions: z.string().max(LIMITS.contextInstructions).default(""),
+  /** Plain text from the working document, shortened to a safe length. */
+  document: z.string().max(LIMITS.contextDocument).default(""),
+  currentStep: shortText.default(""),
   focusSessions: z
     .array(
       z.object({
@@ -314,8 +321,34 @@ export type TaskRecoveryResult = {
   exhausted?: boolean
 }
 
+/* ---------- Task breakdown ---------- */
+
+export const TaskBreakdownOutputSchema = z.object({
+  note: z.string().describe("One short sentence about the plan, or empty."),
+  steps: z
+    .array(z.string())
+    .describe("3 to 8 concrete steps, not repeating finished ones."),
+  ambiguities: z
+    .array(z.string())
+    .describe("Unclear requirements worth asking about. Empty if none."),
+})
+export type TaskBreakdownOutput = z.infer<typeof TaskBreakdownOutputSchema>
+
+export const TaskBreakdownRequestSchema = z.object({
+  stage: z.literal("task-breakdown"),
+  task: TaskContextSchema,
+  today: z.string().refine(isCalendarDate),
+  rejected: z.array(z.array(shortText).max(10)).max(3).default([]),
+})
+export type TaskBreakdownRequest = z.infer<typeof TaskBreakdownRequestSchema>
+
+export type TaskBreakdownResult = TaskBreakdownOutput & {
+  usedFallback?: boolean
+}
+
 export const RecoveryRequestSchema = z.discriminatedUnion("stage", [
   AnalyzeRequestSchema,
   NextStepRequestSchema,
   TaskRecoveryRequestSchema,
+  TaskBreakdownRequestSchema,
 ])

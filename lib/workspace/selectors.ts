@@ -7,15 +7,42 @@ export function deadlinePassed(task: Task, today: string) {
   return Boolean(isActive(task) && task.deadline && task.deadline < today)
 }
 
+/** The step being worked on: the one chosen by the user, or else the first open. */
+export function currentSubtask(task: Task) {
+  const chosen = task.subtasks.find(
+    (sub) => sub.id === task.currentSubtaskId && !sub.done
+  )
+  return chosen ?? task.subtasks.find((sub) => !sub.done) ?? null
+}
+
+export function stepCounts(task: Task) {
+  return {
+    done: task.subtasks.filter((sub) => sub.done).length,
+    total: task.subtasks.length,
+  }
+}
+
 /** The single next action for a task. */
 export function nextActionFor(task: Task) {
   if (task.nextAction) return task.nextAction
-  const open = task.subtasks.find((sub) => !sub.done)
+  const open = currentSubtask(task)
   if (open) return open.title
   if (task.status === "needs-recovery") {
     return `Get a recovery plan for “${task.title}”`
   }
-  return `Spend 5 minutes on “${task.title}”`
+  return `Break “${task.title}” into small steps`
+}
+
+/** The task to come back to: the one most recently worked on, and still open. */
+export function resumeTask(state: Workspace) {
+  const candidates = state.tasks.filter(
+    (task) => isActive(task) && task.status !== "paused" && task.lastWorkedAt
+  )
+  return (
+    [...candidates].sort((a, b) =>
+      (b.lastWorkedAt ?? "").localeCompare(a.lastWorkedAt ?? "")
+    )[0] ?? null
+  )
 }
 
 function score(task: Task, state: Workspace, today: string) {
@@ -85,16 +112,12 @@ export function upcomingDeadlines(state: Workspace, today: string, days = 14) {
     .sort((a, b) => a.deadline.localeCompare(b.deadline))
 }
 
-const COMPLETED_PREFIXES = ["Completed", "Status changed to Completed"]
-
 export function recentActions(state: Workspace, limit = 5) {
   const items: { task: Task; event: TaskEvent }[] = []
   for (const task of state.tasks) {
     for (const event of task.history) {
-      const finished =
-        event.text.startsWith("Focus session completed") ||
-        COMPLETED_PREFIXES.some((prefix) => event.text.startsWith(prefix))
-      if (finished) items.push({ task, event })
+      // Time on a timer isn't listed as done, only work the user finished.
+      if (event.kind === "completed") items.push({ task, event })
     }
   }
   return items

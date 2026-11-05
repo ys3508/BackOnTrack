@@ -191,6 +191,9 @@ async function main() {
         attempts: [],
         obstacles: test.stuck ? [test.stuck] : [],
         openSteps: [],
+        instructions: "",
+        document: "",
+        currentStep: "",
         focusSessions: test.stuck
           ? [
               {

@@ -70,7 +70,7 @@ describe("definition of done", () => {
     await user.click(screen.getByRole("button", { name: "Add" }))
 
     // 2. See it in the workspace.
-    await screen.findByRole("heading", { name: "Your one next thing" })
+    await screen.findByRole("heading", { name: "Your next small step" })
     await user.click(await button("Finish my biology homework"))
 
     // 3. View and modify its deadline.

@@ -353,3 +353,75 @@ describe("POST /api/recovery next step (Plan B enforcement)", () => {
     expect(prompt).toContain("Open the job application website.")
   })
 })
+
+describe("POST /api/recovery task-breakdown", () => {
+  const context = {
+    title: "Finish my ML assignment",
+    description: "",
+    deadline: "2026-11-20",
+    originalDeadline: "2026-11-20",
+    status: "In Progress",
+    priority: "Medium",
+    progress: 20,
+    completedActions: ["Completed: Read the brief"],
+    attempts: ["Tried: starting the code"],
+    obstacles: ["Can't find the dataset"],
+    openSteps: ["Write the outline"],
+    instructions: "Train a classifier and report accuracy.",
+    document: "My notes so far",
+    currentStep: "Write the outline",
+    focusSessions: [],
+  }
+  const request = {
+    stage: "task-breakdown",
+    task: context,
+    today: "2026-11-05",
+    rejected: [["Old step"]],
+  }
+
+  it("sends the task's data, and removes finished work from the answer", async () => {
+    const model = modelReturning({
+      note: "A plan.",
+      steps: ["Read the brief", "Load the dataset", "Train the classifier"],
+      ambiguities: ["Which accuracy metric?"],
+    })
+    providerMock.model = model
+    const data = await (await post(request)).json()
+    expect(data.steps).toEqual(["Load the dataset", "Train the classifier"])
+    expect(data.ambiguities).toEqual(["Which accuracy metric?"])
+    const prompt = JSON.stringify(model.doGenerateCalls[0].prompt)
+    for (const expected of [
+      "Finish my ML assignment",
+      "2026-11-20",
+      "Train a classifier and report accuracy.",
+      "Tried: starting the code",
+      "Can't find the dataset",
+      "My notes so far",
+      "Old step",
+    ]) {
+      expect(prompt).toContain(expected)
+    }
+  })
+
+  it("retries vague steps, then uses a labeled template", async () => {
+    const model = modelReturning({
+      note: "",
+      steps: ["Reflect on your motivation"],
+      ambiguities: [],
+    })
+    providerMock.model = model
+    const data = await (await post(request)).json()
+    expect(model.doGenerateCalls).toHaveLength(2)
+    expect(data.usedFallback).toBe(true)
+    expect(data.steps.join(" ")).not.toMatch(/motivation/)
+  })
+
+  it("rejects over-long instructions", async () => {
+    providerMock.model = modelReturning({})
+    const response = await post({
+      ...request,
+      task: { ...context, instructions: "x".repeat(12_001) },
+    })
+    expect(response.status).toBe(400)
+  })
+})

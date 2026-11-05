@@ -22,6 +22,7 @@ const timerFor = (extra: Partial<TimerState> = {}): TimerState => ({
   id: "s",
   kind: "focus",
   taskId: "a",
+  subtaskId: null,
   plannedSeconds: 300,
   startedAt: new Date(T0).toISOString(),
   runningSince: T0,
@@ -106,7 +107,7 @@ describe("focus sessions and tasks", () => {
     expect(state.timer).toBeNull()
     expect(state.finishedSessionId).toBe("s")
     expect(state.tasks[0].history.at(-1)?.text).toBe(
-      "Focus session completed (5 min)"
+      "Focus session finished (5 min)"
     )
   })
 

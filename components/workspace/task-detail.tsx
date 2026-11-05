@@ -11,9 +11,9 @@ import {
   Plus,
   Timer,
   Trash2,
-  X,
 } from "lucide-react"
 
+import { BreakdownPanel } from "@/components/workspace/breakdown-panel"
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -157,7 +157,7 @@ function TaskBody({ task }: { task: Task }) {
       {isActive(task) && <FocusCard task={task} />}
       <ProgressCard task={task} />
       <DetailsCard task={task} onStatus={setStatus} />
-      <StepsCard task={task} />
+      <BreakdownPanel task={task} guard={(action) => action()} />
       <DocumentsCard task={task} />
       <ScheduleCard task={task} />
       <FocusHistoryCard task={task} />
@@ -507,96 +507,6 @@ function DetailsCard({
           Original deadline: {shortDate(task.originalDeadline)}
         </p>
       )}
-    </Card>
-  )
-}
-
-function StepsCard({ task }: { task: Task }) {
-  const { dispatch } = useStore()
-  const [title, setTitle] = useState("")
-  return (
-    <Card>
-      <SectionTitle>Steps</SectionTitle>
-      {task.subtasks.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {task.subtasks.map((sub) => (
-            <li key={sub.id} className="flex items-center gap-1">
-              <label className="flex min-h-11 flex-1 cursor-pointer items-center gap-3 rounded-lg px-1 has-focus-visible:ring-3 has-focus-visible:ring-ring/30">
-                <input
-                  type="checkbox"
-                  checked={sub.done}
-                  onChange={() =>
-                    dispatch({
-                      type: "toggle-subtask",
-                      id: task.id,
-                      at: nowIso(),
-                      subId: sub.id,
-                    })
-                  }
-                  className="size-5 accent-[var(--primary)]"
-                />
-                <span
-                  className={
-                    sub.done ? "text-muted-foreground line-through" : undefined
-                  }
-                >
-                  {sub.title}
-                </span>
-              </label>
-              <button
-                type="button"
-                aria-label={`Remove ${sub.title}`}
-                onClick={() =>
-                  dispatch({
-                    type: "remove-subtask",
-                    id: task.id,
-                    subId: sub.id,
-                  })
-                }
-                className="grid size-11 place-items-center rounded-md text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form
-        className="mt-2 flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!title.trim()) return
-          dispatch({
-            type: "add-subtask",
-            id: task.id,
-            at: nowIso(),
-            subId: newId(),
-            title,
-          })
-          setTitle("")
-        }}
-      >
-        <label htmlFor="new-step" className="sr-only">
-          New step
-        </label>
-        <Input
-          id="new-step"
-          value={title}
-          maxLength={200}
-          placeholder="Add a step..."
-          onChange={(event) => setTitle(event.target.value)}
-          className="h-11 flex-1"
-        />
-        <Button
-          type="submit"
-          size="xl"
-          variant="outline"
-          disabled={!title.trim()}
-        >
-          <Plus aria-hidden />
-          Add
-        </Button>
-      </form>
     </Card>
   )
 }

@@ -29,6 +29,8 @@ import {
   nextActionFor,
   recentActions,
   recommendTask,
+  resumeTask,
+  stepCounts,
   tasksNeedingAttention,
   upcomingDeadlines,
 } from "@/lib/workspace/selectors"
@@ -68,12 +70,51 @@ export function TaskRow({
   )
 }
 
+/** The full list stays out of the way until someone asks for it. */
+function NextStepDetails({ task }: { task: Task }) {
+  const [open, setOpen] = useState(false)
+  const { done, total } = stepCounts(task)
+  if (!total) return null
+  return (
+    <div className="mt-2">
+      <p className="text-sm text-muted-foreground">
+        You completed {done} of {total} steps for {task.title}.
+      </p>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="min-h-11 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+      >
+        {open ? "Hide all steps" : "See all steps"}
+      </button>
+      {open && (
+        <ol className="mb-2 space-y-1 text-sm">
+          {task.subtasks.map((sub) => (
+            <li
+              key={sub.id}
+              className={
+                sub.done ? "text-muted-foreground line-through" : undefined
+              }
+            >
+              {sub.title}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  )
+}
+
 export function WorkspaceView() {
   const { state, today, navigate, dispatch } = useStore()
   const startFocus = useStartFocus()
   const defaultMinutes = state.settings.defaultFocusMinutes
   const limit = state.settings.homeListSize
-  const recommended = recommendTask(state, today)
+  const skipped = state.skipped.date === today ? state.skipped.taskIds : []
+  const resume = resumeTask(state)
+  const resuming = resume && !skipped.includes(resume.id) ? resume : null
+  const recommended = resuming ?? recommendTask(state, today)
   const attention = tasksNeedingAttention(state, today, recommended?.id)
   const upcoming = upcomingDeadlines(state, today).filter(
     (task) => task.id !== recommended?.id
@@ -86,7 +127,11 @@ export function WorkspaceView() {
     <div className="space-y-6">
       <div>
         <ScreenHeading>
-          {recommended ? "Your one next thing" : "What’s on your plate?"}
+          {resuming
+            ? "Continue where you left off"
+            : recommended
+              ? "Your next small step"
+              : "What’s on your plate?"}
         </ScreenHeading>
         {!recommended && (
           <p className="mt-2 text-muted-foreground">
@@ -112,6 +157,7 @@ export function WorkspaceView() {
           <p className="mt-2 font-heading text-[1.625rem] leading-tight sm:text-[2rem]">
             {nextActionFor(recommended)}
           </p>
+          <NextStepDetails task={recommended} />
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button
               type="button"

@@ -35,9 +35,9 @@ describe("workspace home", () => {
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: /on your plate/i })
     await addTask(user, "Finish homework")
-    await screen.findByRole("heading", { name: "Your one next thing" })
+    await screen.findByRole("heading", { name: "Your next small step" })
     expect(
-      screen.getByText(/Spend 5 minutes on “Finish homework”/)
+      screen.getByText(/Break “Finish homework” into small steps/)
     ).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledTimes(1)
   })

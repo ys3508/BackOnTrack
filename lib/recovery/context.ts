@@ -1,15 +1,34 @@
 import { EMPTY_INTAKE } from "@/lib/intake"
+import { LIMITS } from "@/lib/schemas"
 import type {
   Intake,
   RejectedPlan,
   Strategy,
+  TaskBreakdownRequest,
   TaskContext,
   TaskRecoveryRequest,
 } from "@/lib/schemas"
 import { STATUS_LABEL, PRIORITY_LABEL } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
+import { currentSubtask } from "@/lib/workspace/selectors"
 
 const clip = (text: string) => text.slice(0, 400)
+
+/** Turns saved editor HTML into plain text, keeping paragraphs apart. */
+export function htmlToText(html: string) {
+  return html
+    .replace(/<\/(p|h[1-6]|li|blockquote)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
 
 /** Collects what the recovery engine may use: the task's own recorded data. */
 export function buildTaskContext(task: Task, state: Workspace): TaskContext {
@@ -29,12 +48,12 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
     progress: task.progress,
     completedActions: texts(
       (event) =>
-        (event.type === "action" || event.type === "subtask") &&
-        event.text.startsWith("Completed")
+        event.kind === "completed" && event.text.startsWith("Completed")
     ),
     attempts: texts(
       (event) =>
         event.type === "recovery" ||
+        event.type === "stuck" ||
         (event.type === "focus" && event.text.startsWith("Stopped"))
     ),
     obstacles: texts((event) => event.type === "obstacle").slice(-10),
@@ -42,6 +61,15 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
       .filter((sub) => !sub.done)
       .map((sub) => clip(sub.title))
       .slice(0, 15),
+    instructions: (task.instructions?.text ?? "").slice(
+      0,
+      LIMITS.contextInstructions
+    ),
+    document: htmlToText(task.workDoc?.content ?? "").slice(
+      0,
+      LIMITS.contextDocument
+    ),
+    currentStep: clip(currentSubtask(task)?.title ?? ""),
     focusSessions: state.focusSessions
       .filter((session) => session.taskId === task.id)
       .slice(-10)
@@ -52,6 +80,20 @@ export function buildTaskContext(task: Task, state: Workspace): TaskContext {
         outcome: session.outcome,
         note: clip(session.note),
       })),
+  }
+}
+
+export function buildBreakdownRequest(
+  task: Task,
+  state: Workspace,
+  today: string,
+  rejected: string[][] = []
+): TaskBreakdownRequest {
+  return {
+    stage: "task-breakdown",
+    task: buildTaskContext(task, state),
+    today,
+    rejected: rejected.slice(-3).map((steps) => steps.slice(0, 10).map(clip)),
   }
 }
 

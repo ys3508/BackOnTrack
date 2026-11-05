@@ -1,10 +1,13 @@
 import { demoAnalysis, demoNextStep } from "@/lib/demo/engine"
+import { demoBreakdown } from "@/lib/recovery/demo-breakdown"
 import { demoTaskRecovery } from "@/lib/recovery/demo-plan"
 import type {
   Analysis,
   Intake,
   NextStepRequest,
   NextStepResult,
+  TaskBreakdownRequest,
+  TaskBreakdownResult,
   TaskRecoveryRequest,
   TaskRecoveryResult,
 } from "@/lib/schemas"
@@ -62,6 +65,14 @@ export async function requestTaskRecovery(
 ): Promise<TaskRecoveryResult> {
   if (mode === "demo") return demoTaskRecovery(request)
   return postRecovery<TaskRecoveryResult>(request)
+}
+
+export async function requestBreakdown(
+  mode: Source,
+  request: TaskBreakdownRequest
+): Promise<TaskBreakdownResult> {
+  if (mode === "demo") return demoBreakdown(request)
+  return postRecovery<TaskBreakdownResult>(request)
 }
 
 export async function fetchLiveStatus(): Promise<{

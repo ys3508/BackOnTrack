@@ -54,8 +54,15 @@ export const TaskEventSchema = z.object({
     "schedule",
     "obstacle",
     "recovery",
+    "breakdown",
+    "stuck",
+    "instructions",
   ]),
   text: z.string(),
+  /** Separates a suggestion from something accepted, tried, or really finished. */
+  kind: z
+    .enum(["info", "suggested", "accepted", "attempted", "completed"])
+    .default("info"),
 })
 export type TaskEvent = z.infer<typeof TaskEventSchema>
 
@@ -63,6 +70,8 @@ export const SubtaskSchema = z.object({
   id: z.string(),
   title: z.string(),
   done: z.boolean(),
+  source: z.enum(["user", "live", "demo"]).default("user"),
+  completedAt: z.string().nullable().default(null),
 })
 export type Subtask = z.infer<typeof SubtaskSchema>
 
@@ -74,6 +83,48 @@ export const TaskDocumentSchema = z.object({
   updatedAt: z.string(),
 })
 export type TaskDocument = z.infer<typeof TaskDocumentSchema>
+
+/** The task's rich-text document, stored as sanitized editor HTML. */
+export const WorkDocSchema = z.object({
+  content: z.string(),
+  updatedAt: z.string(),
+  /** Where the cursor was, so returning can continue from the same place. */
+  cursor: z.number().default(0),
+  /** The version from before the last accepted AI suggestion. */
+  previous: z.string().nullable().default(null),
+})
+export type WorkDoc = z.infer<typeof WorkDocSchema>
+
+export const InstructionsSchema = z.object({
+  text: z.string(),
+  sourceName: z.string().default(""),
+  kind: z.enum(["paste", "file"]).default("paste"),
+  truncated: z.boolean().default(false),
+  addedAt: z.string(),
+})
+export type Instructions = z.infer<typeof InstructionsSchema>
+
+/** A suggested breakdown. These aren't task steps until the user accepts them. */
+export const PendingBreakdownSchema = z.object({
+  steps: z.array(z.string()),
+  note: z.string().default(""),
+  ambiguities: z.array(z.string()).default([]),
+  source: z.enum(["live", "demo"]),
+  usedFallback: z.boolean().default(false),
+  createdAt: z.string(),
+})
+export type PendingBreakdown = z.infer<typeof PendingBreakdownSchema>
+
+export const RecoveryAttemptSchema = z.object({
+  id: z.string(),
+  at: z.string(),
+  subtaskId: z.string().nullable().default(null),
+  obstacle: z.string().default(""),
+  suggestion: z.string(),
+  source: z.enum(["live", "demo"]),
+  outcome: z.enum(["suggested", "accepted", "declined"]),
+})
+export type RecoveryAttempt = z.infer<typeof RecoveryAttemptSchema>
 
 /** A recovery plan waiting for the user's decision. Nothing is applied yet. */
 export const StoredRecoverySchema = z.object({
@@ -106,6 +157,14 @@ export const TaskSchema = z.object({
   completedAt: z.string().nullable().default(null),
   recovery: StoredRecoverySchema.nullable().catch(null).default(null),
   rejectedPlans: z.array(RejectedPlanSchema).catch([]).default([]),
+  workDoc: WorkDocSchema.nullable().catch(null).default(null),
+  instructions: InstructionsSchema.nullable().catch(null).default(null),
+  /** When the user agreed to send this task's documents to the AI provider. */
+  aiConsentAt: z.string().nullable().catch(null).default(null),
+  pendingBreakdown: PendingBreakdownSchema.nullable().catch(null).default(null),
+  currentSubtaskId: z.string().nullable().catch(null).default(null),
+  lastWorkedAt: z.string().nullable().catch(null).default(null),
+  recoveryAttempts: z.array(RecoveryAttemptSchema).catch([]).default([]),
 })
 export type Task = z.infer<typeof TaskSchema>
 
@@ -119,6 +178,9 @@ export const FocusSessionSchema = z.object({
   endedAt: z.string(),
   outcome: z.enum(["completed", "continue-later", "stuck"]),
   note: z.string().default(""),
+  subtaskId: z.string().nullable().default(null),
+  /** The user's own answer. Elapsed time alone is never treated as progress. */
+  progressReport: z.enum(["yes", "a-little", "stuck"]).nullable().default(null),
 })
 export type FocusSession = z.infer<typeof FocusSessionSchema>
 
@@ -138,6 +200,7 @@ export const TimerSchema = z.object({
   id: z.string(),
   kind: z.enum(["focus", "break"]),
   taskId: z.string().nullable(),
+  subtaskId: z.string().nullable().default(null),
   plannedSeconds: z.number(),
   startedAt: z.string(),
   /** Wall-clock milliseconds when it last started running, or null if paused. */
@@ -162,8 +225,10 @@ export const DEFAULT_SETTINGS: Settings = {
   homeListSize: 3,
 }
 
+export const WORKSPACE_VERSION = 2
+
 export type Workspace = {
-  version: 1
+  version: 2
   tasks: Task[]
   focusSessions: FocusSession[]
   planned: PlannedSession[]
@@ -177,7 +242,7 @@ export type Workspace = {
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
-  version: 1,
+  version: 2,
   tasks: [],
   focusSessions: [],
   planned: [],
