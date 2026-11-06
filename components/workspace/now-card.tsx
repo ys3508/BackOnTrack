@@ -17,7 +17,7 @@ import {
 import { Card } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { DurationChips } from "@/components/workspace/calendar-overlays"
+import { ReportedMinutes } from "@/components/workspace/calendar-overlays"
 import {
   FinishedPanel,
   StopChoice,
@@ -240,7 +240,8 @@ function ReadyControls({
   const start = useStartFocus({ stay: true })
   const smaller = useMakeSmaller(task)
   const [changing, setChanging] = useState(false)
-  const length = smaller.made ? 5 : minutes
+  // A scheduled block keeps its own length, even after making the step smaller.
+  const length = smaller.made && !session ? 5 : minutes
 
   if (changing) {
     return (
@@ -534,15 +535,14 @@ function SessionCard({
 function WorkedOnThis({ session }: { session: PlannedSession }) {
   const { dispatch } = useStore()
   const [confirming, setConfirming] = useState(false)
-  const [minutes, setMinutes] = useState(session.minutes)
-  const answer = (outcome: "did" | "didnt") =>
+  const answer = (outcome: "did" | "didnt", minutes?: number) =>
     dispatch({
       type: "planned-outcome",
       at: nowIso(),
       id: session.id,
       outcome,
       sessionId: newId(),
-      minutes: outcome === "did" ? minutes : undefined,
+      minutes,
     })
   return (
     <div className="space-y-2 rounded-xl bg-secondary p-3.5 text-sm">
@@ -550,32 +550,12 @@ function WorkedOnThis({ session }: { session: PlannedSession }) {
         Did you work on this?
       </p>
       {confirming ? (
-        <div className="space-y-2">
-          <DurationChips value={minutes} onChange={setMinutes} />
-          <p className="text-xs text-muted-foreground">
-            About how long? This is saved as what you reported, not as timed.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              className="min-h-11"
-              onClick={() => answer("did")}
-            >
-              Save {formatDuration(minutes)}
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              variant="ghost"
-              className="min-h-11"
-              onClick={() => setConfirming(false)}
-            >
-              Back
-            </Button>
-          </div>
-        </div>
+        <ReportedMinutes
+          planned={session.minutes}
+          onSave={(minutes) => answer("did", minutes)}
+          onCancel={() => setConfirming(false)}
+          cancelLabel="Back"
+        />
       ) : (
         <div
           role="group"
@@ -792,6 +772,25 @@ function MissedCard({
   )
 }
 
+function StuckLink({
+  taskId,
+  plannedId,
+}: {
+  taskId: string
+  plannedId: string
+}) {
+  const enterRecovery = useEnterRecovery()
+  return (
+    <button
+      type="button"
+      onClick={() => enterRecovery(taskId, plannedId)}
+      className="min-h-11 rounded-md px-2 text-left text-sm font-medium text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
+    >
+      I’m stuck
+    </button>
+  )
+}
+
 /** Exactly one thing to do next, with one main button. */
 export function NowCard({ empty }: { empty: React.ReactNode }) {
   const { state, today, settings } = useNowStore()
@@ -856,21 +855,25 @@ export function NowCard({ empty }: { empty: React.ReactNode }) {
         minutes={session?.minutes ?? sessionMinutes(task, settings)}
         label={label}
         extra={
-          current.kind === "suggested" && (
-            <Button
-              type="button"
-              size="xl"
-              variant="ghost"
-              className={quiet}
-              onClick={() => {
-                const next = pickAnother(state, today, task.id)
-                setPickedId(next.id)
-                setKept(next.keptBecause)
-              }}
-            >
-              <Shuffle aria-hidden />
-              Pick one for me
-            </Button>
+          session ? (
+            <StuckLink taskId={task.id} plannedId={session.id} />
+          ) : (
+            current.kind === "suggested" && (
+              <Button
+                type="button"
+                size="xl"
+                variant="ghost"
+                className={quiet}
+                onClick={() => {
+                  const next = pickAnother(state, today, task.id)
+                  setPickedId(next.id)
+                  setKept(next.keptBecause)
+                }}
+              >
+                <Shuffle aria-hidden />
+                Pick one for me
+              </Button>
+            )
           )
         }
       />

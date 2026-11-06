@@ -9,13 +9,13 @@ import timeGridPlugin from "@fullcalendar/timegrid"
 import type { EventClickArg } from "@fullcalendar/core"
 
 import { Card, ScreenHeading } from "@/components/shared"
+import { Button } from "@/components/ui/button"
 import { BlockPopover } from "@/components/workspace/calendar-overlays"
 import type { BlockRef } from "@/components/workspace/calendar-overlays"
 import { NotStartedTray } from "@/components/workspace/calendar-sidebar"
 import { NowCard } from "@/components/workspace/now-card"
 import { DeadlineChip } from "@/components/workspace/parts"
 import { QuickCapture } from "@/components/workspace/quick-capture"
-import { ResumePrompt } from "@/components/workspace/recovery-home"
 import { ReturnView } from "@/components/workspace/return-view"
 import { ReplanDialog } from "@/components/workspace/schedule"
 import { nowIso, useStore } from "@/components/workspace/store"
@@ -405,13 +405,6 @@ function TodayColumn() {
         <button
           type="button"
           className={linkButton}
-          onClick={() => navigate({ view: "plan" })}
-        >
-          Plan my day
-        </button>
-        <button
-          type="button"
-          className={linkButton}
           onClick={() => navigate({ view: "focus" })}
         >
           Focus history
@@ -433,6 +426,49 @@ function Summary() {
   ].filter(Boolean)
   if (!parts.length) return null
   return <p className="text-sm text-muted-foreground">{parts.join(" · ")}</p>
+}
+
+function ResumePrompt({
+  task,
+  onChoose,
+  onDismiss,
+}: {
+  task: Task
+  onChoose: (intent?: "smaller" | "reconsider") => void
+  onDismiss: () => void
+}) {
+  return (
+    <Card className="space-y-3">
+      <p className="font-heading text-2xl leading-snug">
+        Last time, you were working on {task.title}. Would you like to continue,
+        make the next step smaller, or reconsider the plan?
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button type="button" size="xl" onClick={() => onChoose()}>
+          Continue
+        </Button>
+        <Button
+          type="button"
+          size="xl"
+          variant="outline"
+          onClick={() => onChoose("smaller")}
+        >
+          Make the next step smaller
+        </Button>
+        <Button
+          type="button"
+          size="xl"
+          variant="outline"
+          onClick={() => onChoose("reconsider")}
+        >
+          Reconsider the plan
+        </Button>
+        <Button type="button" size="xl" variant="ghost" onClick={onDismiss}>
+          Something else
+        </Button>
+      </div>
+    </Card>
+  )
 }
 
 export function TodayView() {

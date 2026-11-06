@@ -1,8 +1,13 @@
 "use client"
 
 import type { EventApi } from "@fullcalendar/core"
+import { useCallback, useRef, useState } from "react"
 import { Play } from "lucide-react"
 
+import {
+  Floating,
+  ReportedMinutes,
+} from "@/components/workspace/calendar-overlays"
 import { useStartFocus } from "@/components/workspace/focus-view"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import {
@@ -30,6 +35,10 @@ export function BlockContent({
 }) {
   const { state, dispatch } = useStore()
   const startFocus = useStartFocus({ stay: true })
+  const [reporting, setReporting] = useState(false)
+  const didItRef = useRef<HTMLButtonElement>(null)
+  const anchor = useCallback(() => didItRef.current, [])
+  const stopReporting = useCallback(() => setReporting(false), [])
   const {
     kind,
     refId,
@@ -70,13 +79,14 @@ export function BlockContent({
     !session?.done &&
     !state.timer
 
-  const answer = (outcome: "did" | "didnt") =>
+  const answer = (outcome: "did" | "didnt", reported?: number) =>
     dispatch({
       type: "planned-outcome",
       at: nowIso(),
       id: refId,
       outcome,
       sessionId: newId(),
+      minutes: reported,
     })
 
   return (
@@ -125,10 +135,12 @@ export function BlockContent({
           {awaitingAnswer && (
             <>
               <button
+                ref={didItRef}
                 type="button"
                 data-block-action
                 aria-label={`Did it: ${title}`}
-                onClick={() => answer("did")}
+                aria-expanded={reporting}
+                onClick={() => setReporting(true)}
               >
                 ✓<span className="bot-block-word"> Did it</span>
               </button>
@@ -146,6 +158,20 @@ export function BlockContent({
             </>
           )}
         </span>
+      )}
+      {reporting && (
+        <Floating
+          anchor={anchor}
+          label={`Did it: ${title}`}
+          onClose={stopReporting}
+        >
+          <p className="mb-2 text-[15px] font-medium break-words">{title}</p>
+          <ReportedMinutes
+            planned={session?.minutes ?? Math.round(minutes ?? 25)}
+            onSave={(reported) => answer("did", reported)}
+            onCancel={stopReporting}
+          />
+        </Floating>
       )}
     </div>
   )

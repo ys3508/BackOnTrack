@@ -3,30 +3,18 @@
 import { useEffect } from "react"
 import { Timer } from "lucide-react"
 
-import { RecoveryApp } from "@/components/recovery-app"
 import { CalendarView } from "@/components/workspace/calendar-view"
 import { FocusView, useNow } from "@/components/workspace/focus-view"
 import { GlobalQuickCapture } from "@/components/workspace/quick-capture"
-import { RecoverView } from "@/components/workspace/recover-view"
-import { RecoveryHome } from "@/components/workspace/recovery-home"
-import { RecoveryWorkspace } from "@/components/workspace/recovery-workspace"
 import { ReminderWatcher } from "@/components/workspace/reminder-watcher"
 import { RoutinesView } from "@/components/workspace/routines-view"
 import { SettingsView } from "@/components/workspace/settings-view"
-import {
-  WorkspaceProvider,
-  newId,
-  nowIso,
-  useStore,
-} from "@/components/workspace/store"
+import { WorkspaceProvider, useStore } from "@/components/workspace/store"
 import type { Route } from "@/components/workspace/store"
 import { TaskDetail } from "@/components/workspace/task-detail"
 import { TasksView } from "@/components/workspace/tasks-view"
 import { TodayView } from "@/components/workspace/today-view"
-import { WorkspaceView } from "@/components/workspace/workspace-view"
 import { formatClock, remainingSeconds } from "@/lib/focus/timer"
-import type { Session } from "@/lib/session"
-import { taskFromSession } from "@/lib/workspace/storage"
 import { cn } from "@/lib/utils"
 
 export function WorkspaceApp() {
@@ -41,17 +29,7 @@ const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
   {
     label: "Today",
     route: { view: "workspace" },
-    match: [
-      "workspace",
-      "plan",
-      "avoid",
-      "guided",
-      "recover",
-      "case",
-      "tasks",
-      "task",
-      "focus",
-    ],
+    match: ["workspace", "tasks", "task", "focus"],
   },
   { label: "Calendar", route: { view: "calendar" }, match: ["calendar"] },
   { label: "Routines", route: { view: "routines" }, match: ["routines"] },
@@ -60,14 +38,7 @@ const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
 
 function Shell() {
   const { route, navigate, mode, storageFailed } = useStore()
-  const routeKey =
-    route.view === "task"
-      ? `task-${route.id}`
-      : route.view === "case"
-        ? `case-${route.id}`
-        : route.view === "recover"
-          ? `recover-${route.taskId ?? ""}`
-          : route.view
+  const routeKey = route.view === "task" ? `task-${route.id}` : route.view
 
   return (
     <div data-mode={mode} className="flex min-h-svh flex-col">
@@ -133,21 +104,14 @@ function Shell() {
           className="animate-in duration-300 fade-in slide-in-from-bottom-1"
         >
           {route.view === "workspace" && <TodayView />}
-          {route.view === "avoid" && <RecoveryHome />}
-          {route.view === "plan" && <WorkspaceView />}
           {route.view === "routines" && <RoutinesView />}
-          {route.view === "case" && (
-            <RecoveryWorkspace id={route.id} intent={route.intent} />
-          )}
           {route.view === "tasks" && <TasksView />}
           {route.view === "task" && (
             <TaskDetail id={route.id} section={route.section} />
           )}
           {route.view === "calendar" && <CalendarView />}
           {route.view === "focus" && <FocusView />}
-          {route.view === "recover" && <RecoverView taskId={route.taskId} />}
           {route.view === "settings" && <SettingsView />}
-          {route.view === "guided" && <GuidedView />}
         </div>
       </main>
 
@@ -181,8 +145,7 @@ function TimerPill() {
   const shownHere =
     route.view === "focus" ||
     route.view === "workspace" ||
-    (route.view === "task" && route.id === timer?.taskId) ||
-    (route.view === "case" && route.id === timer?.taskId)
+    (route.view === "task" && route.id === timer?.taskId)
   if (!timer || shownHere) return null
   const timerTask = state.tasks.find((task) => task.id === timer.taskId)
   return (
@@ -204,23 +167,6 @@ function TimerPill() {
       {clock}
       {paused && <span className="font-normal"> paused</span>}
     </button>
-  )
-}
-
-function GuidedView() {
-  const { mode, dispatch, navigate } = useStore()
-  return (
-    <RecoveryApp
-      embedded
-      modeOverride={mode}
-      onSaveAsTask={(session: Session) => {
-        const id = newId()
-        const task = taskFromSession(session, id, nowIso())
-        if (!task) return
-        dispatch({ type: "add-existing-task", task })
-        navigate({ view: "task", id })
-      }}
-    />
   )
 }
 

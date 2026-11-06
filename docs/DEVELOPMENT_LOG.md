@@ -317,6 +317,17 @@ Found in a real browser, since unit tests mock FullCalendar.
 - Today hid routines when there were no tasks.
 - "You said you made progress" appeared for minimum and completed outcomes in focus history.
 
+
+### One recovery system
+
+The older screens (`#/plan`, `#/avoid`, `#/case/:id`, `#/recover`) and the "Want a fuller plan?" link are gone. Their addresses now open Today. `#/guided` went too, because its only link was on a removed screen.
+
+What the removed screens did that the Now card doesn't: a daily plan from your available time, a generated draft with steps and work sessions to accept, the four Reality Check questions, a free-text "What happened?" after getting stuck, marking a step done without a timer, editing later plan steps, a list of recovery cases, and example tasks on an empty workspace. The message draft already sat under the Reality Gap boxes, so it stayed.
+
+Saved data from those screens still loads. The wizard, the daily-plan logic, and the plan request code remain in the repo with nothing in the app using them.
+
+Also changed: "I'm stuck" on the Upcoming card, "Did it" on calendar blocks now asks for minutes, starting from the planned length, a scheduled block keeps its own length after "Make it smaller", and "I completed the minimum version" asks "What did you do?" when none is written.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

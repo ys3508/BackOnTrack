@@ -1,7 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Calendar, Pencil, Play, Shuffle } from "lucide-react"
+import {
+  ArrowLeft,
+  Calendar,
+  FlaskConical,
+  Pencil,
+  Play,
+  Shuffle,
+  Sparkles,
+  UserRound,
+} from "lucide-react"
 
 import { Card, LoadingNotice } from "@/components/shared"
 import { Button } from "@/components/ui/button"
@@ -12,15 +21,12 @@ import {
 } from "@/components/workspace/calendar-overlays"
 import { useStartFocus } from "@/components/workspace/focus-view"
 import { DeadlineChip, TaskLink } from "@/components/workspace/parts"
-import {
-  OriginNote,
-  RealityGapTool,
-  useCaseAssist,
-} from "@/components/workspace/recovery-workspace"
-import type { Assist } from "@/components/workspace/recovery-workspace"
+import { RealityGapTool } from "@/components/workspace/reality-gap"
 import { RescheduleForm } from "@/components/workspace/reschedule-form"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { SupportNotice } from "@/components/workspace/support-notice"
+import { useCaseAssist } from "@/components/workspace/use-case-assist"
+import type { Assist } from "@/components/workspace/use-case-assist"
 import { isCrisisText } from "@/lib/guards"
 import {
   RELEASE_CAUTION,
@@ -63,6 +69,21 @@ function Back({
       <ArrowLeft className="size-4" aria-hidden />
       {children}
     </button>
+  )
+}
+
+function OriginNote({ origin }: { origin: "live" | "demo" | "user" }) {
+  const { Icon, text } =
+    origin === "live"
+      ? { Icon: Sparkles, text: "Suggested by AI. It can be wrong." }
+      : origin === "user"
+        ? { Icon: UserRound, text: "Your own step" }
+        : { Icon: FlaskConical, text: "Built-in suggestion, not AI" }
+  return (
+    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Icon className="size-3.5" aria-hidden />
+      {text}
+    </p>
   )
 }
 
@@ -167,7 +188,7 @@ function ReasonList({
   recovery: Recovery
   assist: Assist
 }) {
-  const { dispatch, navigate } = useStore()
+  const { dispatch } = useStore()
   const start = useStartFocus({ stay: true })
   const [scheduling, setScheduling] = useState(false)
   const recoveryCase = task.recoveryCase
@@ -270,16 +291,6 @@ function ReasonList({
             <Back onClick={() => dispatch({ type: "exit-recovery" })}>
               Not now
             </Back>
-            <button
-              type="button"
-              onClick={() => {
-                dispatch({ type: "exit-recovery" })
-                navigate({ view: "recover", taskId: task.id })
-              }}
-              className="min-h-11 rounded-md text-sm font-medium text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
-            >
-              Want a fuller plan?
-            </button>
           </div>
         </>
       )}

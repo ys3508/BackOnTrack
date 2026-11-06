@@ -355,7 +355,24 @@ function WrapUpForm({
   onOutcome: (outcome: EndOutcome, resumeNote: string) => void
   children?: React.ReactNode
 }) {
+  const { dispatch } = useStore()
   const [note, setNote] = useState("")
+  const [askingMinimum, setAskingMinimum] = useState(false)
+  const [minimum, setMinimum] = useState("")
+
+  function saveMinimum() {
+    const value = minimum.trim()
+    if (value) {
+      dispatch({
+        type: "edit-task",
+        id: task.id,
+        at: nowIso(),
+        patch: { minimumVersion: value },
+      })
+    }
+    onOutcome("minimum", note)
+  }
+
   return (
     <div className="space-y-3 text-left">
       <div>
@@ -388,7 +405,11 @@ function WrapUpForm({
           size="xl"
           variant="outline"
           className="h-auto min-h-11 py-2 whitespace-normal"
-          onClick={() => onOutcome("minimum", note)}
+          onClick={() =>
+            task.minimumVersion
+              ? onOutcome("minimum", note)
+              : setAskingMinimum(true)
+          }
         >
           I completed the minimum version
         </Button>
@@ -401,6 +422,32 @@ function WrapUpForm({
           I completed the original task
         </Button>
       </div>
+      {askingMinimum && (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            saveMinimum()
+          }}
+        >
+          <div className="min-w-0 flex-1">
+            <label htmlFor="minimum-did" className="block text-sm font-medium">
+              What did you do?
+            </label>
+            <Input
+              id="minimum-did"
+              autoFocus
+              value={minimum}
+              maxLength={300}
+              onChange={(event) => setMinimum(event.target.value)}
+              className="mt-1 h-11"
+            />
+          </div>
+          <Button type="submit" size="xl" variant="outline">
+            Save
+          </Button>
+        </form>
+      )}
       {task.minimumVersion && (
         <p className="text-sm text-muted-foreground">
           Minimum version: {task.minimumVersion}. The original task stays open

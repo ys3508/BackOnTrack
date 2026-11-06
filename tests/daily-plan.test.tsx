@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import axe from "axe-core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
@@ -34,7 +33,6 @@ const STORAGE = "backontrack.workspace.v1"
 const AT = "2026-11-05T12:00:00.000Z"
 const TODAY = localToday()
 const saved = () => JSON.parse(window.localStorage.getItem(STORAGE)!)
-const button = (name: RegExp | string) => screen.findByRole("button", { name })
 const run = (actions: WorkspaceAction[], start: Workspace = EMPTY_WORKSPACE) =>
   actions.reduce(workspaceReducer, start)
 
@@ -385,134 +383,6 @@ describe("in the app", () => {
     expect(screen.queryByRole("button", { name: "Plan my day" })).toBeNull()
   })
 
-  it("explains the suggested next step", async () => {
-    seed(mixed())
-    render(<WorkspaceApp />)
-    expect(
-      await screen.findByText(/Why this one: Due in 3 days/)
-    ).toBeInTheDocument()
-  })
-
-  it("needs only the time, proposes a plan, and changes nothing until used", async () => {
-    seed(mixed())
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Plan my day"))
-    expect(screen.getByRole("button", { name: "Use this plan" })).toBeDisabled()
-    await user.click(screen.getByRole("button", { name: "1 hr" }))
-
-    const list = screen.getByRole("list", { name: "Suggested plan" })
-    expect(within(list).getAllByRole("listitem")).toHaveLength(3)
-    expect(screen.getByText(/and not by AI/)).toBeInTheDocument()
-    expect(within(list).getAllByText(/^Why:/)).toHaveLength(3)
-    expect(saved().dailyPlan).toBeNull()
-
-    // The order is the user's to change.
-    await user.click(
-      screen.getByRole("button", { name: "Move up: History essay" })
-    )
-    await user.click(
-      screen.getByRole("button", { name: "Not today: Tidy my notes" })
-    )
-    expect(within(list).getAllByRole("listitem")).toHaveLength(2)
-    await user.click(await button("Add to today: Tidy my notes"))
-    await user.click(
-      screen.getByRole("button", { name: "Not today: Tidy my notes" })
-    )
-
-    await user.click(screen.getByRole("button", { name: "Use this plan" }))
-    await screen.findByRole("heading", { name: "Your plan for today" })
-    await waitFor(() =>
-      expect(
-        saved().dailyPlan.items.map((item: { taskId: string }) => item.taskId)
-      ).toEqual(["essay", "email"])
-    )
-    // No task, deadline, or planned session was touched.
-    expect(saved().planned).toEqual([])
-    expect(saved().tasks[0].deadline).toBe(addDays(TODAY, 3))
-  })
-
-  it("starts focus from the plan, and notices when it's all done", async () => {
-    seed(mixed())
-    const user = userEvent.setup()
-    const view = render(<WorkspaceApp />)
-    await user.click(await button("Plan my day"))
-    await user.click(screen.getByRole("button", { name: "15 min" }))
-    await user.click(screen.getByRole("button", { name: "Use this plan" }))
-
-    await waitFor(() =>
-      expect(saved().dailyPlan.items.length).toBeGreaterThan(0)
-    )
-    for (const item of saved().dailyPlan.items) {
-      await user.click(await button(`Done for today: ${item.title}`))
-    }
-    expect(
-      await screen.findByText(/That’s today’s plan done/)
-    ).toBeInTheDocument()
-
-    await user.click(await button(/Today changed/))
-    expect(
-      await screen.findByRole("heading", {
-        name: "What can today realistically hold?",
-      })
-    ).toBeInTheDocument()
-    view.unmount()
-  })
-
-  it("opens the task's work with a timer of the planned length", async () => {
-    const state = run(
-      [
-        {
-          type: "set-daily-plan",
-          plan: {
-            date: TODAY,
-            minutes: 60,
-            energy: null,
-            createdAt: AT,
-            items: plan(mixed()).items,
-          },
-        },
-      ],
-      mixed()
-    )
-    seed(state)
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button(/^Start \d+ minutes: History essay/))
-    await waitFor(() => expect(window.location.hash).toBe("#/tasks/essay/doc"))
-    await waitFor(() =>
-      expect(saved().timer?.plannedSeconds).toBe(
-        state.dailyPlan!.items.find((item) => item.taskId === "essay")!
-          .minutes * 60
-      )
-    )
-  })
-
-  it("ignores yesterday's plan as today's", async () => {
-    seed(
-      run(
-        [
-          {
-            type: "set-daily-plan",
-            plan: {
-              date: addDays(TODAY, -1),
-              minutes: 60,
-              energy: null,
-              createdAt: AT,
-              items: plan(mixed()).items,
-            },
-          },
-        ],
-        mixed()
-      )
-    )
-    render(<WorkspaceApp />)
-    await button("Plan my day")
-    expect(
-      screen.queryByRole("heading", { name: "Your plan for today" })
-    ).toBeNull()
-  })
-
   it("shows the suggested order with reasons on Tasks, and can switch it off", async () => {
     seed(
       run([
@@ -547,24 +417,5 @@ describe("in the app", () => {
     await user.click(screen.getByRole("button", { name: "Add" }))
     await waitFor(() => expect(saved().tasks[0].estimateMinutes).toBe(15))
     expect(screen.getByLabelText("Time needed (optional)")).toHaveValue("")
-  })
-
-  it("has no accessibility violations", async () => {
-    seed(mixed())
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Plan my day"))
-    await user.click(screen.getByRole("button", { name: "1 hr" }))
-    await waitFor(() => expect(fetch).toHaveBeenCalled())
-    const first = await axe.run(document.body, {
-      rules: { "color-contrast": { enabled: false } },
-    })
-    expect(first.violations.map((item) => item.id)).toEqual([])
-    await user.click(screen.getByRole("button", { name: "Use this plan" }))
-    await screen.findByRole("heading", { name: "Your plan for today" })
-    const second = await axe.run(document.body, {
-      rules: { "color-contrast": { enabled: false } },
-    })
-    expect(second.violations.map((item) => item.id)).toEqual([])
   })
 })

@@ -53,7 +53,7 @@ export const ROUTINE_MINUTES = [15, 30, 45, 60, 90]
  * Stays attached to what it's about. It reads the anchor's real position, again
  * whenever anything scrolls, so the time it shows always matches where it sits.
  */
-function Floating({
+export function Floating({
   anchor,
   label,
   onClose,
@@ -218,6 +218,49 @@ export function DurationChips({
           />
         </label>
       )}
+    </div>
+  )
+}
+
+/** How long they say they spent, starting from what was planned. */
+export function ReportedMinutes({
+  planned,
+  onSave,
+  onCancel,
+  cancelLabel = "Cancel",
+}: {
+  planned: number
+  onSave: (minutes: number) => void
+  onCancel: () => void
+  cancelLabel?: string
+}) {
+  const [minutes, setMinutes] = useState(planned)
+  return (
+    <div className="space-y-2">
+      <DurationChips value={minutes} onChange={setMinutes} />
+      <p className="text-xs text-muted-foreground">
+        About how long? This is saved as what you reported, not as timed.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="lg"
+          variant="outline"
+          className="min-h-11"
+          onClick={() => onSave(minutes)}
+        >
+          Save {formatDuration(minutes)}
+        </Button>
+        <Button
+          type="button"
+          size="lg"
+          variant="ghost"
+          className="min-h-11"
+          onClick={onCancel}
+        >
+          {cancelLabel}
+        </Button>
+      </div>
     </div>
   )
 }

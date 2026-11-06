@@ -404,41 +404,6 @@ describe("in the app", () => {
     expect(task.history.at(-1).text).toMatch(/^Declined/)
   })
 
-  it("opens the task and starts helping from the home page", async () => {
-    seed(withSteps())
-    window.location.hash = "#/plan"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Help me do this"))
-    await screen.findByText("Open the dataset and identify the target column")
-    expect(window.location.hash).toBe("#/tasks/a/help")
-  })
-
-  it("offers workspace setup from the home page for a new task", async () => {
-    seed(mlTask())
-    window.location.hash = "#/plan"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Set up my workspace"))
-    await screen.findByText("What has to be handed in")
-  })
-
-  it("opens the document with the timer when starting focus from home", async () => {
-    seed(withSteps())
-    window.location.hash = "#/plan"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Start 5 minutes"))
-    await waitFor(() => expect(window.location.hash).toBe("#/tasks/a/doc"))
-    expect(await screen.findByRole("timer")).toBeInTheDocument()
-    expect(
-      screen.getAllByText("Train a classifier on the provided dataset").length
-    ).toBeGreaterThan(0)
-    const editor = await getEditor()
-    await waitFor(() => expect(editor.isFocused).toBe(true))
-    expect(await button("Pause timer")).toBeInTheDocument()
-  })
-
   it("does the same from the Focus page, and stays there with no task", async () => {
     seed(withSteps())
     window.location.hash = "#/focus"
@@ -585,46 +550,6 @@ describe("adaptive Plan B", () => {
     expect(request(done).task.stuckOnStep).toBe(0)
     expect(request(done).task.completedActions.join(" ")).toContain(
       "Train a classifier"
-    )
-  })
-
-  it("applies smaller steps from a recovery plan, keeping finished work", async () => {
-    const state = run(
-      [
-        {
-          type: "add-subtask",
-          id: "a",
-          at: AT,
-          subId: "0",
-          title: "Read the brief",
-        },
-        { type: "toggle-subtask", id: "a", at: AT, subId: "0" },
-        {
-          type: "add-subtask",
-          id: "a",
-          at: AT,
-          subId: "1",
-          title: "Train a classifier on the provided dataset",
-        },
-      ],
-      mlTask()
-    )
-    seed(state)
-    window.location.hash = "#/recover/a"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Get a recovery plan"))
-    await screen.findByRole("heading", { name: "Make this step smaller" })
-    expect(screen.getByText(/This code hasn’t been run/)).toBeInTheDocument()
-    await user.click(await button("Add selected to my task"))
-    await waitFor(() => expect(saved().tasks[0].recovery).toBeNull())
-    const subs = saved().tasks[0].subtasks
-    expect(subs[0]).toMatchObject({ title: "Read the brief", done: true })
-    expect(subs[1].title).toBe(
-      "Open the dataset and identify the target column"
-    )
-    expect(subs.map((sub: { title: string }) => sub.title)).not.toContain(
-      "Train a classifier on the provided dataset"
     )
   })
 })

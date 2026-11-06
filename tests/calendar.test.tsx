@@ -1243,6 +1243,39 @@ describe("calendar screen", () => {
         JSON.stringify({ ...ended, legacyMigrated: true })
       )
 
+    it("asks how long Did it took, starting from the planned length", async () => {
+      seedEnded()
+      const user = userEvent.setup()
+      render(<WorkspaceApp />)
+      await user.click(
+        await screen.findByRole("button", { name: "Did it: Bank call" })
+      )
+      // Nothing is saved until they answer.
+      expect(saved().focusSessions).toEqual([])
+      const dialog = await screen.findByRole("dialog", {
+        name: "Did it: Bank call",
+      })
+      expect(
+        within(dialog).getByRole("button", { name: /^Save 30/ })
+      ).toBeTruthy()
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }))
+      expect(saved().focusSessions).toEqual([])
+      expect(screen.queryByRole("dialog")).toBeNull()
+
+      await user.click(
+        await screen.findByRole("button", { name: "Did it: Bank call" })
+      )
+      const again = await screen.findByRole("dialog", {
+        name: "Did it: Bank call",
+      })
+      await user.click(within(again).getByRole("button", { name: "45" }))
+      await user.click(within(again).getByRole("button", { name: /^Save/ }))
+      expect(saved().focusSessions[0]).toMatchObject({
+        reported: true,
+        actualSeconds: 2700,
+      })
+    })
+
     it("turns Did it into focus time, and stops asking", async () => {
       seedEnded()
       const user = userEvent.setup()
@@ -1250,6 +1283,7 @@ describe("calendar screen", () => {
       await user.click(
         await screen.findByRole("button", { name: "Did it: Bank call" })
       )
+      await user.click(await screen.findByRole("button", { name: /^Save/ }))
       const [record] = saved().focusSessions
       expect(record).toMatchObject({
         taskId: "t",
@@ -1272,6 +1306,7 @@ describe("calendar screen", () => {
       await user.click(
         await screen.findByRole("button", { name: "Did it: Bank call" })
       )
+      await user.click(await screen.findByRole("button", { name: /^Save/ }))
       const { id } = saved().focusSessions[0]
       clickBlock({ kind: "focused", refId: id, taskId: "t" }, "Bank call")
       await user.click(

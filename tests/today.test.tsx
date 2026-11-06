@@ -252,7 +252,7 @@ describe("navigation", () => {
     ).toEqual(["Today", "Calendar", "Routines", "Settings"])
   })
 
-  it("keeps the older screens reachable", async () => {
+  it("keeps the remaining screens reachable", async () => {
     seed(run([task("a")]))
     const user = userEvent.setup()
     render(<WorkspaceApp />)
@@ -262,8 +262,22 @@ describe("navigation", () => {
     await user.click(await button("Focus history"))
     await screen.findByRole("heading", { name: "Focus" })
     await user.click(await button("Today"))
-    await user.click(await button("Plan my day"))
-    await waitFor(() => expect(window.location.hash).toBe("#/plan"))
+    await screen.findByRole("heading", { name: "Today" })
+    expect(screen.queryByRole("button", { name: "Plan my day" })).toBeNull()
+  })
+
+  it.each([
+    "#/plan",
+    "#/avoid",
+    "#/case/a",
+    "#/recover",
+    "#/recover/a",
+    "#/guided",
+  ])("sends the old address %s to Today", async (hash) => {
+    seed(run([task("a")]))
+    window.location.hash = hash
+    render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Today" })
   })
 
   it("shows routines on their own page", async () => {
@@ -322,6 +336,33 @@ describe("Test 1 and Test 10: the card shows only what's relevant", () => {
     within(card).getByRole("button", { name: "Make it smaller" })
     within(card).getByRole("button", { name: "Change time" })
     expect(within(card).queryByRole("button", { name: "Pause" })).toBeNull()
+  })
+
+  it("offers I'm stuck on an upcoming block, as a small link", async () => {
+    seed(run([task("a", "Essay"), block("u", "a", clock(offset(40)), 45)]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Today" })
+    const stuck = within(nowCard()).getByRole("button", { name: "I’m stuck" })
+    expect(primaries()).toHaveLength(1)
+    await user.click(stuck)
+    expect(saved().recovery).toMatchObject({
+      taskId: "a",
+      plannedId: "u",
+      source: "scheduled",
+    })
+    await screen.findByRole("heading", {
+      name: "What’s making this difficult right now?",
+    })
+  })
+
+  it("doesn't offer I'm stuck on a suggested task's card", async () => {
+    seed(run([task("a", "Essay")]))
+    render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Today" })
+    expect(
+      within(nowCard()).queryByRole("button", { name: "I’m stuck" })
+    ).toBeNull()
   })
 
   it("with a missed block: says so plainly, and doesn't call it overdue", async () => {
@@ -457,6 +498,21 @@ describe("working from the card", () => {
     expect(saved().tasks[0].nextAction).not.toBe(step)
     await user.click(await button("Start"))
     expect(saved().timer.plannedSeconds).toBe(300)
+  })
+
+  it("keeps a block's own length, even after making its step smaller", async () => {
+    seed(
+      run([
+        task("a", "Clean my kitchen"),
+        block("u", "a", clock(offset(40)), 45),
+      ])
+    )
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Make it smaller"))
+    await user.click(await button("Start"))
+    expect(saved().timer.plannedSeconds).toBe(45 * 60)
+    expect(saved().timer.plannedId).toBe("u")
   })
 
   it("lets the user rewrite the step", async () => {

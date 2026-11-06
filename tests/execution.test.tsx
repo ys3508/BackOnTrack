@@ -50,7 +50,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/plan"
+  window.location.hash = "#/tasks"
   window.scrollTo = vi.fn() as typeof window.scrollTo
 })
 
@@ -69,7 +69,7 @@ describe("definition of done", () => {
       "Finish my machine learning assignment"
     )
     await user.click(screen.getByRole("button", { name: "Add" }))
-    await user.click(await button("Finish my machine learning assignment"))
+    await user.click(await button(/^Finish my machine learning assignment/))
 
     // 2. Paste task instructions.
     await user.click(await button(/^Instructions/))
@@ -144,20 +144,9 @@ describe("definition of done", () => {
     await screen.findByRole("heading", {
       name: "What’s making this difficult right now?",
     })
-    await user.click(await button("Want a fuller plan?"))
-    await user.click(await button("Get a recovery plan"))
-    const first = (await screen.findByRole("heading", { level: 1 })).textContent
-    expect(first).toMatch(/Pull out what/)
-    expect(
-      (screen.getByLabelText(/Your draft/) as HTMLTextAreaElement).value
-    ).toContain("- [ ] Train a classifier")
-    await user.click(await button(/Still stuck/))
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1 }).textContent).not.toBe(
-        first
-      )
-    )
-    await user.click(await button("Add selected to my task"))
+    await user.click(await button("Not now"))
+    await user.click(await button("All tasks"))
+    await user.click(await button(/^Finish my machine learning assignment/))
 
     // 12. See accurate progress and history.
     await screen.findByRole("heading", {
@@ -174,10 +163,6 @@ describe("definition of done", () => {
       /Started a focus session/,
       /Completed: /,
       /Stopped focus|Interrupted attempt/,
-      /Reported being stuck/,
-      /Suggested a recovery plan/,
-      /Declined a suggested plan/,
-      /Accepted a recovery plan/,
     ]) {
       expect(within(history).getAllByText(text).length).toBeGreaterThan(0)
     }
@@ -187,12 +172,9 @@ describe("definition of done", () => {
     expect(task.completedAt).toBeNull()
 
     // 11. Return later, and resume from the saved position.
-    window.location.hash = "#/plan"
+    window.location.hash = `#/tasks/${task.id}/doc`
     unmount()
     render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: "Continue where you left off" })
-    expect(screen.getByText(/You completed 1 of \d+ steps/)).toBeInTheDocument()
-    await user.click(await button("Open my document"))
     const restored = await getEditor()
     await waitFor(() => expect(restored.getText()).toContain("My own sentence"))
 
@@ -321,19 +303,5 @@ describe("demo examples", () => {
     )
     expect(plan.choices).toHaveLength(3)
     expect(plan.adaptationNote).toContain("I stared at the blank page")
-  })
-
-  it("adds an example with one click on an empty workspace", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => Response.json({ live: false, model: null }))
-    )
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Homework assignment"))
-    await screen.findByRole("heading", {
-      name: "Finish my machine learning assignment",
-    })
-    expect(saved().tasks[0].instructions.text).toContain("Train a classifier")
   })
 })

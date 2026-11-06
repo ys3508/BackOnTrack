@@ -41,12 +41,10 @@ When you're stuck, or you've been avoiding something you never scheduled, recove
 
 Each ends in a Plan B: an action you can edit, a short time, and Start. A missed block can also move to a buffer or be rescheduled, and neither ever changes a hard deadline. Ending a session asks where to pick up next time, and whether you made progress, met the minimum version, or finished the original task, which stay separate. "Restarted" counts sessions that really began, never cards that were looked at.
 
-The navigation is Today, Calendar, Routines, and Settings. All tasks, the suggested daily plan, and focus history are linked from Today.
+The navigation is Today, Calendar, Routines, and Settings. All tasks and focus history are linked from Today.
 
 | Area | What you can do |
 | --- | --- |
-| **Plan my day** | "Plan my day" asks how much time you have, and optionally your energy, then proposes a realistic plan from your tasks. It gives each item a reason, says what's left out, and warns about deadlines at risk. This is calculated, not AI, and it never moves a deadline. |
-| **Today** | "Plan my day" asks how much time you have, and optionally your energy, then proposes a realistic plan from your tasks. It gives each item a reason, says what's left out, and warns about deadlines at risk. You can reorder, remove, or add before using it. This is calculated, not AI, and it never moves a deadline. |
 | **Suggested order** | Tasks are ordered by deadline, priority, progress, and plans, with the reason shown. You can turn this off, and change a task's priority or time estimate. |
 | **Learning what helps** | BackOnTrack notices when work stalls, such as getting stuck on empty documents, and whether accepted help was followed by progress. Then it changes which help comes first, and says why. It needs at least 3 separate moments before claiming anything. In Settings, you can see every record, say "This isn't right", delete anything, state a preference, or switch it off. |
 | **Coming back** | After a few days away, Today shows one way back in, leading with the note you left yourself. It shows no overdue counts, backlog, or streaks. |
@@ -60,7 +58,6 @@ The navigation is Today, Calendar, Routines, and Settings. All tasks, the sugges
 | **Routines** | Fixed or flexible, with an optional minimum version. Each occurrence can be ● Full, ◐ Minimum, or skipped, and these are counted apart. Edit one occurrence or all future ones. No streaks. |
 | **Reminders** | Optional, about five minutes before a scheduled block. They only work while BackOnTrack is open in a tab, and aren't push notifications. |
 | **Calendar export** | A one-time `.ics` file of upcoming planned blocks and deadlines. There's no syncing. |
-| **Fuller recovery plan** | From the recovery card, "Want a fuller plan?" opens the earlier plan view, with an editable draft, steps, and work sessions you preview before accepting. |
 
 | | |
 | --- | --- |
@@ -166,12 +163,11 @@ This repository does not yet have its own license for the original BackOnTrack c
 - Reminders depend on an open browser tab, and browsers can delay them in the background. There's no push service, so a closed tab means no reminder.
 - The `.ics` file has only been checked for correct format by tests, not imported into a real calendar app.
 - Buffer times are fixed slots (3 PM, then 5 PM, 11 AM, and 7 PM). You choose how many and how long, not when.
-- The earlier recovery screens (`#/avoid`, `#/case`, `#/recover`) still exist alongside the Now card, so nothing is lost. Only the fuller plan is linked from the main flow.
 - Recovery cases are saved only in this browser, along with everything else. Clearing browser data deletes them, so use Export in Settings to keep a backup.
 - In Demo Mode, the blocker suggestion, errand detection, Reality Gap sorting, and next steps come from wording rules and templates. They handle any text, but only generally, and can sort a sentence wrongly. Everything is editable, and each suggestion says it isn't AI.
 - Crisis wording is matched by rules, so it can miss phrasing or misfire. Live AI can flag it too, and someone who isn't in danger can continue. BackOnTrack is not a crisis service.
 - The Live AI recovery stage has only been tested against a mocked model, not a real one.
-- The suggested order and daily plan use fixed rules with chosen weights, not AI, and the weights haven't been tested with users. Time estimates are rough, and steps without an estimate are assumed to take 25 minutes.
+- The suggested order uses fixed rules with chosen weights, not AI, and the weights haven't been tested with users. Time estimates are rough, and steps without an estimate are assumed to take 25 minutes.
 - Learning what helps is simple counting, and hasn't been tried with real use over time. Progress after some help doesn't prove that the help caused it.
 - BackOnTrack hasn't been tried on a real assignment yet. See the real-case test in [docs/DESIGN_THINKING.md](docs/DESIGN_THINKING.md).
 - The real AI model has not been tested, and the public site doesn't use it. See [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).

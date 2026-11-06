@@ -104,17 +104,12 @@ beforeEach(() => {
 
 describe("automated accessibility scan", () => {
   it.each([
-    ["plan", "#/plan", /Your next small step/],
-    ["recovery intake", "#/avoid", /putting off/],
     ["today", "#/", /^Today$/],
     ["tasks list", "#/tasks", /Tasks/],
     ["task detail", "#/tasks/a", /Biology homework/],
     ["calendar", "#/calendar", /Calendar/],
     ["focus", "#/focus", /Focus/],
-    ["recovery chooser", "#/recover", /Which task/],
-    ["recovery start", "#/recover/a", /find a way back/],
     ["settings", "#/settings", /Settings/],
-    ["guided check-in", "#/guided", /weighing on you/],
   ])("finds no violations on %s", async (_name, hash, heading) => {
     window.location.hash = hash
     render(<WorkspaceApp />)
@@ -139,17 +134,6 @@ describe("automated accessibility scan", () => {
       await screen.findByRole("button", { name: "5-minute Quick Start" })
     )
     await screen.findByRole("timer")
-    expect(await violations()).toEqual([])
-  })
-
-  it("finds no violations on a plan preview with its reasoning open", async () => {
-    window.location.hash = "#/recover/a"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(
-      await screen.findByRole("button", { name: "Get a recovery plan" })
-    )
-    await user.click(await screen.findByRole("button", { name: /See why/ }))
     expect(await violations()).toEqual([])
   })
 

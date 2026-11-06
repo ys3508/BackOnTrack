@@ -484,59 +484,6 @@ describe("task screen and home", () => {
     await user.click(await button("Delete One better"))
     expect(saved().tasks[0].subtasks).toHaveLength(1)
   })
-
-  it("shows one small step on the home page, with the rest behind a toggle", async () => {
-    let state = run(
-      [
-        {
-          type: "set-breakdown",
-          id: "a",
-          at: AT,
-          breakdown: breakdown(["One", "Two", "Three"]),
-        },
-        {
-          type: "accept-breakdown",
-          id: "a",
-          at: AT,
-          steps: [
-            { id: "1", title: "One" },
-            { id: "2", title: "Second step" },
-            { id: "3", title: "Third step" },
-          ],
-        },
-      ],
-      seed()
-    )
-    state = workspaceReducer(state, {
-      type: "toggle-subtask",
-      id: "a",
-      at: AT,
-      subId: "1",
-    })
-    window.localStorage.setItem(
-      STORAGE,
-      JSON.stringify({ ...state, legacyMigrated: true })
-    )
-    window.location.hash = "#/plan"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: "Continue where you left off" })
-    expect(screen.getByText(/You completed 1 of 3 steps/)).toBeInTheDocument()
-    expect(screen.getByText("Second step")).toBeInTheDocument()
-    expect(screen.queryByText("Third step")).not.toBeInTheDocument()
-    await user.click(await button("See all steps"))
-    expect(screen.getByText("Third step")).toBeInTheDocument()
-  })
-
-  it("offers one step on a new task, without any list", async () => {
-    window.location.hash = "#/plan"
-    render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: "Your next small step" })
-    expect(screen.getByText(/into small steps/)).toBeInTheDocument()
-    expect(
-      screen.queryByRole("button", { name: "See all steps" })
-    ).not.toBeInTheDocument()
-  })
 })
 
 describe("requirement extraction", () => {

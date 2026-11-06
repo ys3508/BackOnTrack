@@ -271,6 +271,82 @@ describe("the four reasons", () => {
     expect(screen.queryByText(/^Then 2:/)).toBeNull()
   })
 
+  it("offers an editable message draft under the Reality Gap boxes", async () => {
+    seed(run([task("a", "I'm afraid to email my professor")]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button(/I’ve been avoiding something/))
+    await user.type(
+      await screen.findByRole("combobox", {
+        name: "What you’ve been avoiding",
+      }),
+      "I'm afraid to email my professor"
+    )
+    await user.click(await button("Continue"))
+    await user.click(await button(/I’m worried about the outcome/))
+    await user.click(await button(/message draft|Draft a message/))
+    const draft = (await screen.findByLabelText(
+      "A message you could send"
+    )) as HTMLTextAreaElement
+    expect(draft.value.length).toBeGreaterThan(10)
+    expect(screen.getByText(/doesn’t send anything/)).toBeTruthy()
+    await user.type(draft, " Thanks.")
+    expect(saved().tasks[0].recoveryCase.messageDraft).toMatch(/Thanks\.$/)
+    expect(
+      draft.compareDocumentPosition(
+        screen.getByRole("heading", { name: "Possible Actions" })
+      ) & Node.DOCUMENT_POSITION_PRECEDING
+    ).toBeTruthy()
+  })
+
+  it("has no way out to a second recovery screen", async () => {
+    seed(run([task("a", "Essay")]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button(/I’ve been avoiding something/))
+    await user.type(
+      await screen.findByRole("combobox", {
+        name: "What you’ve been avoiding",
+      }),
+      "Essay"
+    )
+    await user.click(await button("Continue"))
+    await screen.findByRole("heading", {
+      name: "What’s making this difficult right now?",
+    })
+    expect(screen.queryByRole("button", { name: /fuller plan/ })).toBeNull()
+  })
+
+  it("says so and keeps going with a built-in step when Live AI fails", async () => {
+    const state = run([task("a", "Essay")])
+    seed({
+      ...state,
+      settings: { ...state.settings, modePreference: "live" },
+    })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) =>
+        init?.method === "POST"
+          ? new Response("nope", { status: 500 })
+          : Response.json({ live: true, model: "test-model" })
+      )
+    )
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button(/I’ve been avoiding something/))
+    await user.type(
+      await screen.findByRole("combobox", {
+        name: "What you’ve been avoiding",
+      }),
+      "Essay"
+    )
+    await user.click(await button("Continue"))
+    await user.click(await button(/I don’t know where to begin/))
+    expect(await screen.findByText(/Live AI couldn’t answer/)).toBeTruthy()
+    expect(screen.getByTestId("plan-b-action").textContent).not.toBe("")
+    expect(screen.getByText(/Built-in suggestion, not AI/)).toBeTruthy()
+  })
+
   it("Test 3: Reason 3 opens the four editable Reality Gap sections", async () => {
     seed(run([task("a", "I'm afraid to open my email")]))
     const user = userEvent.setup()

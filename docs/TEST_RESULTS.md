@@ -397,3 +397,17 @@ Run in the built app, in Demo Mode, in a real browser, on the final build. Click
 | 10. No clutter | Passed for no tasks, upcoming, missed, active, and paused, each with one main button. |
 
 Not tested: Live AI against a real model (no key is configured locally), a real browser notification (the browser used had them blocked, so it was checked with a stand-in), importing the `.ics` into a real calendar app, touch screens, other time zones, and use by real people.
+
+## One recovery system, phone-width walk
+
+Run in the production build at 375 x 812, in Demo Mode, with real clicks and typing for the main choices and scripted page clicks for some buttons.
+
+| Step | Result |
+| --- | --- |
+| "Did it" on a real calendar block | Asked for minutes, starting at the planned 30. It stayed open for 8 seconds, saved nothing until answered, and then saved 30 minutes as reported. |
+| "I'm stuck" on the Upcoming card | Opened the four reasons, linked to that block. |
+| Worried path | Reality Gap and Plan B showed, with the message draft below Possible Actions. No sideways scroll. |
+| Plan B, pause, end session | Timer ran for the 5 minutes chosen in Plan B, and one restart was recorded. |
+| Minimum version with none written | Asked "What did you do?", saved the answer, and left the task open. It survived a reload. |
+
+One open question: on the first pass, the message draft looked closed in a screenshot just after opening by script. Three more attempts, one from a fresh state with the same steps, stayed open for 6 seconds each, so the cause is unknown.

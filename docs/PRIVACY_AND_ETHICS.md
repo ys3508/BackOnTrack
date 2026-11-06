@@ -92,7 +92,6 @@ The app helps students think and start, and they stay the author.
 - A document can be copied, or exported as Markdown or text.
 - Each task can be deleted separately.
 - AI suggestions change nothing until accepted, and each part can be left out or edited first.
-- In the guided check-in, the user can also copy or download a summary.
 - Data already sent to an AI provider in Live AI mode can't be deleted from within this app. It is governed by the provider's retention policy.
 
 ## Privacy-policy and terms-of-use considerations

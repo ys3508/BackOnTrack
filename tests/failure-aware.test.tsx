@@ -562,6 +562,7 @@ describe("in the app", () => {
       )
     )
     const user = userEvent.setup()
+    window.location.hash = "#/tasks/a"
     render(<WorkspaceApp />)
     const hint = await screen.findByRole("region", {
       name: "Something BackOnTrack noticed",
@@ -643,32 +644,32 @@ describe("in the app", () => {
     ).toBeInTheDocument()
   })
 
-  it.each([
-    ["settings", "#/settings"],
-    ["home with a hint", "#/plan"],
-  ])("has no accessibility violations on %s", async (_name, hash) => {
-    seed(
-      run(
-        [
-          {
-            type: "add-subtask",
-            id: "a",
-            at: AT,
-            subId: "1",
-            title: "Write it",
-          },
-        ],
-        threeStuck()
+  it.each([["settings", "#/settings"]])(
+    "has no accessibility violations on %s",
+    async (_name, hash) => {
+      seed(
+        run(
+          [
+            {
+              type: "add-subtask",
+              id: "a",
+              at: AT,
+              subId: "1",
+              title: "Write it",
+            },
+          ],
+          threeStuck()
+        )
       )
-    )
-    window.location.hash = hash
-    render(<WorkspaceApp />)
-    await screen.findByRole("heading", { level: 1 })
-    await screen.findByText(/Empty documents/)
-    await waitFor(() => expect(fetch).toHaveBeenCalled())
-    const { violations } = await axe.run(document.body, {
-      rules: { "color-contrast": { enabled: false } },
-    })
-    expect(violations.map((item) => item.id)).toEqual([])
-  })
+      window.location.hash = hash
+      render(<WorkspaceApp />)
+      await screen.findByRole("heading", { level: 1 })
+      await screen.findByText(/Empty documents/)
+      await waitFor(() => expect(fetch).toHaveBeenCalled())
+      const { violations } = await axe.run(document.body, {
+        rules: { "color-contrast": { enabled: false } },
+      })
+      expect(violations.map((item) => item.id)).toEqual([])
+    }
+  )
 })

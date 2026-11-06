@@ -297,11 +297,43 @@ describe("ending a session", () => {
     const user = userEvent.setup()
     await start(user)
     await user.click(await button("I completed the minimum version"))
+    await user.click(await button("Save"))
     await user.click(await button("Focus history"))
     expect(
       await screen.findByText(/You said you completed the minimum version/)
     ).toBeTruthy()
     expect(screen.queryByText(/You said you made progress/)).toBeNull()
+  })
+
+  it("asks what they did when no minimum version is written, and saves it", async () => {
+    seed(withTask())
+    const user = userEvent.setup()
+    await start(user)
+    await user.click(await button("I completed the minimum version"))
+    await user.type(
+      await screen.findByLabelText("What did you do?"),
+      "Wrote the opening line{Enter}"
+    )
+    await waitFor(() => expect(saved().timer).toBeNull())
+    expect(saved().tasks[0].minimumVersion).toBe("Wrote the opening line")
+    expect(saved().tasks[0].status).not.toBe("completed")
+  })
+
+  it("doesn't ask again when a minimum version is already written", async () => {
+    seed(
+      workspaceReducer(withTask(), {
+        type: "edit-task",
+        id: withTask().tasks[0].id,
+        at: AT,
+        patch: { minimumVersion: "One line" },
+      })
+    )
+    const user = userEvent.setup()
+    await start(user)
+    await user.click(await button("I completed the minimum version"))
+    expect(screen.queryByLabelText("What did you do?")).toBeNull()
+    await waitFor(() => expect(saved().timer).toBeNull())
+    expect(saved().tasks[0].minimumVersion).toBe("One line")
   })
 
   it("keeps a session with no task simple", async () => {
