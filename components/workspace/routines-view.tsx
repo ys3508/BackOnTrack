@@ -11,7 +11,7 @@ export function RoutinesView() {
   const [editing, setEditing] = useState<string | null>(null)
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <ScreenHeading>Routines</ScreenHeading>
+      <ScreenHeading className="text-xl sm:text-xl">Routines</ScreenHeading>
       <MyRoutines
         editingId={editing}
         setEditingId={setEditing}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import {
   Clock,
   HelpCircle,
+  Hourglass,
   Inbox,
   Minimize2,
   NotebookPen,
@@ -59,6 +60,7 @@ import { startCue } from "@/lib/workspace/selectors"
 import { cn } from "@/lib/utils"
 
 const quiet = "min-h-11 justify-start text-muted-foreground"
+const compactAction = "min-h-11 px-2 text-muted-foreground"
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -118,17 +120,34 @@ function StepLine({ task }: { task: Task }) {
     )
   }
   if (!cue) {
+    const save = () => {
+      const value = text.trim()
+      if (!value) return
+      dispatch({
+        type: "edit-task",
+        id: task.id,
+        at: nowIso(),
+        patch: task.recoveryCase ? { nextAction: value } : { firstStep: value },
+      })
+    }
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setText("")
-          setEditing(true)
-        }}
-        className="min-h-9 rounded-md text-sm font-medium text-indigo underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
-      >
-        What will you do first?
-      </button>
+      <div>
+        <label htmlFor="now-first-step" className="sr-only">
+          What will you do first?
+        </label>
+        <Input
+          id="now-first-step"
+          value={text}
+          maxLength={300}
+          placeholder="e.g. open the assignment page"
+          onChange={(event) => setText(event.target.value)}
+          onBlur={save}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur()
+          }}
+          className="h-11"
+        />
+      </div>
     )
   }
   return (
@@ -237,6 +256,7 @@ function ReadyControls({
   label: string
   extra?: React.ReactNode
 }) {
+  const { dispatch } = useStore()
   const start = useStartFocus({ stay: true })
   const smaller = useMakeSmaller(task)
   const [changing, setChanging] = useState(false)
@@ -274,20 +294,21 @@ function ReadyControls({
           {label} · {formatDuration(length)}
         </p>
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <Button
+        type="button"
+        size="xl"
+        className="w-full sm:w-auto sm:min-w-40"
+        onClick={() => start(task.id, length, session?.id)}
+      >
+        <Play aria-hidden />
+        Start
+      </Button>
+      <div className="flex flex-wrap items-center gap-x-0.5">
         <Button
           type="button"
-          size="xl"
-          onClick={() => start(task.id, length, session?.id)}
-        >
-          <Play aria-hidden />
-          Start
-        </Button>
-        <Button
-          type="button"
-          size="xl"
+          size="lg"
           variant="ghost"
-          className={quiet}
+          className={compactAction}
           onClick={smaller.makeSmaller}
         >
           <Minimize2 aria-hidden />
@@ -295,15 +316,32 @@ function ReadyControls({
         </Button>
         <Button
           type="button"
-          size="xl"
+          size="lg"
           variant="ghost"
-          className={quiet}
+          className={compactAction}
           onClick={() => setChanging(true)}
         >
           <Clock aria-hidden />
           Change time
         </Button>
         {extra}
+        <Button
+          type="button"
+          size="lg"
+          variant="ghost"
+          className={compactAction}
+          onClick={() => {
+            dispatch({
+              type: "enter-recovery",
+              at: nowIso(),
+              taskId: null,
+              source: "avoidance",
+            })
+          }}
+        >
+          <Hourglass aria-hidden />
+          I’ve been avoiding something
+        </Button>
         <TaskLink task={task} className="px-2" />
       </div>
     </>
@@ -784,7 +822,7 @@ function StuckLink({
     <button
       type="button"
       onClick={() => enterRecovery(taskId, plannedId)}
-      className="min-h-11 rounded-md px-2 text-left text-sm font-medium text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
+      className="min-h-11 rounded-md px-2 text-sm font-medium text-muted-foreground underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
     >
       I’m stuck
     </button>
@@ -833,19 +871,21 @@ export function NowCard({ empty }: { empty: React.ReactNode }) {
     ? `At ${formatClockTime(new Date(`${session.date}T${session.time}:00`))}`
     : "Suggested for now"
   return (
-    <Card className="space-y-4 p-6 sm:p-8">
+    <Card className="space-y-3 p-5 sm:p-6">
       <div>
         <Label>{session ? "Coming up" : "You could start with"}</Label>
-        <p className="mt-1 font-heading text-[1.625rem] leading-tight break-words sm:text-[2rem]">
+        <p className="mt-0.5 font-heading text-[1.375rem] leading-tight break-words sm:text-[1.625rem]">
           {task.title}
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-x-3">
           <DeadlineChip task={task} />
-          {current.kind === "suggested" && current.reason && (
-            <span className="text-xs text-muted-foreground">
-              {current.reason}
-            </span>
-          )}
+          {current.kind === "suggested" &&
+            current.reason &&
+            !(task.deadline && current.reason.startsWith("Due")) && (
+              <span className="text-xs text-muted-foreground">
+                {current.reason}
+              </span>
+            )}
         </div>
       </div>
       <ReadyControls
@@ -861,9 +901,9 @@ export function NowCard({ empty }: { empty: React.ReactNode }) {
             current.kind === "suggested" && (
               <Button
                 type="button"
-                size="xl"
+                size="lg"
                 variant="ghost"
-                className={quiet}
+                className={compactAction}
                 onClick={() => {
                   const next = pickAnother(state, today, task.id)
                   setPickedId(next.id)

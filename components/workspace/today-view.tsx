@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Check, ChevronRight } from "lucide-react"
 import interactionPlugin from "@fullcalendar/interaction"
 import FullCalendar from "@fullcalendar/react"
@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button"
 import { BlockPopover } from "@/components/workspace/calendar-overlays"
 import type { BlockRef } from "@/components/workspace/calendar-overlays"
 import { NotStartedTray } from "@/components/workspace/calendar-sidebar"
+import { useNow } from "@/components/workspace/focus-view"
 import { NowCard } from "@/components/workspace/now-card"
-import { DeadlineChip } from "@/components/workspace/parts"
+import { DeadlineChip, ExpandableList } from "@/components/workspace/parts"
 import { QuickCapture } from "@/components/workspace/quick-capture"
 import { ReturnView } from "@/components/workspace/return-view"
 import { ReplanDialog } from "@/components/workspace/schedule"
@@ -23,20 +24,26 @@ import { useCalendarEvents } from "@/components/workspace/use-calendar-events"
 import {
   formatClockTime,
   formatDuration,
-  hourRange,
   occurrenceOutcome,
   rangeStats,
   routineOccursOn,
   routineTime,
+  trayItems,
 } from "@/lib/calendar/derived"
 import type { CalendarItemKind } from "@/lib/calendar/events"
 import { caseContext, demoSmaller } from "@/lib/recovery/case-engine"
 import {
   HEAVY_DAY_MINUTES,
+  nowState,
   plannedMinutesOn,
   restartsOn,
   splitTasks,
 } from "@/lib/today/now"
+import {
+  blocksOutsideWindow,
+  hasScheduleToday,
+  timelineWindow,
+} from "@/lib/today/timeline"
 import { addDays, formatDateTime, localToday } from "@/lib/workspace/dates"
 import { returnSummary } from "@/lib/workspace/returning"
 import { isActive } from "@/lib/workspace/schemas"
@@ -53,26 +60,32 @@ function TodayTimeline() {
   const { state, today, navigate } = useStore()
   const { events, eventClasses, eventContent, eventDidMount } =
     useCalendarEvents()
-  const hours = hourRange(state, today, addDays(today, 1))
+  const [hour, setHour] = useState(() => new Date().getHours())
   const [opened, setOpened] = useState<{
     block: BlockRef
     element: Element
   } | null>(null)
   const [replanning, setReplanning] = useState<Task | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const close = useCallback(() => setOpened(null), [])
   const element = opened?.element ?? null
   const anchor = useCallback(() => element, [element])
+
+  useEffect(() => {
+    const id = window.setInterval(() => setHour(new Date().getHours()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   function open(info: EventClickArg) {
     if ((info.jsEvent.target as Element).closest?.("[data-block-action]")) {
       return
     }
     const { kind, refId, taskId } = info.event.extendedProps as {
-      kind: BlockRef["kind"] | Extract<CalendarItemKind, "pending">
+      kind: BlockRef["kind"] | Extract<CalendarItemKind, "pending" | "buffer">
       refId: string
       taskId: string | null
     }
-    if (kind === "pending") return
+    if (kind === "pending" || kind === "buffer") return
     const { start, end } = info.event
     info.jsEvent.preventDefault()
     setOpened({
@@ -89,25 +102,59 @@ function TodayTimeline() {
     })
   }
 
-  const scrollHour = Math.max(hours.first, new Date().getHours() - 1)
+  const clock = new Date(`${today}T${pad(hour)}:00:00`)
+  const hours = timelineWindow(clock)
+  const scheduled = hasScheduleToday(state, today, clock.getTime())
+  const elsewhere = blocksOutsideWindow(state, today, hours)
+
+  if (!scheduled && !expanded) {
+    return (
+      <section aria-labelledby="timeline-heading" className="min-w-0">
+        <h2 id="timeline-heading" className="sr-only">
+          Today’s timeline
+        </h2>
+        <button
+          type="button"
+          aria-expanded={false}
+          onClick={() => setExpanded(true)}
+          className="flex min-h-11 w-full items-center gap-1 rounded-xl border border-border bg-card px-3.5 py-2 text-left text-sm text-muted-foreground outline-none hover:border-primary/40 focus-visible:ring-3 focus-visible:ring-ring/30"
+        >
+          <span className="min-w-0 flex-1">
+            Nothing scheduled today · plan a block
+          </span>
+          <ChevronRight className="size-4 shrink-0" aria-hidden />
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section aria-labelledby="timeline-heading" className="min-w-0">
-      <h2 id="timeline-heading" className={cn(sectionTitle, "mb-2")}>
-        Today’s timeline
-      </h2>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+        <h2 id="timeline-heading" className={sectionTitle}>
+          Today’s timeline
+        </h2>
+        <button
+          type="button"
+          className={linkButton}
+          onClick={() => navigate({ view: "calendar" })}
+        >
+          {elsewhere > 0
+            ? `${elsewhere} more today · full Calendar`
+            : "Full Calendar"}
+        </button>
+      </div>
       <Card className="p-2 sm:p-3">
         <FullCalendar
           plugins={[timeGridPlugin, interactionPlugin, rrulePlugin]}
           initialView="timeGridDay"
           headerToolbar={false}
           dayHeaders={false}
-          height={520}
+          height="auto"
           allDayText=""
           nowIndicator
           slotMinTime={`${pad(hours.first)}:00:00`}
           slotMaxTime={`${pad(hours.last)}:00:00`}
-          scrollTime={`${pad(scrollHour)}:00:00`}
           slotLabelContent={(arg) => formatClockTime(arg.date)}
           eventInteractive
           eventDisplay="block"
@@ -332,6 +379,11 @@ function TodayColumn() {
   const [heavyHidden, setHeavyHidden] = useState(false)
   const lists = splitTasks(state, today)
   const planned = plannedMinutesOn(state, today)
+  const notStarted = trayItems(state, today).length
+  const now = useNow(true)
+  const nowKind = nowState(state, today, now).kind
+  // The Now card already has this among its actions, so it isn't said twice.
+  const cardOffersAvoiding = nowKind === "suggested" || nowKind === "upcoming"
   return (
     <aside aria-label="Today’s items" className="min-w-0 space-y-5">
       <section aria-labelledby="tasks-today" className="space-y-2">
@@ -339,23 +391,23 @@ function TodayColumn() {
           Today’s tasks
         </h2>
         <QuickCapture />
-        {lists.today.length > 0 && (
-          <ul className="space-y-1.5">
-            {lists.today.map((task) => (
-              <TaskLine key={task.id} task={task} />
-            ))}
-          </ul>
-        )}
+        <ExpandableList
+          items={lists.today}
+          limit={state.settings.homeListSize}
+          label="tasks"
+          render={(task) => <TaskLine key={task.id} task={task} />}
+        />
         {lists.later.length > 0 && (
           <details>
             <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-muted-foreground">
               Other open tasks ({lists.later.length})
             </summary>
-            <ul className="space-y-1.5">
-              {lists.later.map((task) => (
-                <TaskLine key={task.id} task={task} />
-              ))}
-            </ul>
+            <ExpandableList
+              items={lists.later}
+              limit={state.settings.homeListSize}
+              label="tasks"
+              render={(task) => <TaskLine key={task.id} task={task} />}
+            />
           </details>
         )}
         {planned > HEAVY_DAY_MINUTES && !heavyHidden && (
@@ -375,26 +427,30 @@ function TodayColumn() {
 
       <RoutinesToday />
 
-      <details>
-        <summary className={cn(sectionTitle, "min-h-11 cursor-pointer py-2")}>
-          Not started yet
-        </summary>
-        <NotStartedTray
-          hideHeading
-          onSchedule={(taskId) =>
-            setReplanning(
-              state.tasks.find((task) => task.id === taskId) ?? null
-            )
-          }
-        />
-      </details>
+      {notStarted > 0 && (
+        <details>
+          <summary className={cn(sectionTitle, "min-h-11 cursor-pointer py-2")}>
+            Not started yet ({notStarted})
+          </summary>
+          <NotStartedTray
+            hideHeading
+            onSchedule={(taskId) =>
+              setReplanning(
+                state.tasks.find((task) => task.id === taskId) ?? null
+              )
+            }
+          />
+        </details>
+      )}
 
       <ParkedThoughts />
 
       <nav aria-label="More" className="flex flex-wrap gap-x-4 gap-y-0">
-        <button type="button" className={linkButton} onClick={avoid}>
-          I’ve been avoiding something
-        </button>
+        {!cardOffersAvoiding && (
+          <button type="button" className={linkButton} onClick={avoid}>
+            I’ve been avoiding something
+          </button>
+        )}
         <button
           type="button"
           className={linkButton}
@@ -482,7 +538,7 @@ export function TodayView() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-        <ScreenHeading>Today</ScreenHeading>
+        <ScreenHeading className="text-xl sm:text-xl">Today</ScreenHeading>
         <Summary />
       </div>
 

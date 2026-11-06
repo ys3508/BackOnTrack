@@ -2,6 +2,7 @@
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -10,6 +11,7 @@ import {
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { timelineWindow } from "@/lib/today/timeline"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import {
   firstStepOf,
@@ -296,7 +298,7 @@ describe("Test 1 and Test 10: the card shows only what's relevant", () => {
     const card = nowCard()
     expect(within(card).getAllByRole("button")).toHaveLength(1)
     expect(
-      within(card).getByPlaceholderText("What do you need to do?")
+      within(card).getByPlaceholderText("What have you been putting off?")
     ).toBeTruthy()
     expect(screen.queryByText("Today’s timeline")).toBeNull()
     expect(screen.queryByText(/Focused/)).toBeNull()
@@ -306,7 +308,7 @@ describe("Test 1 and Test 10: the card shows only what's relevant", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.type(
-      await screen.findByPlaceholderText("What do you need to do?"),
+      await screen.findByPlaceholderText("What have you been putting off?"),
       "Buy lunch{Enter}"
     )
     expect(saved().tasks[0]).toMatchObject({
@@ -519,10 +521,86 @@ describe("working from the card", () => {
     seed(run([task("a", "Essay")]))
     const user = userEvent.setup()
     render(<WorkspaceApp />)
-    await user.click(await button("What will you do first?"))
-    const input = await screen.findByLabelText("What will you do first?")
+    const input = await screen.findByPlaceholderText(
+      "e.g. open the assignment page"
+    )
     await user.type(input, "Open the doc{Enter}")
     expect(saved().tasks[0].firstStep).toBe("Open the doc")
+  })
+
+  it("saves the first step when the field loses focus", async () => {
+    seed(run([task("a", "Essay")]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.type(
+      await screen.findByLabelText("What will you do first?"),
+      "Open the doc"
+    )
+    await user.tab()
+    expect(saved().tasks[0].firstStep).toBe("Open the doc")
+  })
+
+  it("offers I've been avoiding something once, on the card", async () => {
+    seed(run([task("a", "Essay")]))
+    render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Today" })
+    expect(
+      screen.getAllByRole("button", { name: /I’ve been avoiding something/ })
+    ).toHaveLength(1)
+    within(nowCard()).getByRole("button", {
+      name: /I’ve been avoiding something/,
+    })
+  })
+
+  it("collapses an empty timeline to one line that opens", async () => {
+    seed(run([task("a", "Essay")]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    const line = await button(/Nothing scheduled today · plan a block/)
+    expect(screen.queryByRole("button", { name: "Full Calendar" })).toBeNull()
+    await user.click(line)
+    await button("Full Calendar")
+  })
+
+  it("shows the timeline when something is scheduled", async () => {
+    seed(run([task("a", "Essay"), block("u", "a", clock(offset(40)), 45)]))
+    render(<WorkspaceApp />)
+    await button(/Full Calendar/)
+    expect(
+      screen.queryByRole("button", { name: /Nothing scheduled today/ })
+    ).toBeNull()
+  })
+
+  it("never hides tasks: the rest are behind Show all", async () => {
+    seed(
+      run([
+        task("a", "One", TODAY),
+        task("b", "Two", TODAY),
+        task("c", "Three", TODAY),
+        task("d", "Four", TODAY),
+        task("e", "Five", TODAY),
+      ])
+    )
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    const list = (await screen.findByRole("heading", { name: "Today’s tasks" }))
+      .parentElement!
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3)
+    await user.click(within(list).getByRole("button", { name: /Show all 5/ }))
+    expect(within(list).getAllByRole("listitem")).toHaveLength(5)
+  })
+
+  it("counts Not started yet, and hides it when empty", async () => {
+    seed(run([task("a", "Essay")]))
+    const first = render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Today" })
+    expect(screen.queryByText(/Not started yet/)).toBeNull()
+    first.unmount()
+    seed(
+      run([task("a", "Essay", "2020-01-01"), task("b", "Rent", "2020-01-02")])
+    )
+    render(<WorkspaceApp />)
+    await screen.findByText("Not started yet (2)")
   })
 
   it("keeps a parked thought without leaving the session", async () => {
@@ -607,7 +685,7 @@ describe("Quick Capture anywhere", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.type(
-      await screen.findByPlaceholderText("What do you need to do?"),
+      await screen.findByPlaceholderText("What have you been putting off?"),
       "Pay rent by Friday{Enter}"
     )
     expect(saved().tasks[0].deadline).toBeNull()
@@ -617,7 +695,7 @@ describe("Quick Capture anywhere", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.type(
-      await screen.findByPlaceholderText("What do you need to do?"),
+      await screen.findByPlaceholderText("What have you been putting off?"),
       "I want to kill myself{Enter}"
     )
     expect(await screen.findByRole("alert")).toHaveTextContent("988")
@@ -658,6 +736,9 @@ describe("around the card", () => {
     await screen.findByRole("heading", { name: "Today" })
     // Made on an earlier day, so these aren't all about today.
     expect(screen.getByText("Other open tasks (12)")).toBeTruthy()
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show all 12 tasks", hidden: true })
+    )
     for (let i = 0; i < 12; i++) {
       expect(
         screen.getByRole("button", {
@@ -736,5 +817,20 @@ describe("around the card", () => {
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Pick up where you left off" })
     act(() => {})
+  })
+})
+
+describe("the timeline's window", () => {
+  const at = (hour: number) => {
+    const date = new Date()
+    date.setHours(hour, 0, 0, 0)
+    return date
+  }
+  it("shows an hour before now, and the next four", () => {
+    expect(timelineWindow(at(13))).toEqual({ first: 12, last: 17 })
+  })
+  it("stays inside the day", () => {
+    expect(timelineWindow(at(23))).toEqual({ first: 19, last: 24 })
+    expect(timelineWindow(at(0))).toEqual({ first: 0, last: 5 })
   })
 })

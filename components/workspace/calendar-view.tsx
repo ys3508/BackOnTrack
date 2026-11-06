@@ -510,7 +510,7 @@ export function CalendarView() {
 
   return (
     <div className="space-y-4">
-      <ScreenHeading>Calendar</ScreenHeading>
+      <ScreenHeading className="text-xl sm:text-xl">Calendar</ScreenHeading>
 
       {isTimed && (
         <CalendarDashboard

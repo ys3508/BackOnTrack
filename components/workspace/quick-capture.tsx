@@ -61,7 +61,7 @@ export function QuickCapture({
         value={capture.text}
         autoFocus={autoFocus}
         maxLength={200}
-        placeholder="What do you need to do?"
+        placeholder="What have you been putting off?"
         onChange={(event) => capture.setText(event.target.value)}
         className="h-11 flex-1 bg-card"
       />

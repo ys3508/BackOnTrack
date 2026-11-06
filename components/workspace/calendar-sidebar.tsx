@@ -64,6 +64,7 @@ export function NotStartedTray({
   const { state, today } = useStore()
   const items = trayItems(state, today)
   const ref = useCalendarDraggable()
+  if (!items.length) return null
   return (
     <section
       aria-labelledby={hideHeading ? undefined : "tray-heading"}
@@ -74,11 +75,8 @@ export function NotStartedTray({
           id="tray-heading"
           className="mb-2 font-sans text-[15px] font-semibold tracking-normal"
         >
-          Not started yet
+          Not started yet ({items.length})
         </h2>
-      )}
-      {items.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nothing waiting here.</p>
       )}
       <ul ref={ref} className="space-y-1.5">
         {items.map(({ task, putOffDays }) => (

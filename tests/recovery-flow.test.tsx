@@ -873,7 +873,7 @@ describe("getting there from elsewhere", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.type(
-      await screen.findByPlaceholderText("What do you need to do?"),
+      await screen.findByPlaceholderText("What have you been putting off?"),
       "Buy lunch{Enter}"
     )
     await user.click(await button("Start"))

@@ -164,7 +164,7 @@ export function ExpandableList<T>({
         >
           {expanded
             ? "Show fewer"
-            : `Show ${items.length - limit} more ${label}`}
+            : `Show all ${items.length} ${label}`}
         </button>
       )}
     </>

@@ -204,7 +204,7 @@ export function SettingsView() {
               htmlFor="home-size"
               className="mb-1 block text-sm font-medium"
             >
-              Tasks shown per list on the home page
+              Tasks shown per list on Today
             </label>
             <select
               id="home-size"
