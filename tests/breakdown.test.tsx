@@ -517,7 +517,7 @@ describe("task screen and home", () => {
       STORAGE,
       JSON.stringify({ ...state, legacyMigrated: true })
     )
-    window.location.hash = "#/today"
+    window.location.hash = "#/plan"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Continue where you left off" })
@@ -529,7 +529,7 @@ describe("task screen and home", () => {
   })
 
   it("offers one step on a new task, without any list", async () => {
-    window.location.hash = "#/today"
+    window.location.hash = "#/plan"
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Your next small step" })
     expect(screen.getByText(/into small steps/)).toBeInTheDocument()

@@ -121,7 +121,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/today"
+  window.location.hash = "#/plan"
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => Response.json({ live: false, model: null }))
@@ -645,7 +645,7 @@ describe("in the app", () => {
 
   it.each([
     ["settings", "#/settings"],
-    ["home with a hint", "#/today"],
+    ["home with a hint", "#/plan"],
   ])("has no accessibility violations on %s", async (_name, hash) => {
     seed(
       run(

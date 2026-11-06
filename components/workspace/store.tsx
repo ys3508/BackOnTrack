@@ -33,7 +33,9 @@ export type CaseIntent = "smaller" | "reconsider" | "stuck"
 
 export type Route =
   | { view: "workspace" }
-  | { view: "today" }
+  | { view: "plan" }
+  | { view: "avoid" }
+  | { view: "routines" }
   | { view: "case"; id: string; intent?: CaseIntent }
   | { view: "tasks" }
   | { view: "task"; id: string; section?: TaskSection }
@@ -51,7 +53,9 @@ export function parseHash(hash: string): Route {
       : { view: "task", id }
   }
   if (view === "case" && id) return { view: "case", id }
-  if (view === "today") return { view: "today" }
+  if (view === "plan" || view === "avoid" || view === "routines") {
+    return { view }
+  }
   if (view === "focus") return { view: "focus", taskId: id }
   if (view === "recover") return { view: "recover", taskId: id }
   if (
@@ -107,6 +111,24 @@ export function useStore() {
   const store = useContext(StoreContext)
   if (!store) throw new Error("useStore must be used inside WorkspaceProvider")
   return store
+}
+
+/** Goes back to the Now card, where recovery happens, for this task. */
+export function useEnterRecovery() {
+  const { dispatch, navigate } = useStore()
+  return useCallback(
+    (taskId: string, plannedId: string | null = null) => {
+      dispatch({
+        type: "enter-recovery",
+        at: nowIso(),
+        taskId,
+        plannedId,
+        source: plannedId ? "scheduled" : "avoidance",
+      })
+      navigate({ view: "workspace" })
+    },
+    [dispatch, navigate]
+  )
 }
 
 export function newId() {

@@ -1,25 +1,25 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Plus } from "lucide-react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import type {
   DateClickArg,
+  DropArg,
   EventResizeDoneArg,
 } from "@fullcalendar/interaction"
-import type { DropArg } from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import FullCalendar from "@fullcalendar/react"
 import rrulePlugin from "@fullcalendar/rrule"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import type {
+  DateSelectArg,
+  DateSpanApi,
   DatesSetArg,
   DayCellContentArg,
   EventClickArg,
-  EventContentArg,
   EventDropArg,
-  EventMountArg,
   EventInput,
 } from "@fullcalendar/core"
 
@@ -28,28 +28,32 @@ import { Button } from "@/components/ui/button"
 import { CalendarDashboard } from "@/components/workspace/calendar-dashboard"
 import {
   BlockPopover,
-  InlineCreate,
+  CreateSession,
+  CreateTask,
 } from "@/components/workspace/calendar-overlays"
-import type { BlockRef, Point } from "@/components/workspace/calendar-overlays"
+import type { BlockRef } from "@/components/workspace/calendar-overlays"
 import {
   MyRoutines,
   NotStartedTray,
 } from "@/components/workspace/calendar-sidebar"
 import { ConfirmDialog } from "@/components/workspace/parts"
-import { PlanRemaining } from "@/components/workspace/plan-remaining"
-import {
-  PlannedSessionRow,
-  ReplanDialog,
-} from "@/components/workspace/schedule"
+import { useCalendarEvents } from "@/components/workspace/use-calendar-events"
+import { ReplanDialog } from "@/components/workspace/schedule"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import {
+  PALETTE,
+  defaultSessionMinutes,
   focusMinutesByDay,
   formatClockTime,
   formatDuration,
   heatLevel,
+  hourRange,
+  occurrenceOutcome,
   routineTime,
 } from "@/lib/calendar/derived"
-import { buildCalendarItems, droppedSlot } from "@/lib/calendar/events"
+import { droppedSlot } from "@/lib/calendar/events"
+import { downloadIcs } from "@/lib/calendar/ics"
+import { withGap } from "@/lib/today/buffer"
 import type { CalendarItemKind } from "@/lib/calendar/events"
 import { addDays, localToday, shortDate } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
@@ -60,16 +64,31 @@ const WEEK_VIEW = "timeGridWeek"
 const MONTH_VIEW = "dayGridMonth"
 const YEAR_VIEW = "multiMonthYear"
 
-const SESSION_MINUTES = 25
-
 type DeadlineMove = { task: Task; date: string }
 
-type Creating = { at: Point; date: string; time: string | null }
-type Open = { block: BlockRef; at: Point }
+type Creating = {
+  date: string
+  time: string | null
+  minutes: number
+  /** Which way it was opened, since only "Add to" takes a remembered length. */
+  source: "click" | "drag" | "add"
+  /** True once a length was chosen on purpose, so it's remembered. */
+  chosen: boolean
+}
+type Open = { block: BlockRef; element: Element }
 type Shown = { type: string; from: string; until: string }
 
+const pad = (value: number) => String(value).padStart(2, "0")
+
+/** About an hour before now, so the current time is on screen and has context. */
+function scrollPosition() {
+  const now = new Date()
+  return `${pad(Math.max(0, now.getHours() - 1))}:00:00`
+}
+
 export function CalendarView() {
-  const { state, dispatch, navigate, today } = useStore()
+  const { state, dispatch, today } = useStore()
+  const { settings } = state
   const [selected, setSelected] = useState(today)
   const [deadlineMove, setDeadlineMove] = useState<DeadlineMove | null>(null)
   const [replanning, setReplanning] = useState<Task | null>(null)
@@ -82,77 +101,44 @@ export function CalendarView() {
     until: addDays(today, 1),
   })
   const calendar = useRef<FullCalendar>(null)
-  const surface = useRef<HTMLDivElement>(null)
 
   const isYear = shown.type === YEAR_VIEW
+  const isMonth = shown.type === MONTH_VIEW
   const isTimed = shown.type === DAY_VIEW || shown.type === WEEK_VIEW
   const closeCreating = useCallback(() => setCreating(null), [])
   const closeOpened = useCallback(() => setOpened(null), [])
 
   const heat = useMemo(() => focusMinutesByDay(state), [state])
+  const hours = useMemo(
+    () => hourRange(state, shown.from, shown.until),
+    [state, shown.from, shown.until]
+  )
 
-  const events = useMemo<EventInput[]>(() => {
-    // The year shows only how focus was spread. No tasks, no blocks.
-    if (isYear) return []
-    const routines = state.routines.map((routine): EventInput => ({
-      id: `routine:${routine.id}`,
-      title: `${routine.emoji} ${routine.name}`.trim(),
-      rrule: routine.rrule,
-      duration: { minutes: routine.duration },
-      exdate: routine.exdates.map(
-        (date) => `${date}T${routineTime(routine)}:00`
-      ),
-      editable: true,
-      durationEditable: false,
-      classNames: ["bot-routine"],
-      extendedProps: {
-        kind: "routine",
-        refId: routine.id,
-        taskId: null,
-        color: routine.color,
+  const { events, eventClasses, eventContent, eventDidMount } =
+    useCalendarEvents(isYear)
+
+  /** Shows where a new session will land, while it's being named. */
+  const withPending = useMemo<EventInput[]>(() => {
+    if (!creating?.time || !isTimed) return events
+    const start = new Date(`${creating.date}T${creating.time}:00`)
+    return [
+      ...events,
+      {
+        id: "pending",
+        title: "New session",
+        start,
+        end: new Date(start.getTime() + creating.minutes * 60_000),
+        editable: false,
+        classNames: ["bot-planned", "bot-pending"],
+        extendedProps: { kind: "pending", refId: "pending", taskId: null },
       },
-    }))
-    const placed = state.routinePlacements.flatMap((item): EventInput[] => {
-      const routine = state.routines.find((r) => r.id === item.routineId)
-      if (!routine) return []
-      const start = new Date(`${item.date}T${item.time}:00`)
-      return [
-        {
-          id: `placement:${item.id}`,
-          title: `${routine.emoji} ${routine.name}`.trim(),
-          start,
-          end: new Date(start.getTime() + routine.duration * 60_000),
-          editable: true,
-          durationEditable: false,
-          classNames: ["bot-routine"],
-          extendedProps: {
-            kind: "routine-placement",
-            refId: item.id,
-            taskId: null,
-            color: routine.color,
-          },
-        },
-      ]
-    })
-    return [...buildCalendarItems(state, today), ...routines, ...placed]
-  }, [state, today, isYear])
-
-  const dueOnDay = state.tasks.filter((task) => task.deadline === selected)
-  const plannedOnDay = state.planned.filter((item) => item.date === selected)
+    ]
+  }, [events, creating, isTimed])
 
   const selectedDay = useCallback(
     (date: Date) => (localToday(date) === selected ? ["bot-selected-day"] : []),
     [selected]
   )
-
-  /** Where to float something, relative to the calendar's own box. */
-  function pointFrom(clientX: number, clientY: number): Point {
-    const box = surface.current?.getBoundingClientRect()
-    return {
-      x: clientX - (box?.left ?? 0),
-      y: clientY - (box?.top ?? 0) + 4,
-    }
-  }
 
   function handleDateClick(info: DateClickArg) {
     const date = info.dateStr.slice(0, 10)
@@ -162,63 +148,108 @@ export function CalendarView() {
       calendar.current?.getApi().changeView(DAY_VIEW, date)
       return
     }
-    const { clientX, clientY } = info.jsEvent
     setCreating({
-      at: pointFrom(clientX, clientY),
       date,
-      time: info.allDay ? null : info.dateStr.slice(11, 16),
+      time: info.allDay
+        ? null
+        : withGap(
+            state,
+            date,
+            info.dateStr.slice(11, 16),
+            defaultSessionMinutes(settings)
+          ),
+      // The length last used, or else the usual 25.
+      minutes: defaultSessionMinutes(settings),
+      source: "click",
+      chosen: false,
     })
   }
 
-  function createFromTitle(title: string) {
+  /** Dragging across slots sets the length directly. */
+  function handleSelect(info: DateSelectArg) {
+    const date = localToday(info.start)
+    setSelected(date)
+    setOpened(null)
+    setCreating({
+      date,
+      time: `${pad(info.start.getHours())}:${pad(info.start.getMinutes())}`,
+      minutes: (info.end.getTime() - info.start.getTime()) / 60_000,
+      source: "drag",
+      chosen: true,
+    })
+    // The pending block takes over from the selection's mirror.
+    calendar.current?.getApi().unselect()
+  }
+
+  function createTask(title: string) {
+    if (!creating) return
+    dispatch({
+      type: "create-task",
+      id: newId(),
+      at: nowIso(),
+      title,
+      deadline: creating.date,
+    })
+    setCreating(null)
+  }
+
+  function createSession(title: string, firstStep: string) {
     if (!creating) return
     const at = nowIso()
-    const { date, time } = creating
-    if (shown.type === MONTH_VIEW) {
-      dispatch({ type: "create-task", id: newId(), at, title, deadline: date })
-    } else {
-      // A title matching an open task sets aside time for it, not a duplicate.
-      const existing = state.tasks.find(
-        (task) =>
-          isActive(task) && task.title.toLowerCase() === title.toLowerCase()
-      )
-      const taskId = existing?.id ?? newId()
-      if (!existing) dispatch({ type: "create-task", id: taskId, at, title })
-      dispatch({
-        type: "add-planned",
-        at,
-        session: {
-          id: newId(),
-          taskId,
-          date,
-          time,
-          minutes: SESSION_MINUTES,
-          label: "",
-          done: false,
-        },
-      })
+    const { date, time, minutes, chosen } = creating
+    // A title matching an open task sets aside time for it, not a duplicate.
+    const existing = state.tasks.find(
+      (task) =>
+        isActive(task) && task.title.toLowerCase() === title.toLowerCase()
+    )
+    const taskId = existing?.id ?? newId()
+    if (!existing) dispatch({ type: "create-task", id: taskId, at, title })
+    if (firstStep) {
+      dispatch({ type: "edit-task", id: taskId, at, patch: { firstStep } })
+    }
+    dispatch({
+      type: "add-planned",
+      at,
+      session: {
+        id: newId(),
+        taskId,
+        date,
+        time,
+        minutes,
+        label: "",
+        done: false,
+      },
+    })
+    if (chosen) {
+      dispatch({ type: "settings", patch: { lastSessionMinutes: minutes } })
     }
     setCreating(null)
   }
 
   function handleEventClick(info: EventClickArg) {
+    // Its own buttons on the block, such as Did it, have already done their job.
+    if ((info.jsEvent.target as Element).closest?.("[data-block-action]")) {
+      return
+    }
     const { kind, refId, taskId } = info.event.extendedProps as {
       kind: CalendarItemKind
       refId: string
       taskId: string | null
     }
-    const start = info.event.start
+    if (kind === "pending" || kind === "buffer") return
+    const { start, end } = info.event
     info.jsEvent.preventDefault()
     setCreating(null)
-    const box = info.el.getBoundingClientRect()
     setOpened({
-      at: pointFrom(box.left, box.bottom),
+      element: info.el,
       block: {
         kind,
         refId,
         taskId,
         title: info.event.title,
         date: start ? localToday(start) : selected,
+        start,
+        end,
       },
     })
   }
@@ -229,6 +260,7 @@ export function CalendarView() {
     const start = info.event.start
     if (!start) return info.revert()
     const slot = droppedSlot(start, info.event.allDay)
+    setOpened(null)
 
     if (kind === "planned") {
       dispatch({
@@ -245,6 +277,7 @@ export function CalendarView() {
     if (kind === "routine") {
       const routine = state.routines.find((item) => item.id === refId)
       const from = info.oldEvent.start
+      const oldEnd = info.oldEvent.end
       if (!routine || !from) return
       dispatch({
         type: "move-routine-occurrence",
@@ -254,8 +287,13 @@ export function CalendarView() {
           id: newId(),
           routineId: refId,
           date: slot.date,
-          time: slot.time ?? routineTime(routine),
+          time:
+            slot.time ??
+            (routine.kind === "flexible" ? "" : routineTime(routine)),
+          minutes: oldEnd ? (oldEnd.getTime() - from.getTime()) / 60_000 : null,
+          adjusted: true,
           done: routine.doneDates.includes(localToday(from)),
+          result: occurrenceOutcome(routine, localToday(from)),
         },
       })
       return
@@ -280,15 +318,47 @@ export function CalendarView() {
 
   function handleEventResize(info: EventResizeDoneArg) {
     const { start, end } = info.event
-    if (info.event.extendedProps.kind !== "planned" || !start || !end) {
-      return info.revert()
+    const { kind, refId } = info.event.extendedProps as {
+      kind: CalendarItemKind
+      refId: string
     }
-    dispatch({
-      type: "resize-planned",
-      at: nowIso(),
-      id: info.event.extendedProps.refId as string,
-      minutes: (end.getTime() - start.getTime()) / 60_000,
-    })
+    if (!start || !end) return info.revert()
+    const minutes = (end.getTime() - start.getTime()) / 60_000
+    setOpened(null)
+    if (kind === "planned") {
+      dispatch({ type: "resize-planned", at: nowIso(), id: refId, minutes })
+      dispatch({ type: "settings", patch: { lastSessionMinutes: minutes } })
+    } else if (kind === "routine") {
+      // Resizing changes this one only, and the popover offers "All future".
+      info.revert()
+      const routine = state.routines.find((item) => item.id === refId)
+      if (!routine) return
+      const date = localToday(start)
+      dispatch({
+        type: "move-routine-occurrence",
+        routineId: refId,
+        fromDate: date,
+        placement: {
+          id: newId(),
+          routineId: refId,
+          date,
+          time: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
+          minutes,
+          adjusted: true,
+          done: routine.doneDates.includes(date),
+          result: occurrenceOutcome(routine, date),
+        },
+      })
+    } else if (kind === "routine-placement") {
+      info.revert()
+      dispatch({
+        type: "update-placement",
+        id: refId,
+        date: localToday(start),
+        time: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
+        minutes,
+      })
+    } else return info.revert()
   }
 
   /** Something dragged in from the tray or from My routines. */
@@ -298,6 +368,8 @@ export function CalendarView() {
     const id = info.draggedEl.getAttribute("data-id")
     if (!id) return
     if (kind === "task") {
+      const task = state.tasks.find((item) => item.id === id)
+      const length = defaultSessionMinutes(settings, task)
       dispatch({
         type: "add-planned",
         at: nowIso(),
@@ -305,8 +377,8 @@ export function CalendarView() {
           id: newId(),
           taskId: id,
           date: slot.date,
-          time: slot.time,
-          minutes: SESSION_MINUTES,
+          time: slot.time && withGap(state, slot.date, slot.time, length),
+          minutes: length,
           label: "",
           done: false,
         },
@@ -321,36 +393,16 @@ export function CalendarView() {
           id: newId(),
           routineId: id,
           date: slot.date,
-          time: slot.time ?? routineTime(routine),
+          time:
+            slot.time ??
+            (routine.kind === "flexible" ? "" : routineTime(routine)),
           done: false,
         },
       })
     }
   }
 
-  /** Which occurrence of a routine is done, or has gone by, varies by date. */
-  const eventClasses = useCallback(
-    (arg: EventContentArg) => {
-      const { kind, refId } = arg.event.extendedProps as {
-        kind: CalendarItemKind
-        refId: string
-      }
-      if (kind !== "routine" && kind !== "routine-placement") return []
-      const date = arg.event.start ? localToday(arg.event.start) : ""
-      const done =
-        kind === "routine"
-          ? state.routines
-              .find((item) => item.id === refId)
-              ?.doneDates.includes(date)
-          : state.routinePlacements.find((item) => item.id === refId)?.done
-      if (done) return ["bot-routine-done"]
-      return arg.event.end && arg.event.end.getTime() < Date.now()
-        ? ["bot-missed"]
-        : []
-    },
-    [state.routines, state.routinePlacements]
-  )
-
+  const lastView = useRef("")
   const handleDatesSet = useCallback((info: DatesSetArg) => {
     const from = localToday(info.start)
     setShown({
@@ -360,14 +412,16 @@ export function CalendarView() {
     })
     // In Day view, the day on screen is the chosen day.
     if (info.view.type === DAY_VIEW) setSelected(from)
-    // Coming from a view with no hours, the grid would otherwise start at 12am.
-    if (info.view.type === DAY_VIEW || info.view.type === WEEK_VIEW) {
-      window.setTimeout(() => {
-        calendar.current?.getApi().scrollToTime("07:00:00")
-      }, 0)
-    }
     setCreating(null)
     setOpened(null)
+    if (info.view.type !== lastView.current) {
+      lastView.current = info.view.type
+      if (info.view.type === DAY_VIEW || info.view.type === WEEK_VIEW) {
+        window.setTimeout(() => {
+          calendar.current?.getApi().scrollToTime(scrollPosition())
+        }, 0)
+      }
+    }
   }, [])
 
   const dayClasses = useCallback(
@@ -402,20 +456,57 @@ export function CalendarView() {
     [heat, shown.type]
   )
 
-  function goToSelected(date: string) {
-    setSelected(date)
-    calendar.current?.getApi().gotoDate(date)
-  }
-
   /** The same quick add as clicking the grid, for anyone not using a mouse. */
   function addToSelected() {
     setOpened(null)
+    const nowDate = new Date()
     setCreating({
-      at: { x: 8, y: 56 },
       date: selected,
-      time: shown.type === MONTH_VIEW ? null : "09:00",
+      time: isMonth
+        ? null
+        : selected === today
+          ? `${pad(nowDate.getHours())}:${pad(Math.floor(nowDate.getMinutes() / 15) * 15)}`
+          : "09:00",
+      minutes: defaultSessionMinutes(settings),
+      source: "add",
+      chosen: false,
     })
   }
+
+  const pendingAnchor = useCallback(
+    () => document.querySelector(".bot-pending"),
+    []
+  )
+  const creatingDate = creating?.date
+  const dayAnchor = useCallback(
+    () =>
+      document.querySelector(`.fc-daygrid-day[data-date="${creatingDate}"]`) ??
+      document.querySelector(".fc-view-harness"),
+    [creatingDate]
+  )
+  const openedElement = opened?.element
+  const openedId = opened?.block.refId
+  const openedDate = opened?.block.date
+  const blockAnchor = useCallback(() => {
+    if (openedElement?.isConnected) return openedElement
+    // The calendar redraws blocks, so it finds this one again by its id.
+    return (
+      [...document.querySelectorAll(`[data-block-id="${openedId}"]`)].find(
+        (element) => element.getAttribute("data-date") === openedDate
+      ) ?? null
+    )
+  }, [openedElement, openedId, openedDate])
+
+  const pendingVisible = Boolean(creating?.time && isTimed)
+  useEffect(() => {
+    if (pendingVisible && creating?.source === "add") {
+      document
+        .querySelector(".bot-pending")
+        ?.scrollIntoView({ block: "nearest" })
+    }
+    // Only when it first appears, so typing never moves the grid.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingVisible])
 
   return (
     <div className="space-y-4">
@@ -426,6 +517,7 @@ export function CalendarView() {
           from={shown.from}
           until={shown.until}
           week={shown.type === WEEK_VIEW}
+          hours={hours}
         />
       )}
 
@@ -439,7 +531,7 @@ export function CalendarView() {
         {!isYear && (
           <aside
             aria-label="Things to put on the calendar"
-            className="order-2 space-y-5 lg:order-none"
+            className="order-2 space-y-5 lg:sticky lg:top-4 lg:order-none"
           >
             {isTimed && (
               <NotStartedTray
@@ -502,180 +594,168 @@ export function CalendarView() {
                     aria-hidden
                     className="inline-block h-3.5 w-5 rounded-sm bg-primary"
                   />
-                  Focus you did
+                  Focus done
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="bot-routine-swatch inline-block h-3.5 w-5 rounded-sm"
+                    style={
+                      {
+                        "--routine": state.routines[0]?.color ?? PALETTE[1],
+                      } as React.CSSProperties
+                    }
+                  />
+                  Routine
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="bot-buffer-swatch inline-block h-3.5 w-5 rounded-sm border border-border"
+                  />
+                  Buffer
                 </li>
               </ul>
-              <Button
-                type="button"
-                size="lg"
-                variant="outline"
-                className="min-h-10"
-                onClick={addToSelected}
-              >
-                <Plus aria-hidden />
-                Add to {shortDate(selected)}
-              </Button>
+              <div className="flex flex-wrap items-center gap-1">
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="ghost"
+                  className="min-h-10 text-muted-foreground"
+                  onClick={() => downloadIcs(state, today)}
+                >
+                  Export .ics
+                </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  className="min-h-10"
+                  onClick={addToSelected}
+                >
+                  <Plus aria-hidden />
+                  Add to {shortDate(selected)}
+                </Button>
+              </div>
             </div>
           )}
 
-          <div ref={surface} className="relative">
-            <Card className="p-3 sm:p-4">
-              <FullCalendar
-                ref={calendar}
-                plugins={[
-                  dayGridPlugin,
-                  timeGridPlugin,
-                  multiMonthPlugin,
-                  interactionPlugin,
-                  rrulePlugin,
-                ]}
-                initialView={DAY_VIEW}
-                headerToolbar={{
-                  left: "title",
-                  right: `today prev,next ${DAY_VIEW},${WEEK_VIEW},${MONTH_VIEW},${YEAR_VIEW}`,
-                }}
-                buttonText={{
-                  today: "Today",
-                  day: "Day",
-                  week: "Week",
-                  month: "Month",
-                  year: "Year",
-                }}
-                height={isTimed ? 720 : "auto"}
-                scrollTime="07:00:00"
-                snapDuration="00:05:00"
-                nowIndicator
-                allDayText=""
-                dayMaxEvents={3}
-                multiMonthMaxColumns={4}
-                multiMonthMinWidth={200}
-                eventInteractive
-                eventDisplay="block"
-                editable
-                droppable
-                events={events}
-                eventClassNames={eventClasses}
-                eventDidMount={(arg: EventMountArg) => {
-                  const color = arg.event.extendedProps.color as
-                    string | undefined
-                  if (color) arg.el.style.setProperty("--routine", color)
-                }}
-                dayCellClassNames={dayClasses}
-                dayCellContent={dayContent}
-                dayHeaderClassNames={(info) =>
-                  shown.type === WEEK_VIEW ? selectedDay(info.date) : []
-                }
-                dateClick={handleDateClick}
-                eventClick={handleEventClick}
-                eventDrop={handleEventDrop}
-                eventResize={handleEventResize}
-                drop={handleDrop}
-                datesSet={handleDatesSet}
-              />
-            </Card>
-            {creating && (
-              <InlineCreate
-                key={`${creating.date}-${creating.time}`}
-                at={creating.at}
-                label={
-                  shown.type === MONTH_VIEW
-                    ? `New task due ${shortDate(creating.date)}`
-                    : `${SESSION_MINUTES} minutes on ${shortDate(creating.date)}${creating.time ? ` at ${formatClockTime(new Date(`${creating.date}T${creating.time}:00`))}` : ""}`
-                }
-                placeholder={
-                  shown.type === MONTH_VIEW ? "Task title" : "What’s this for?"
-                }
-                suggestTasks={shown.type !== MONTH_VIEW}
-                onCreate={createFromTitle}
+          <Card className="p-3 sm:p-4">
+            <FullCalendar
+              ref={calendar}
+              plugins={[
+                dayGridPlugin,
+                timeGridPlugin,
+                multiMonthPlugin,
+                interactionPlugin,
+                rrulePlugin,
+              ]}
+              initialView={DAY_VIEW}
+              headerToolbar={{
+                left: "title",
+                right: `today prev,next ${DAY_VIEW},${WEEK_VIEW},${MONTH_VIEW},${YEAR_VIEW}`,
+              }}
+              buttonText={{
+                today: "Today",
+                day: "Day",
+                week: "Week",
+                month: "Month",
+                year: "Year",
+              }}
+              height={isTimed ? 720 : "auto"}
+              slotMinTime={`${pad(hours.first)}:00:00`}
+              slotMaxTime={`${pad(hours.last)}:00:00`}
+              scrollTime={scrollPosition()}
+              snapDuration="00:15:00"
+              slotLabelContent={(arg) => formatClockTime(arg.date)}
+              nowIndicator
+              allDayText=""
+              dayMaxEvents={3}
+              multiMonthMaxColumns={4}
+              multiMonthMinWidth={200}
+              eventInteractive
+              eventDisplay="block"
+              editable
+              droppable
+              selectable={isTimed}
+              selectMirror
+              // A plain click stays a click, and only a real drag selects.
+              selectMinDistance={5}
+              selectAllow={(span: DateSpanApi) =>
+                !span.allDay &&
+                localToday(span.start) ===
+                  localToday(new Date(span.end.getTime() - 1))
+              }
+              select={handleSelect}
+              events={withPending}
+              eventContent={eventContent}
+              eventClassNames={eventClasses}
+              eventDidMount={eventDidMount}
+              dayCellClassNames={dayClasses}
+              dayCellContent={dayContent}
+              dayHeaderClassNames={(info) =>
+                shown.type === WEEK_VIEW ? selectedDay(info.date) : []
+              }
+              dateClick={handleDateClick}
+              eventClick={handleEventClick}
+              eventDrop={handleEventDrop}
+              eventResize={handleEventResize}
+              drop={handleDrop}
+              datesSet={handleDatesSet}
+            />
+          </Card>
+          {creating &&
+            (isMonth ? (
+              <CreateTask
+                key={creating.date}
+                anchor={dayAnchor}
+                date={creating.date}
+                onCreate={createTask}
                 onClose={closeCreating}
               />
-            )}
-            {opened && (
-              <BlockPopover
-                key={`${opened.block.refId}-${opened.block.date}`}
-                block={opened.block}
-                at={opened.at}
-                onClose={closeOpened}
-                onChangeDeadline={(taskId) => {
-                  const task = state.tasks.find((item) => item.id === taskId)
-                  if (task) setReplanning(task)
+            ) : (
+              <CreateSession
+                key={`${creating.date}-${creating.time}`}
+                anchor={creating.time ? pendingAnchor : dayAnchor}
+                date={creating.date}
+                time={creating.time}
+                minutes={creating.minutes}
+                onMinutes={(minutes) =>
+                  setCreating({ ...creating, minutes, chosen: true })
+                }
+                onPickTask={(task) => {
+                  // A remembered length wins, and then the task's own estimate.
+                  if (
+                    task?.estimateMinutes &&
+                    creating.source === "add" &&
+                    !creating.chosen &&
+                    !settings.lastSessionMinutes
+                  ) {
+                    setCreating({
+                      ...creating,
+                      minutes: task.estimateMinutes,
+                    })
+                  }
                 }}
-                onOpenRoutine={setEditingRoutine}
+                onCreate={createSession}
+                onClose={closeCreating}
               />
-            )}
-          </div>
+            ))}
+          {opened && (
+            <BlockPopover
+              key={`${opened.block.refId}-${opened.block.date}`}
+              block={opened.block}
+              anchor={blockAnchor}
+              onClose={closeOpened}
+              onChangeDeadline={(taskId) => {
+                const task = state.tasks.find((item) => item.id === taskId)
+                if (task) setReplanning(task)
+              }}
+              onOpenRoutine={setEditingRoutine}
+            />
+          )}
         </div>
       </div>
-
-      {!isYear && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="space-y-4">
-            <div>
-              <h2 className="font-heading text-2xl">{shortDate(selected)}</h2>
-              <label htmlFor="calendar-day" className="sr-only">
-                Choose a day
-              </label>
-              <input
-                id="calendar-day"
-                type="date"
-                max="9999-12-31"
-                value={selected}
-                onChange={(event) => {
-                  if (event.target.value) goToSelected(event.target.value)
-                }}
-                className="mt-1 h-10 rounded-lg border border-input bg-card px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
-              />
-            </div>
-
-            {dueOnDay.length > 0 && (
-              <div>
-                <h3 className="mb-1 text-sm font-semibold">Due this day</h3>
-                <ul className="space-y-1">
-                  {dueOnDay.map((task) => (
-                    <li key={task.id}>
-                      <button
-                        type="button"
-                        onClick={() => navigate({ view: "task", id: task.id })}
-                        className="min-h-10 rounded-md text-left text-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
-                      >
-                        {task.title}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {plannedOnDay.length > 0 && (
-              <div>
-                <h3 className="mb-1 text-sm font-semibold">Planned work</h3>
-                <ul className="space-y-2">
-                  {plannedOnDay.map((session) => (
-                    <PlannedSessionRow
-                      key={session.id}
-                      session={session}
-                      showTask
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {!dueOnDay.length && !plannedOnDay.length && (
-              <p className="text-sm text-muted-foreground">
-                Nothing on this day.
-              </p>
-            )}
-          </Card>
-
-          <Card>
-            <h2 className="mb-2 font-sans text-[15px] font-semibold tracking-normal">
-              Plan the rest of a task
-            </h2>
-            <PlanRemaining />
-          </Card>
-        </div>
-      )}
 
       <ConfirmDialog
         open={Boolean(deadlineMove)}

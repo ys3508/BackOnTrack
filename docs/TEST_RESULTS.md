@@ -372,3 +372,28 @@ Not tested: the recovery stage against a real AI model, since no key is configur
 Also run with a real mouse in the built app, in Demo Mode: creating from a slot and a month day, moving a block, resizing a block, the popover, dragging from the tray and from My routines, moving one routine occurrence, marking a routine done, Week and Year views, a reload, and phone width.
 
 Not tested: dragging on a touch screen, and time zones other than the one the browser was in (US Central). Daylight saving changes haven't been checked for routines.
+
+## Calendar duration, routines, and block prompts
+
+Run with a real mouse in the built app, in Demo Mode: drag-select, the task combobox, resizing by the grip, Did it, Didn't, ▶, the popover following a scrolled grid, This one only, All future, a routine's Done, a reload compared field by field, Week view, phone width, and opening a block with Enter.
+
+Not tested: touch screens, other time zones, and daylight saving changes. The planned block's prompt appearing on its own as time passes is covered with past dates rather than by waiting in a browser.
+
+## Final MVP acceptance tests
+
+Run in the built app, in Demo Mode, in a real browser, on the final build. Clicks and typing were a mix of real mouse and keyboard input and scripted page events, with results read from what's on screen and what's stored.
+
+| Test | Result |
+| --- | --- |
+| 1. Simple task | Passed. "Buy lunch" could be started and completed, with no recovery workflow. |
+| 2. Unscheduled avoidance | Passed. A sentence led to a reason, an edited next action, and a running session, with no block. |
+| 3. Reality Gap | Passed. Four editable sections, with worries worded as possibilities and no invented facts. |
+| 4. Missed scheduled block | Passed, with a real one-minute wait. One restart recorded, through a pause, a resume, and reloads. |
+| 5. Buffer recovery | Passed. Moved to the free 3:00 PM buffer, with the deadline and task unchanged. |
+| 6. Deadline integrity | Passed. Stored deadline unchanged through reschedule, reduce, and release. |
+| 7. Minimum version | Passed. Recorded as minimum, and the task stayed open. |
+| 8. Routine | Passed. ◐ shown, and counted apart from full. |
+| 9. Persistence | Passed for an active session, a paused session, a recovery workflow, and a resume cue. |
+| 10. No clutter | Passed for no tasks, upcoming, missed, active, and paused, each with one main button. |
+
+Not tested: Live AI against a real model (no key is configured locally), a real browser notification (the browser used had them blocked, so it was checked with a stand-in), importing the `.ics` into a real calendar app, touch screens, other time zones, and use by real people.

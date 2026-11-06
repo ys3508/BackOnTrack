@@ -118,7 +118,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/today"
+  window.location.hash = "#/plan"
   window.scrollTo = vi.fn() as typeof window.scrollTo
   vi.stubGlobal(
     "fetch",
@@ -406,7 +406,7 @@ describe("in the app", () => {
 
   it("opens the task and starts helping from the home page", async () => {
     seed(withSteps())
-    window.location.hash = "#/today"
+    window.location.hash = "#/plan"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Help me do this"))
@@ -416,7 +416,7 @@ describe("in the app", () => {
 
   it("offers workspace setup from the home page for a new task", async () => {
     seed(mlTask())
-    window.location.hash = "#/today"
+    window.location.hash = "#/plan"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Set up my workspace"))
@@ -425,7 +425,7 @@ describe("in the app", () => {
 
   it("opens the document with the timer when starting focus from home", async () => {
     seed(withSteps())
-    window.location.hash = "#/today"
+    window.location.hash = "#/plan"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Start 5 minutes"))
@@ -488,7 +488,7 @@ describe("in the app", () => {
     window.location.hash = "#/tasks/a"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
-    await user.click(await button("Yes"))
+    await user.click(await button("I started / made progress"))
     await user.click(await button(/5-minute break/))
     expect(await screen.findByText("Break")).toBeInTheDocument()
     expect(
@@ -705,6 +705,8 @@ describe("planning remaining work", () => {
       minutes: 30,
       label: "Other",
       done: false,
+      outcome: null,
+      window: null,
     }
     const busy = planRemaining({ ...base, steps: ["A"], existing: [planned] })
     expect(busy.sessions[0].date).toBe("2026-11-03")
@@ -754,7 +756,7 @@ describe("planning remaining work", () => {
         },
       ])
     )
-    window.location.hash = "#/calendar"
+    window.location.hash = "#/tasks/a"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Plan remaining work"))

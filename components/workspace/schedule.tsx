@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog, fieldClass } from "@/components/workspace/parts"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
+import { formatClockTime } from "@/lib/calendar/derived"
 import { addDays, shortDate } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
 import type { PlannedSession, Task } from "@/lib/workspace/schemas"
@@ -172,7 +173,10 @@ export function PlannedSessionRow({
           }
         >
           {showTask ? `${title}: ` : ""}
-          {session.minutes} min{session.time ? ` at ${session.time}` : ""}
+          {session.minutes} min
+          {session.time
+            ? ` at ${formatClockTime(new Date(`${session.date}T${session.time}:00`))}`
+            : ""}
           {session.label ? `: ${session.label}` : ""}
         </span>
       </label>

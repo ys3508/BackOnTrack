@@ -114,7 +114,7 @@ export function RecoveryHome() {
         >
           <button
             type="button"
-            onClick={() => navigate({ view: "today" })}
+            onClick={() => navigate({ view: "plan" })}
             className="min-h-11 rounded-md font-medium text-indigo underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
           >
             Today’s plan and suggested task
@@ -230,7 +230,7 @@ function Intake() {
   )
 }
 
-function ResumePrompt({
+export function ResumePrompt({
   task,
   onChoose,
   onDismiss,

@@ -13,7 +13,7 @@ const saved = () => JSON.parse(window.localStorage.getItem(STORAGE)!)
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/today"
+  window.location.hash = "#/plan"
   window.scrollTo = vi.fn() as typeof window.scrollTo
   vi.stubGlobal(
     "fetch",
@@ -73,8 +73,8 @@ describe("workspace home", () => {
 describe("tasks", () => {
   it("edits, pauses, resumes, completes, and deletes a task", async () => {
     const user = userEvent.setup()
+    window.location.hash = "#/tasks"
     render(<WorkspaceApp />)
-    await user.click(await button("Tasks"))
     await addTask(user, "Pay rent")
     await user.click(await button(/^Pay rent/))
 
@@ -83,10 +83,7 @@ describe("tasks", () => {
 
     // A task that was never started has nothing to pause.
     expect(screen.queryByRole("button", { name: "Pause" })).toBeNull()
-    await user.selectOptions(
-      screen.getByLabelText("Status"),
-      "in-progress"
-    )
+    await user.selectOptions(screen.getByLabelText("Status"), "in-progress")
     await user.click(await button("Pause"))
     expect(saved().tasks[0].status).toBe("paused")
     await user.click(await button("Resume"))
@@ -121,8 +118,8 @@ describe("tasks", () => {
 
   it("asks before releasing something that looks high stakes", async () => {
     const user = userEvent.setup()
+    window.location.hash = "#/tasks"
     render(<WorkspaceApp />)
-    await user.click(await button("Tasks"))
     await addTask(user, "File my tax return")
     await user.click(await button(/^File my tax return/))
     await user.selectOptions(await screen.findByLabelText("Status"), "released")
@@ -134,8 +131,8 @@ describe("tasks", () => {
 
   it("shows every status as a Kanban column, with a keyboard-friendly status control", async () => {
     const user = userEvent.setup()
+    window.location.hash = "#/tasks"
     render(<WorkspaceApp />)
-    await user.click(await button("Tasks"))
     await addTask(user, "Clean desk")
     await user.click(await button("Board"))
     for (const name of [
@@ -194,7 +191,7 @@ describe("persistence and data", () => {
       .mockImplementation(() => {})
     render(<WorkspaceApp />)
     await addTask(user, "Private thing")
-    await user.click(await button("Settings and data"))
+    await user.click(await button("Settings"))
     await user.click(await button("Export my data"))
     expect(click).toHaveBeenCalled()
 
@@ -204,7 +201,7 @@ describe("persistence and data", () => {
         name: "Delete everything",
       })
     )
-    await screen.findByRole("heading", { name: /putting off/i })
+    await screen.findByRole("heading", { name: "Today" })
     await act(async () => {})
     expect(JSON.stringify(saved())).not.toContain("Private thing")
   })

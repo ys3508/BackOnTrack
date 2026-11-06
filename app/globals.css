@@ -104,7 +104,7 @@
   --fc-border-color: var(--border);
   --fc-page-bg-color: var(--card);
   --fc-neutral-bg-color: var(--secondary);
-  --fc-today-bg-color: var(--sage-soft);
+  --fc-today-bg-color: transparent;
   --fc-button-bg-color: var(--card);
   --fc-button-border-color: var(--input);
   --fc-button-text-color: var(--foreground);
@@ -194,13 +194,13 @@
   border: 1px solid var(--primary);
 }
 
-.fc .bot-focused .fc-event-title,
-.fc .bot-focused .fc-event-time {
+.fc .bot-focused .bot-block {
   color: var(--primary-foreground);
 }
 
 /* A routine is a light block in its colour, and fills in when it's done. */
-.fc .bot-routine {
+.fc .bot-routine,
+.bot-routine-swatch {
   background: color-mix(in oklch, var(--routine) 14%, var(--card));
   border: 1px solid color-mix(in oklch, var(--routine) 45%, var(--card));
 }
@@ -210,8 +210,7 @@
   border-color: var(--routine);
 }
 
-.fc .bot-routine-done .fc-event-title,
-.fc .bot-routine-done .fc-event-time {
+.fc .bot-routine-done .bot-block {
   color: white;
 }
 
@@ -219,17 +218,229 @@
 .fc .bot-missed {
   background: transparent;
   border: 1px dashed var(--input);
-  opacity: 0.6;
 }
 
-.fc .bot-missed .fc-event-title,
-.fc .bot-missed .fc-event-time {
+.fc .bot-missed .bot-block-title,
+.fc .bot-missed .bot-block-time {
   color: var(--muted-foreground);
 }
 
-/* Blocks need room for a title, and a bottom edge that can be grabbed. */
+/* Blocks need room for two lines, and a bottom edge that can be grabbed. */
 .fc .fc-timegrid-slot {
-  height: 1.75rem;
+  height: 2.5rem;
+}
+
+/* White behind the hours, so dashed planned blocks stand out. Today is marked
+   only in its header, and by its date in Month. */
+.fc .fc-timegrid {
+  background: white;
+}
+
+.fc .fc-timegrid-axis-cushion,
+.fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.fc .fc-col-header-cell.fc-day-today {
+  background: var(--sage-soft);
+}
+
+.fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-number {
+  border-radius: 999px;
+  background: var(--sage-soft);
+  font-weight: 600;
+}
+
+/* Block text: title on top, then the time. */
+.bot-block {
+  position: relative;
+  container-type: inline-size;
+  min-height: 100%;
+  overflow: hidden;
+  color: var(--foreground);
+  line-height: 1.2;
+}
+
+.bot-block-title {
+  display: block;
+  overflow: hidden;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bot-block-time {
+  display: block;
+  font-size: 0.6875rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.bot-block-adjusted {
+  display: block;
+  font-size: 0.625rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.bot-block-tight .bot-block-time {
+  display: none;
+}
+
+.fc-dayGridMonth-view .bot-block-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.bot-block-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 2px;
+}
+
+.bot-block-actions button {
+  display: inline-flex;
+  min-height: 18px;
+  min-width: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid var(--input);
+  background: var(--card);
+  padding: 0 4px;
+  color: var(--foreground);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.bot-block-actions button:hover {
+  background: var(--secondary);
+}
+
+.bot-block-actions button:focus-visible {
+  outline: 2px solid var(--ring);
+}
+
+/* The start button appears on hover, and stays reachable by keyboard and touch. */
+.bot-block-actions .bot-block-play {
+  opacity: 0;
+}
+
+.fc-event:hover .bot-block-actions .bot-block-play,
+.bot-block-actions .bot-block-play:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .bot-block-actions .bot-block-play {
+    opacity: 1;
+  }
+}
+
+.bot-block-icon {
+  display: none;
+}
+
+/* A narrow Week column keeps the buttons, without the words. */
+@container (max-width: 170px) {
+  .bot-block-word {
+    display: none;
+  }
+
+  .bot-block-icon {
+    display: inline;
+  }
+}
+
+/* A visible grip on the bottom edge, shown on hover. */
+.fc .fc-timegrid-event .fc-event-resizer-end {
+  bottom: 0;
+  height: 9px;
+  cursor: ns-resize;
+}
+
+.fc .fc-timegrid-event .fc-event-resizer-end::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 26px;
+  height: 3px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--muted-foreground);
+  opacity: 0.75;
+}
+
+/* Time set aside for catching up: quiet, and never a thing to feel behind on. */
+.fc .bot-buffer,
+.bot-buffer-swatch {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--secondary),
+    var(--secondary) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  opacity: 1;
+}
+
+.bot-buffer-label {
+  display: block;
+  padding: 1px 4px;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+/* A routine done in its smaller version: half filled, and clearly not full. */
+.fc .bot-routine-minimum {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--routine) 40%, var(--card)) 50%,
+    color-mix(in oklch, var(--routine) 8%, var(--card)) 50%
+  );
+  border: 1px solid var(--routine);
+}
+
+/* Skipped on purpose: quiet, and without the look of something gone wrong. */
+.fc .bot-routine-skipped {
+  background: transparent;
+  border: 1px dotted var(--input);
+}
+
+.fc .bot-routine-skipped .bot-block-title {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+/* An empty untimed row shouldn't take up room. */
+.fc .fc-timegrid .fc-daygrid-body .fc-daygrid-day-events {
+  min-height: 0.75rem;
+  margin-bottom: 0;
+}
+
+.fc .fc-timegrid .fc-daygrid-body-natural .fc-daygrid-day-events {
+  margin-bottom: 0;
+}
+
+.fc .fc-timegrid-divider {
+  padding: 0 0 1px;
+}
+
+/* Where a new session will land, while it's being named. */
+.fc .bot-pending {
+  background: var(--sage-soft);
+  border: 2px dashed var(--primary);
+}
+
+.fc .fc-highlight {
+  background: var(--sage-soft);
+  opacity: 0.8;
 }
 
 /* The year: how focus was spread, from nothing to a lot. */

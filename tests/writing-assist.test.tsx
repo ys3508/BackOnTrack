@@ -363,10 +363,7 @@ describe("sending documents to Live AI", () => {
   }
   const ready = () =>
     waitFor(() =>
-      expect(screen.getByRole("button", { name: "Live AI" })).toHaveAttribute(
-        "aria-pressed",
-        "true"
-      )
+      expect(document.querySelector('[data-mode="live"]')).toBeTruthy()
     )
 
   it("asks first, sends nothing if cancelled, and remembers a yes for this task", async () => {

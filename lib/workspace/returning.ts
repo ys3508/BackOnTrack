@@ -49,6 +49,7 @@ export type ReturnSummary = {
   /** A real date with real consequences, so it's stated once, without alarm. */
   alsoDue: { title: string; deadline: string } | null
   neverStarted: boolean
+  resumeNote: string
 }
 
 /**
@@ -95,6 +96,7 @@ export function returnSummary(
     alsoDue: alsoDue?.deadline
       ? { title: alsoDue.title, deadline: alsoDue.deadline }
       : null,
-    neverStarted: !done && !total && !text,
+    neverStarted: !done && !total && !text && !task.resumeNote,
+    resumeNote: task.resumeNote,
   }
 }

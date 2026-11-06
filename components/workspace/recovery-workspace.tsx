@@ -78,7 +78,7 @@ type RunOptions = {
 }
 
 /** The one way a case gets a suggestion, in either mode. */
-function useCaseAssist(task: Task) {
+export function useCaseAssist(task: Task) {
   const { mode, dispatch } = useStore()
   const [pending, setPending] = useState(false)
   const [fellBack, setFellBack] = useState(false)
@@ -568,7 +568,7 @@ function BlockerPanel({
 
 /* ---------- D & E. One next action, and how it went ---------- */
 
-function OriginNote({ origin }: { origin: "live" | "demo" | "user" }) {
+export function OriginNote({ origin }: { origin: "live" | "demo" | "user" }) {
   const { Icon, text } =
     origin === "live"
       ? { Icon: Sparkles, text: "Suggested by AI. It can be wrong." }
@@ -583,7 +583,7 @@ function OriginNote({ origin }: { origin: "live" | "demo" | "user" }) {
   )
 }
 
-type Assist = ReturnType<typeof useCaseAssist>
+export type Assist = ReturnType<typeof useCaseAssist>
 
 function NextActionCard({
   task,
@@ -925,7 +925,7 @@ function NextActionCard({
   )
 }
 
-function WriteOwnStep({
+export function WriteOwnStep({
   label,
   initial = "",
   onSave,
@@ -1379,25 +1379,25 @@ const GAP_SECTIONS: {
 }[] = [
   {
     key: "known",
-    title: "What I know",
+    title: "Known Facts",
     help: "Facts you’ve confirmed.",
     add: "Add a fact",
   },
   {
     key: "worried",
-    title: "What I’m worried about",
-    help: "Predictions and fears. They may not happen.",
+    title: "Worries / Assumptions",
+    help: "These are possibilities, not facts. They may not happen.",
     add: "Add a worry",
   },
   {
     key: "unknown",
-    title: "What I don’t know yet",
+    title: "Unknowns",
     help: "Things worth finding out.",
     add: "Add a question",
   },
   {
     key: "can",
-    title: "What I can do",
+    title: "Possible Actions",
     help: "Realistic options. Choose one as your next step.",
     add: "Add an option",
   },
@@ -1462,7 +1462,7 @@ function ItemEditor({
   )
 }
 
-function RealityGapTool({ task }: { task: Task }) {
+export function RealityGapTool({ task }: { task: Task }) {
   const { dispatch } = useStore()
   const recovery = task.recoveryCase!
   const gap = recovery.realityGap ?? {

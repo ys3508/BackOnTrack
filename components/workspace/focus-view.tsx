@@ -1,13 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Check, Coffee, Pause, Play, RotateCcw, Square } from "lucide-react"
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ExpandableList, fieldClass } from "@/components/workspace/parts"
-import { newId, nowIso, useStore } from "@/components/workspace/store"
+import {
+  newId,
+  nowIso,
+  useEnterRecovery,
+  useStore,
+} from "@/components/workspace/store"
 import { formatClock, formatMinutes, remainingSeconds } from "@/lib/focus/timer"
 import { formatDateTime } from "@/lib/workspace/dates"
 import { isActive, isInterrupted } from "@/lib/workspace/schemas"
@@ -27,6 +32,12 @@ const OUTCOME_LABEL: Record<FocusSession["outcome"], string> = {
   "continue-later": "Will continue later",
   stuck: "Got stuck",
 }
+
+const OUTCOME_REPORT = {
+  progress: "You said you made progress",
+  minimum: "You said you completed the minimum version",
+  completed: "You said you completed the task",
+} as const
 
 const REPORT_LABEL = {
   yes: "You said you made progress",
@@ -56,7 +67,12 @@ export function useNow(active: boolean) {
 /** Starts focus from anywhere. A session already running is never overwritten. */
 export function useStartFocus({ stay = false } = {}) {
   const { state, dispatch, navigate } = useStore()
-  return (taskId: string | null, minutes: number) => {
+  return (
+    taskId: string | null,
+    minutes: number,
+    plannedId?: string,
+    restart = false
+  ) => {
     if (!state.timer) {
       const task = state.tasks.find((item) => item.id === taskId)
       dispatch({
@@ -65,6 +81,8 @@ export function useStartFocus({ stay = false } = {}) {
         kind: "focus",
         taskId,
         subtaskId: task ? (currentSubtask(task)?.id ?? null) : null,
+        plannedId: plannedId ?? null,
+        restart,
         minutes,
         now: Date.now(),
         at: nowIso(),
@@ -77,7 +95,7 @@ export function useStartFocus({ stay = false } = {}) {
     navigate(
       running
         ? onCase
-          ? { view: "case", id: running }
+          ? { view: "workspace" }
           : { view: "task", id: running, section: "doc" }
         : { view: "focus" }
     )
@@ -98,12 +116,17 @@ export function startLabel(timer: TimerState | null, minutes: number) {
 export function describeSession(session: FocusSession) {
   const where = session.taskId === null ? "no specific task" : session.taskTitle
   const length = formatMinutes(session.actualSeconds)
-  const summary = isInterrupted(session)
-    ? `Interrupted attempt, not counted as focus time: ${length} of ${session.plannedMinutes} min on ${where}`
-    : session.outcome === "completed"
-      ? `Ran the full ${session.plannedMinutes} min on ${where}`
-      : `Stopped after ${length} of ${session.plannedMinutes} min on ${where}. ${OUTCOME_LABEL[session.outcome]}`
-  const report = session.progressReport && REPORT_LABEL[session.progressReport]
+  const summary = session.reported
+    ? `You said you did this: ${length} on ${where}`
+    : isInterrupted(session)
+      ? `Interrupted attempt, not counted as focus time: ${length} of ${session.plannedMinutes} min on ${where}`
+      : session.outcome === "completed"
+        ? `Ran the full ${session.plannedMinutes} min on ${where}`
+        : `Stopped after ${length} of ${session.plannedMinutes} min on ${where}. ${OUTCOME_LABEL[session.outcome]}`
+  // What they said came of it is more specific than a plain progress report.
+  const report = session.endOutcome
+    ? OUTCOME_REPORT[session.endOutcome]
+    : session.progressReport && REPORT_LABEL[session.progressReport]
   return report ? `${summary}. ${report}` : summary
 }
 
@@ -129,7 +152,7 @@ export function FocusView() {
                 navigate(
                   state.tasks.find((task) => task.id === state.timer!.taskId)
                     ?.recoveryCase
-                    ? { view: "case", id: state.timer!.taskId! }
+                    ? { view: "workspace" }
                     : {
                         view: "task",
                         id: state.timer!.taskId!,
@@ -320,7 +343,80 @@ export function ActiveTimer({
   )
 }
 
-function StopChoice({
+type EndOutcome = "progress" | "minimum" | "completed"
+
+/** Where to pick up, then what really came of it. The three are kept apart. */
+function WrapUpForm({
+  task,
+  onOutcome,
+  children,
+}: {
+  task: Task
+  onOutcome: (outcome: EndOutcome, resumeNote: string) => void
+  children?: React.ReactNode
+}) {
+  const [note, setNote] = useState("")
+  return (
+    <div className="space-y-3 text-left">
+      <div>
+        <label htmlFor="resume-note" className="block text-sm font-medium">
+          Where should you start next time?
+        </label>
+        <Input
+          id="resume-note"
+          value={note}
+          maxLength={300}
+          placeholder="Optional. For example: continue from paragraph two."
+          onChange={(event) => setNote(event.target.value)}
+          className="mt-1 h-11"
+        />
+      </div>
+      <div
+        role="group"
+        aria-label="What came of it"
+        className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+      >
+        <Button
+          type="button"
+          size="xl"
+          onClick={() => onOutcome("progress", note)}
+        >
+          I started / made progress
+        </Button>
+        <Button
+          type="button"
+          size="xl"
+          variant="outline"
+          className="h-auto min-h-11 py-2 whitespace-normal"
+          onClick={() => onOutcome("minimum", note)}
+        >
+          I completed the minimum version
+        </Button>
+        <Button
+          type="button"
+          size="xl"
+          variant="outline"
+          onClick={() => onOutcome("completed", note)}
+        >
+          I completed the original task
+        </Button>
+      </div>
+      {task.minimumVersion && (
+        <p className="text-sm text-muted-foreground">
+          Minimum version: {task.minimumVersion}. The original task stays open
+          if that’s all you did.
+        </p>
+      )}
+      {children && (
+        <div className="flex flex-wrap items-center gap-x-2">{children}</div>
+      )}
+    </div>
+  )
+}
+
+/** Ending a session. The clock stops first, so answering adds no focus time. */
+export function StopChoice({
+  timer,
   task,
   onCancel,
 }: {
@@ -328,9 +424,27 @@ function StopChoice({
   task?: Task
   onCancel: () => void
 }) {
-  const { dispatch, navigate } = useStore()
+  const { dispatch } = useStore()
+  const enterRecovery = useEnterRecovery()
   const [askingWhy, setAskingWhy] = useState(false)
   const [note, setNote] = useState("")
+  const wasRunning = useRef(false)
+
+  useEffect(() => {
+    if (timer.runningSince !== null) {
+      wasRunning.current = true
+      dispatch({ type: "timer-pause", now: Date.now() })
+    }
+    // Only as this opens: pausing is what changes the timer it was given.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function keepGoing() {
+    if (wasRunning.current) {
+      dispatch({ type: "timer-resume", now: Date.now() })
+    }
+    onCancel()
+  }
 
   function stopStuck() {
     dispatch({
@@ -340,7 +454,25 @@ function StopChoice({
       outcome: "stuck",
       note: note.trim(),
     })
-    if (task) navigate({ view: "recover", taskId: task.id })
+    if (task) enterRecovery(task.id, timer.plannedId)
+  }
+
+  function finish(outcome: EndOutcome, resumeNote: string) {
+    const at = nowIso()
+    dispatch({
+      type: "timer-stop",
+      now: Date.now(),
+      at,
+      outcome: "continue-later",
+      note: "",
+    })
+    dispatch({
+      type: "session-wrap-up",
+      sessionId: timer.id,
+      at,
+      outcome,
+      resumeNote,
+    })
   }
 
   if (askingWhy) {
@@ -373,63 +505,84 @@ function StopChoice({
     )
   }
 
+  if (!task) {
+    return (
+      <div className="flex flex-col justify-center gap-2 sm:flex-row sm:flex-wrap">
+        <Button
+          type="button"
+          size="xl"
+          onClick={() =>
+            dispatch({
+              type: "timer-stop",
+              now: Date.now(),
+              at: nowIso(),
+              outcome: "continue-later",
+              note: "",
+            })
+          }
+        >
+          End session
+        </Button>
+        <Button type="button" size="xl" variant="ghost" onClick={keepGoing}>
+          Keep going
+        </Button>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col justify-center gap-2 sm:flex-row sm:flex-wrap">
+    <WrapUpForm task={task} onOutcome={finish}>
       <Button
         type="button"
         size="xl"
-        onClick={() =>
-          dispatch({
-            type: "timer-stop",
-            now: Date.now(),
-            at: nowIso(),
-            outcome: "continue-later",
-            note: "",
-          })
-        }
-      >
-        Continue later
-      </Button>
-      <Button
-        type="button"
-        size="xl"
-        variant="outline"
+        variant="ghost"
+        className="text-muted-foreground"
         onClick={() => setAskingWhy(true)}
       >
         I got stuck
       </Button>
-      <Button type="button" size="xl" variant="ghost" onClick={onCancel}>
+      <Button
+        type="button"
+        size="xl"
+        variant="ghost"
+        className="text-muted-foreground"
+        onClick={keepGoing}
+      >
         Keep going
       </Button>
-    </div>
+    </WrapUpForm>
   )
 }
 
 export function FinishedPanel({
   session,
   onTask = false,
+  wrapOnly = false,
 }: {
   session: FocusSession
   /** Already on the task's page, so there's nowhere to navigate to. */
   onTask?: boolean
+  /** Moves on after the answer, instead of offering breaks and more time. */
+  wrapOnly?: boolean
 }) {
   const { state, dispatch, navigate } = useStore()
+  const enterRecovery = useEnterRecovery()
   const task = state.tasks.find((item) => item.id === session.taskId)
   const step = task
     ? (task.subtasks.find((sub) => sub.id === session.subtaskId && !sub.done) ??
       currentSubtask(task))
     : null
 
-  const answer = (report: "yes" | "a-little" | "stuck") => {
+  const stuck = () => {
     dispatch({
       type: "report-focus",
       sessionId: session.id,
-      report,
+      report: "stuck",
       at: nowIso(),
     })
-    if (report === "stuck" && task) {
+    if (task) {
       dispatch({ type: "timer-acknowledge" })
-      navigate({ view: "recover", taskId: task.id })
+      enterRecovery(task.id, session.plannedId)
     }
   }
 
@@ -439,34 +592,61 @@ export function FinishedPanel({
         <h2 className="font-heading text-3xl">
           {formatMinutes(session.actualSeconds)} of focus, done.
         </h2>
-        <p className="text-[15px]" id="progress-question">
-          Did you make progress?
+        <p className="text-sm text-muted-foreground">
+          The task stays open until you say otherwise.
         </p>
-        <div
-          role="group"
-          aria-labelledby="progress-question"
-          className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+        <WrapUpForm
+          task={task}
+          onOutcome={(outcome, resumeNote) => {
+            dispatch({
+              type: "session-wrap-up",
+              sessionId: session.id,
+              at: nowIso(),
+              outcome,
+              resumeNote,
+            })
+            if (wrapOnly || outcome === "completed") {
+              dispatch({ type: "timer-acknowledge" })
+              if (!onTask && outcome === "completed") {
+                navigate(
+                  task.recoveryCase
+                    ? { view: "workspace" }
+                    : { view: "task", id: task.id }
+                )
+              }
+            }
+          }}
         >
-          <Button type="button" size="xl" onClick={() => answer("yes")}>
-            Yes
-          </Button>
           <Button
             type="button"
             size="xl"
-            variant="outline"
-            onClick={() => answer("a-little")}
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() => {
+              dispatch({ type: "timer-acknowledge" })
+              dispatch({
+                type: "timer-start",
+                id: newId(),
+                kind: "focus",
+                taskId: session.taskId,
+                minutes: session.plannedMinutes,
+                now: Date.now(),
+                at: nowIso(),
+              })
+            }}
           >
-            A little
+            Keep going, {session.plannedMinutes} more minutes
           </Button>
           <Button
             type="button"
             size="xl"
-            variant="outline"
-            onClick={() => answer("stuck")}
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={stuck}
           >
             I got stuck
           </Button>
-        </div>
+        </WrapUpForm>
       </Card>
     )
   }
@@ -584,7 +764,7 @@ export function FinishedPanel({
               if (!onTask) {
                 navigate(
                   task.recoveryCase
-                    ? { view: "case", id: task.id }
+                    ? { view: "workspace" }
                     : { view: "task", id: task.id }
                 )
               }
@@ -602,7 +782,7 @@ export function FinishedPanel({
             if (!onTask) {
               navigate(
                 task?.recoveryCase
-                  ? { view: "case", id: task.id }
+                  ? { view: "workspace" }
                   : task
                     ? { view: "task", id: task.id }
                     : { view: "workspace" }

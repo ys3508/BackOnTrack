@@ -11,8 +11,14 @@ const fontHeading = Newsreader({
 })
 
 export const metadata: Metadata = {
-  title: "BackOnTrack AI",
-  description: "When plans fall apart, find your way forward.",
+  title: "BackOnTrack",
+  description:
+    "A failure-aware action system: find one concrete next action, start it, and recover when the plan doesn't work.",
+  openGraph: {
+    title: "BackOnTrack",
+    description: "Plan, start, get stuck, recover, continue.",
+    type: "website",
+  },
 }
 
 export default function RootLayout({

@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect } from "react"
-import { Settings as SettingsIcon, Timer } from "lucide-react"
+import { Timer } from "lucide-react"
 
 import { RecoveryApp } from "@/components/recovery-app"
 import { CalendarView } from "@/components/workspace/calendar-view"
 import { FocusView, useNow } from "@/components/workspace/focus-view"
+import { GlobalQuickCapture } from "@/components/workspace/quick-capture"
 import { RecoverView } from "@/components/workspace/recover-view"
 import { RecoveryHome } from "@/components/workspace/recovery-home"
 import { RecoveryWorkspace } from "@/components/workspace/recovery-workspace"
+import { ReminderWatcher } from "@/components/workspace/reminder-watcher"
+import { RoutinesView } from "@/components/workspace/routines-view"
 import { SettingsView } from "@/components/workspace/settings-view"
 import {
   WorkspaceProvider,
@@ -19,9 +22,10 @@ import {
 import type { Route } from "@/components/workspace/store"
 import { TaskDetail } from "@/components/workspace/task-detail"
 import { TasksView } from "@/components/workspace/tasks-view"
+import { TodayView } from "@/components/workspace/today-view"
 import { WorkspaceView } from "@/components/workspace/workspace-view"
 import { formatClock, remainingSeconds } from "@/lib/focus/timer"
-import type { Session, Source } from "@/lib/session"
+import type { Session } from "@/lib/session"
 import { taskFromSession } from "@/lib/workspace/storage"
 import { cn } from "@/lib/utils"
 
@@ -35,29 +39,27 @@ export function WorkspaceApp() {
 
 const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
   {
-    label: "Workspace",
+    label: "Today",
     route: { view: "workspace" },
-    match: ["workspace", "guided", "recover", "case"],
-  },
-  {
-    label: "Tasks",
-    route: { view: "tasks" },
-    match: ["tasks", "task", "today"],
+    match: [
+      "workspace",
+      "plan",
+      "avoid",
+      "guided",
+      "recover",
+      "case",
+      "tasks",
+      "task",
+      "focus",
+    ],
   },
   { label: "Calendar", route: { view: "calendar" }, match: ["calendar"] },
-  { label: "Focus", route: { view: "focus" }, match: ["focus"] },
+  { label: "Routines", route: { view: "routines" }, match: ["routines"] },
+  { label: "Settings", route: { view: "settings" }, match: ["settings"] },
 ]
 
 function Shell() {
-  const {
-    route,
-    navigate,
-    mode,
-    liveAvailable,
-    statusChecked,
-    dispatch,
-    storageFailed,
-  } = useStore()
+  const { route, navigate, mode, storageFailed } = useStore()
   const routeKey =
     route.view === "task"
       ? `task-${route.id}`
@@ -68,7 +70,7 @@ function Shell() {
           : route.view
 
   return (
-    <div className="flex min-h-svh flex-col">
+    <div data-mode={mode} className="flex min-h-svh flex-col">
       <header className="border-b border-border/70">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
           <button
@@ -81,22 +83,6 @@ function Shell() {
           </button>
           <div className="flex items-center gap-1.5">
             <TimerPill />
-            <ModeSwitch
-              mode={mode}
-              liveAvailable={liveAvailable}
-              checked={statusChecked}
-              onChange={(next) =>
-                dispatch({ type: "settings", patch: { modePreference: next } })
-              }
-            />
-            <button
-              type="button"
-              aria-label="Settings and data"
-              onClick={() => navigate({ view: "settings" })}
-              className="grid size-10 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30"
-            >
-              <SettingsIcon className="size-5" aria-hidden />
-            </button>
           </div>
         </div>
         <nav
@@ -146,8 +132,10 @@ function Shell() {
           key={routeKey}
           className="animate-in duration-300 fade-in slide-in-from-bottom-1"
         >
-          {route.view === "workspace" && <RecoveryHome />}
-          {route.view === "today" && <WorkspaceView />}
+          {route.view === "workspace" && <TodayView />}
+          {route.view === "avoid" && <RecoveryHome />}
+          {route.view === "plan" && <WorkspaceView />}
+          {route.view === "routines" && <RoutinesView />}
           {route.view === "case" && (
             <RecoveryWorkspace id={route.id} intent={route.intent} />
           )}
@@ -157,28 +145,19 @@ function Shell() {
           )}
           {route.view === "calendar" && <CalendarView />}
           {route.view === "focus" && <FocusView />}
-          {route.view === "recover" && <RecoverRoute taskId={route.taskId} />}
+          {route.view === "recover" && <RecoverView taskId={route.taskId} />}
           {route.view === "settings" && <SettingsView />}
           {route.view === "guided" && <GuidedView />}
         </div>
       </main>
 
+      <GlobalQuickCapture />
+      <ReminderWatcher />
       <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">
         BackOnTrack offers suggestions and can be wrong. It is not medical,
         legal, or financial advice.
       </footer>
     </div>
-  )
-}
-
-/** A task being worked on in Recovery keeps all of its recovery in one place. */
-function RecoverRoute({ taskId }: { taskId?: string }) {
-  const { state } = useStore()
-  const task = state.tasks.find((item) => item.id === taskId)
-  return task?.recoveryCase ? (
-    <RecoveryWorkspace id={task.id} intent="stuck" />
-  ) : (
-    <RecoverView taskId={taskId} />
   )
 }
 
@@ -195,12 +174,13 @@ function TimerPill() {
   useEffect(() => {
     document.title = timer
       ? `${paused ? "Paused" : clock} · BackOnTrack`
-      : "BackOnTrack AI"
+      : "BackOnTrack"
   }, [timer, clock, paused])
 
   // These views already show the timer.
   const shownHere =
     route.view === "focus" ||
+    route.view === "workspace" ||
     (route.view === "task" && route.id === timer?.taskId) ||
     (route.view === "case" && route.id === timer?.taskId)
   if (!timer || shownHere) return null
@@ -212,7 +192,7 @@ function TimerPill() {
       onClick={() =>
         navigate(
           timerTask?.recoveryCase
-            ? { view: "case", id: timerTask.id }
+            ? { view: "workspace" }
             : timer.taskId
               ? { view: "task", id: timer.taskId, section: "doc" }
               : { view: "focus" }
@@ -241,57 +221,6 @@ function GuidedView() {
         navigate({ view: "task", id })
       }}
     />
-  )
-}
-
-function ModeSwitch({
-  mode,
-  liveAvailable,
-  checked,
-  onChange,
-}: {
-  mode: Source
-  liveAvailable: boolean
-  checked: boolean
-  onChange: (mode: Source) => void
-}) {
-  const options: { value: Source; label: string }[] = [
-    { value: "live", label: "Live AI" },
-    { value: "demo", label: "Demo" },
-  ]
-  return (
-    <div
-      role="group"
-      aria-label="Response source for suggestions"
-      className="flex rounded-lg bg-secondary p-0.5 text-xs font-medium"
-    >
-      {options.map((option) => {
-        const unavailable = option.value === "live" && !liveAvailable
-        return (
-          <button
-            key={option.value}
-            type="button"
-            aria-pressed={mode === option.value}
-            disabled={unavailable || !checked}
-            title={
-              unavailable && checked
-                ? "Live AI needs an API key on the server"
-                : undefined
-            }
-            onClick={() => onChange(option.value)}
-            className={cn(
-              "min-h-8 rounded-md px-2.5 py-1.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              mode === option.value
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground",
-              unavailable && "cursor-not-allowed"
-            )}
-          >
-            {option.label}
-          </button>
-        )
-      })}
-    </div>
   )
 }
 

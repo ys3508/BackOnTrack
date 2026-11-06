@@ -1,13 +1,21 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { Download, Trash2, Upload } from "lucide-react"
+import {
+  CalendarArrowDown as CalendarDown,
+  Download,
+  Trash2,
+  Upload,
+} from "lucide-react"
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { LearningCard } from "@/components/workspace/learning-card"
 import { ConfirmDialog, fieldClass } from "@/components/workspace/parts"
+import { notificationStatus } from "@/components/workspace/reminder-watcher"
 import { useStore } from "@/components/workspace/store"
+import { downloadIcs } from "@/lib/calendar/ics"
+import type { Source } from "@/lib/session"
 import {
   STORAGE_LIMIT_BYTES,
   exportWorkspace,
@@ -16,8 +24,126 @@ import {
 } from "@/lib/workspace/storage"
 import type { Settings, Workspace } from "@/lib/workspace/schemas"
 
+function SuggestionsCard() {
+  const { state, dispatch, mode, liveAvailable, statusChecked } = useStore()
+  const options: { value: Source; label: string }[] = [
+    { value: "demo", label: "Demo" },
+    { value: "live", label: "Live AI" },
+  ]
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+        Where suggestions come from
+      </h2>
+      <div
+        role="group"
+        aria-label="Response source for suggestions"
+        className="inline-flex rounded-lg bg-secondary p-0.5 text-sm font-medium"
+      >
+        {options.map((option) => {
+          const unavailable = option.value === "live" && !liveAvailable
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={mode === option.value}
+              disabled={unavailable || !statusChecked}
+              onClick={() =>
+                dispatch({
+                  type: "settings",
+                  patch: { modePreference: option.value },
+                })
+              }
+              className={
+                "min-h-10 rounded-md px-3.5 outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                (mode === option.value
+                  ? "bg-card shadow-sm"
+                  : "text-muted-foreground") +
+                (unavailable ? " cursor-not-allowed" : "")
+              }
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {mode === "live"
+          ? "Live AI sends what you write about a task to the AI provider, to suggest next steps. It can be wrong, and you confirm any change."
+          : "Demo uses built-in templates and wording rules, not AI, and sends nothing anywhere. Each suggestion says so."}
+        {statusChecked && !liveAvailable && !state.settings.modePreference
+          ? " Live AI needs an API key on the server, and none is set here."
+          : ""}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Tasks, the timer, recovery, and the calendar all work without AI.
+      </p>
+    </Card>
+  )
+}
+
+function RemindersCard() {
+  const { state, dispatch } = useStore()
+  const [permission, setPermission] = useState(notificationStatus)
+  const on = state.settings.remindersEnabled
+
+  async function turnOn() {
+    dispatch({ type: "settings", patch: { remindersEnabled: true } })
+    // Asked here, once they've read why and chosen to turn this on.
+    if (notificationStatus() === "default") {
+      try {
+        setPermission(await Notification.requestPermission())
+      } catch {
+        setPermission(notificationStatus())
+      }
+    }
+  }
+
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+        Reminders
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        A reminder about five minutes before a scheduled block. Your browser may
+        ask for permission to show notifications, so they can reach you when
+        you’re in another tab.
+      </p>
+      <p className="text-sm text-muted-foreground">
+        These only work while BackOnTrack is open in a browser tab, and browsers
+        can delay them in the background. They aren’t push notifications: a
+        closed tab or a sleeping computer means no reminder, so don’t rely on
+        them for anything critical.
+      </p>
+      <Button
+        type="button"
+        size="xl"
+        variant={on ? "outline" : "default"}
+        onClick={() =>
+          on
+            ? dispatch({ type: "settings", patch: { remindersEnabled: false } })
+            : turnOn()
+        }
+      >
+        {on ? "Turn off reminders" : "Turn on reminders"}
+      </Button>
+      {on && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {permission === "granted"
+            ? "On. You’ll get a browser notification and an on-screen reminder."
+            : permission === "denied"
+              ? "On, on screen only. Your browser is blocking notifications, which you can change in its site settings."
+              : permission === "unsupported"
+                ? "On, on screen only. This browser doesn’t support notifications."
+                : "On, on screen only, unless you allow notifications."}
+        </p>
+      )}
+    </Card>
+  )
+}
+
 export function SettingsView() {
-  const { state, dispatch, deleteAll } = useStore()
+  const { state, dispatch, deleteAll, today } = useStore()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingImport, setPendingImport] = useState<Workspace | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -102,12 +228,125 @@ export function SettingsView() {
         </div>
       </Card>
 
+      <SuggestionsCard />
+      <RemindersCard />
+
+      <Card className="space-y-3">
+        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+          Buffers
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Time kept free for catching up. An unused buffer doesn’t count as
+          anything missed.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label
+              htmlFor="buffer-count"
+              className="mb-1 block text-sm font-medium"
+            >
+              Buffers each day
+            </label>
+            <select
+              id="buffer-count"
+              value={state.settings.bufferCount}
+              onChange={(event) =>
+                dispatch({
+                  type: "settings",
+                  patch: { bufferCount: Number(event.target.value) },
+                })
+              }
+              className={fieldClass}
+            >
+              {[0, 1, 2, 3, 4].map((count) => (
+                <option key={count} value={count}>
+                  {count === 0 ? "None" : count}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="buffer-minutes"
+              className="mb-1 block text-sm font-medium"
+            >
+              Length of each
+            </label>
+            <select
+              id="buffer-minutes"
+              value={state.settings.bufferMinutes}
+              onChange={(event) =>
+                dispatch({
+                  type: "settings",
+                  patch: { bufferMinutes: Number(event.target.value) },
+                })
+              }
+              className={fieldClass}
+            >
+              {[15, 30, 45, 60].map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} minutes
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="buffer-gap"
+              className="mb-1 block text-sm font-medium"
+            >
+              Gap between work blocks
+            </label>
+            <select
+              id="buffer-gap"
+              value={state.settings.bufferGapMinutes}
+              onChange={(event) =>
+                dispatch({
+                  type: "settings",
+                  patch: { bufferGapMinutes: Number(event.target.value) },
+                })
+              }
+              className={fieldClass}
+            >
+              {[0, 5, 10, 15].map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes === 0 ? "No gap" : `${minutes} minutes`}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {state.settings.bufferCount > 0 && (
+          <p className="text-xs text-muted-foreground">
+            They start at{" "}
+            {["3:00 PM", "5:00 PM", "11:00 AM", "7:00 PM"]
+              .slice(0, state.settings.bufferCount)
+              .join(", ")}
+            . A gap moves a newly placed block later, so it doesn’t sit right
+            after another one.
+          </p>
+        )}
+      </Card>
+
       <LearningCard />
 
       <Card className="space-y-3">
         <h2 className="font-sans text-[15px] font-semibold tracking-normal">
           Your data
         </h2>
+        <Button
+          type="button"
+          size="xl"
+          variant="outline"
+          onClick={() => downloadIcs(state, today)}
+        >
+          <CalendarDown aria-hidden />
+          Export calendar (.ics)
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          A one-time copy of upcoming planned blocks and deadlines, for another
+          calendar app. It doesn’t stay in sync.
+        </p>
         <p className="text-sm text-muted-foreground">
           Your tasks and documents are saved only in this browser. There’s no
           account, and they aren’t synced to other devices. Clearing your

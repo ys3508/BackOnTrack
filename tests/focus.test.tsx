@@ -27,6 +27,7 @@ const timerFor = (extra: Partial<TimerState> = {}): TimerState => ({
   startedAt: new Date(T0).toISOString(),
   runningSince: T0,
   accumulatedMs: 0,
+  plannedId: null,
   ...extra,
 })
 
@@ -246,10 +247,13 @@ describe("focus screen", () => {
     ).toBeInTheDocument()
     expect(saved().tasks[0].status).toBe("in-progress")
     expect(saved().focusSessions).toHaveLength(1)
-    expect(screen.getByText("Did you make progress?")).toBeInTheDocument()
-    click("A little")
-    expect(saved().focusSessions[0].progressReport).toBe("a-little")
-    expect(saved().tasks[0].progress).toBe(5)
+    expect(
+      screen.getByLabelText("Where should you start next time?")
+    ).toBeInTheDocument()
+    click("I started / made progress")
+    expect(saved().focusSessions[0].progressReport).toBe("yes")
+    expect(saved().focusSessions[0].endOutcome).toBe("progress")
+    expect(saved().tasks[0].progress).toBe(10)
     expect(
       screen.getByRole("button", { name: /5-minute break/ })
     ).toBeInTheDocument()
@@ -283,7 +287,7 @@ describe("focus screen", () => {
     ).toBeInTheDocument()
   })
 
-  it("offers Continue later or I got stuck when stopping early", async () => {
+  it("asks what came of it, or if you got stuck, when stopping early", async () => {
     render(<WorkspaceApp />)
     click("5-minute Quick Start")
     await advance(2 * MIN)
@@ -293,7 +297,7 @@ describe("focus screen", () => {
       target: { value: "Too noisy" },
     })
     click("Back")
-    click("Continue later")
+    click("I started / made progress")
     expect(saved().focusSessions[0]).toMatchObject({
       outcome: "continue-later",
       actualSeconds: 120,

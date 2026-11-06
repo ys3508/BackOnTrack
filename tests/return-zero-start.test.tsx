@@ -208,7 +208,7 @@ describe("coming back in the app", () => {
     await waitFor(() => expect(window.location.hash).toBe("#/tasks/a/doc"))
     expect((await getEditor()).getText()).toContain("Sleep affects memory.")
 
-    await user.click(await button("Workspace"))
+    await user.click(await button("Today"))
     await waitFor(() =>
       expect(
         screen.queryByRole("heading", { name: "Pick up where you left off" })

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Dialog } from "@base-ui/react/dialog"
-import { CalendarClock, Flag } from "lucide-react"
+import { ExternalLink, CalendarClock, Flag } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/components/workspace/store"
@@ -31,6 +31,47 @@ export function StatusBadge({ status }: { status: TaskStatus }) {
     >
       {STATUS_LABEL[status]}
     </span>
+  )
+}
+
+/** Only web addresses, so a pasted script can never run from a link. */
+export function safeLink(link: string) {
+  const text = link.trim()
+  if (!text) return null
+  try {
+    const url = new URL(
+      /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`
+    )
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.href
+      : null
+  } catch {
+    return null
+  }
+}
+
+export function TaskLink({
+  task,
+  className,
+}: {
+  task: Task
+  className?: string
+}) {
+  const href = safeLink(task.link)
+  if (!href) return null
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-indigo underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30",
+        className
+      )}
+    >
+      <ExternalLink className="size-4" aria-hidden />
+      Open link
+    </a>
   )
 }
 

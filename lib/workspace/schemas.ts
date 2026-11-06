@@ -293,6 +293,14 @@ export const TaskSchema = z.object({
   recoveryAttempts: z.array(RecoveryAttemptSchema).catch([]).default([]),
   /** The user's rough guess at the whole task, in minutes. Optional. */
   estimateMinutes: z.number().positive().nullable().catch(null).default(null),
+  /** "What will you do first?" Optional, and the user's own words. */
+  firstStep: z.string().catch("").default(""),
+  /** Where to pick up next time. It comes before the first step when present. */
+  resumeNote: z.string().catch("").default(""),
+  /** A web address that opens the work directly. */
+  link: z.string().catch("").default(""),
+  /** The smaller version that still counts, which is not the whole task. */
+  minimumVersion: z.string().catch("").default(""),
   /** Present when this responsibility is being worked on in Recovery. */
   recoveryCase: RecoveryCaseSchema.nullable().catch(null).default(null),
   /** A simple errand from the home page, which needs no recovery workflow. */
@@ -313,6 +321,16 @@ export const FocusSessionSchema = z.object({
   subtaskId: z.string().nullable().default(null),
   /** The user's own answer. Elapsed time alone is never treated as progress. */
   progressReport: z.enum(["yes", "a-little", "stuck"]).nullable().default(null),
+  /** The planned session this came from, if any. */
+  plannedId: z.string().nullable().catch(null).default(null),
+  /** True when the user said it happened, rather than a timer measuring it. */
+  reported: z.boolean().catch(false).default(false),
+  /** What the user said came of it, once they said. */
+  endOutcome: z
+    .enum(["progress", "minimum", "completed"])
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type FocusSession = z.infer<typeof FocusSessionSchema>
 
@@ -325,6 +343,14 @@ export const PlannedSessionSchema = z.object({
   minutes: z.number(),
   label: z.string().default(""),
   done: z.boolean().default(false),
+  /** The user's answer once its time has gone by. "did" became focus time. */
+  outcome: z.enum(["did", "didnt"]).nullable().catch(null).default(null),
+  /** A part of the day instead of an exact time. Only when time is null. */
+  window: z
+    .enum(["morning", "afternoon", "evening"])
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type PlannedSession = z.infer<typeof PlannedSessionSchema>
 
@@ -339,6 +365,8 @@ export const TimerSchema = z.object({
   runningSince: z.number().nullable(),
   /** Milliseconds counted before the current run. */
   accumulatedMs: z.number(),
+  /** The planned session this timer is carrying out, if any. */
+  plannedId: z.string().nullable().catch(null).default(null),
 })
 export type TimerState = z.infer<typeof TimerSchema>
 
@@ -348,6 +376,22 @@ export const SettingsSchema = z.object({
     .union([z.literal(5), z.literal(10), z.literal(25)])
     .default(5),
   homeListSize: z.union([z.literal(3), z.literal(5)]).default(3),
+  /** The length last chosen on the calendar, used as the next default. */
+  lastSessionMinutes: z
+    .number()
+    .positive()
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** Time kept free each day for catching up. */
+  bufferCount: z.number().int().min(0).max(4).catch(1).default(1),
+  bufferMinutes: z.number().positive().catch(30).default(30),
+  /** Space to leave after a work block when placing the next one. 0 is off. */
+  bufferGapMinutes: z.number().min(0).catch(0).default(0),
+  /** Off until the user chooses, after being told what they can and can't do. */
+  remindersEnabled: z.boolean().catch(false).default(false),
+  /** The one-time note that everything is saved in this browser. */
+  storageNoticeSeen: z.boolean().catch(false).default(false),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -355,6 +399,12 @@ export const DEFAULT_SETTINGS: Settings = {
   modePreference: null,
   defaultFocusMinutes: 5,
   homeListSize: 3,
+  lastSessionMinutes: null,
+  bufferCount: 1,
+  bufferMinutes: 30,
+  bufferGapMinutes: 0,
+  remindersEnabled: false,
+  storageNoticeSeen: false,
 }
 
 export const ESTIMATE_OPTIONS = [5, 15, 30, 60, 120, 240]
@@ -389,6 +439,19 @@ export const RoutineSchema = z.object({
   exdates: z.array(z.string()).catch([]).default([]),
   /** Dates whose regular occurrence the user marked done. */
   doneDates: z.array(z.string()).catch([]).default([]),
+  /** Fixed happens at a time. Flexible can happen any time on the day. */
+  kind: z.enum(["fixed", "flexible"]).catch("fixed").default("fixed"),
+  /** A smaller alternative. Doing it isn't the same as doing the full one. */
+  minimumVersion: z.string().catch("").default(""),
+  /** Dates done in the smaller version. */
+  minimumDates: z.array(z.string()).catch([]).default([]),
+  /** Dates the user chose to skip. */
+  skippedDates: z.array(z.string()).catch([]).default([]),
+  /** Earlier versions, so "All future" never rewrites past weeks. */
+  priorRules: z
+    .array(z.object({ rrule: z.string(), duration: z.number().positive() }))
+    .catch([])
+    .default([]),
   createdAt: z.string(),
 })
 export type Routine = z.infer<typeof RoutineSchema>
@@ -400,8 +463,80 @@ export const RoutinePlacementSchema = z.object({
   date: DateString,
   time: z.string(),
   done: z.boolean().default(false),
+  /** Its own length, when this one differs from the routine. */
+  minutes: z.number().positive().nullable().catch(null).default(null),
+  /** True when this replaces a regular occurrence, or was changed by hand. */
+  adjusted: z.boolean().catch(false).default(false),
+  /** What came of it. "full" is the same as done. */
+  result: z
+    .enum(["full", "minimum", "skipped"])
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type RoutinePlacement = z.infer<typeof RoutinePlacementSchema>
+
+export const PROGRESS_EVENT_TYPES = [
+  "started",
+  "minimum_met",
+  "completed",
+  "restarted",
+  "recovery_shown",
+  "recovery_action_taken",
+] as const
+
+/** A moment of real progress, kept apart from any task's or session's status. */
+export const ProgressEventSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  type: z.enum(PROGRESS_EVENT_TYPES),
+  at: z.string(),
+  sessionId: z.string().nullable().default(null),
+})
+export type ProgressEvent = z.infer<typeof ProgressEventSchema>
+
+export const RECOVERY_REASONS = [
+  "cant-start",
+  "dont-know-start",
+  "worried",
+  "no-time",
+] as const
+export type RecoveryReason = (typeof RECOVERY_REASONS)[number]
+
+export const RECOVERY_REASON_LABEL: Record<RecoveryReason, string> = {
+  "cant-start": "I know what to do, but I can’t start",
+  "dont-know-start": "I don’t know where to begin",
+  worried: "I’m worried about the outcome or someone’s reaction",
+  "no-time": "I don’t have enough time anymore",
+}
+
+/** Each reason opens the tools that fit, using the existing recovery engine. */
+export const REASON_BLOCKER: Record<RecoveryReason, Blocker> = {
+  "cant-start": "cant-start",
+  "dont-know-start": "dont-know-start",
+  worried: "worried",
+  "no-time": "behind",
+}
+
+/** Someone working through recovery, kept so a reload lands in the same place. */
+export const RecoverySchema = z.object({
+  /** Null while choosing what they've been avoiding. */
+  taskId: z.string().nullable(),
+  plannedId: z.string().nullable().default(null),
+  source: z.enum(["scheduled", "avoidance"]),
+  reason: z.enum(RECOVERY_REASONS).nullable().default(null),
+  enteredAt: z.string(),
+})
+export type Recovery = z.infer<typeof RecoverySchema>
+
+/** A stray thought caught during a session, so it can wait without being lost. */
+export const ParkedThoughtSchema = z.object({
+  id: z.string(),
+  text: z.string().min(1),
+  taskId: z.string().nullable().default(null),
+  at: z.string(),
+})
+export type ParkedThought = z.infer<typeof ParkedThoughtSchema>
 
 export const ENERGY_LEVELS = ["low", "okay", "good"] as const
 export type Energy = (typeof ENERGY_LEVELS)[number]
@@ -504,12 +639,21 @@ export type Workspace = {
   intakeDraft: string
   routines: Routine[]
   routinePlacements: RoutinePlacement[]
+  parkingLot: ParkedThought[]
+  progressEvents: ProgressEvent[]
+  recovery: Recovery | null
+  /** Which blocks have reminded, so a reload never repeats one. */
+  remindedBlocks: string[]
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
   intakeDraft: "",
   routines: [],
   routinePlacements: [],
+  parkingLot: [],
+  progressEvents: [],
+  recovery: null,
+  remindedBlocks: [],
   version: 2,
   tasks: [],
   focusSessions: [],

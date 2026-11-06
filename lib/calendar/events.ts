@@ -3,7 +3,13 @@ import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type { PlannedSession, Workspace } from "@/lib/workspace/schemas"
 
 export type CalendarItemKind =
-  "deadline" | "planned" | "focused" | "routine" | "routine-placement"
+  | "deadline"
+  | "planned"
+  | "focused"
+  | "routine"
+  | "routine-placement"
+  | "pending"
+  | "buffer"
 
 export type CalendarItem = {
   id: string
@@ -19,6 +25,11 @@ export type CalendarItem = {
     taskId: string | null
     refId: string
     color?: string
+    /** Planned work whose time has gone by, still waiting for an answer. */
+    awaitingAnswer?: boolean
+    timed?: boolean
+    window?: string | null
+    reported?: boolean
   }
 }
 
@@ -77,10 +88,12 @@ export function buildCalendarItems(
   const planned = state.planned.flatMap((session): CalendarItem[] => {
     const title = titleOf(session.taskId)
     if (!title) return []
+    // It became focus time, which is drawn instead.
+    if (session.outcome === "did") return []
     return [
       {
         id: `planned:${session.id}`,
-        title: `Work: ${title}${session.label ? `: ${session.label}` : ""} (${session.minutes} min)`,
+        title: session.label ? `${title}: ${session.label}` : title,
         start: session.time ? `${session.date}T${session.time}` : session.date,
         end: session.time ? plannedEnd(session) : undefined,
         allDay: !session.time,
@@ -96,6 +109,12 @@ export function buildCalendarItems(
           kind: "planned",
           taskId: session.taskId,
           refId: session.id,
+          timed: Boolean(session.time),
+          window: session.window,
+          awaitingAnswer:
+            Boolean(session.time) &&
+            !session.outcome &&
+            isMissed(session, today, now),
         },
       },
     ]
@@ -105,7 +124,7 @@ export function buildCalendarItems(
     .filter(isFocusTime)
     .map((session): CalendarItem => ({
       id: `focused:${session.id}`,
-      title: `Focused: ${session.taskTitle}`,
+      title: session.taskTitle,
       start: session.startedAt,
       end: session.endedAt,
       allDay: false,
@@ -116,6 +135,7 @@ export function buildCalendarItems(
         kind: "focused",
         taskId: session.taskId,
         refId: session.id,
+        reported: session.reported,
       },
     }))
 

@@ -70,7 +70,7 @@ const seed = (state: Workspace) =>
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/today"
+  window.location.hash = "#/plan"
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => Response.json({ live: false, model: null }))

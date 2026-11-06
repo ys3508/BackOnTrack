@@ -59,7 +59,7 @@ function seed(title: string, deadline: string | null = null) {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/today"
+  window.location.hash = "#/plan"
   window.scrollTo = vi.fn() as typeof window.scrollTo
 })
 
@@ -106,6 +106,10 @@ describe("definition of done", () => {
       "Can't find the worksheet"
     )
     await user.click(await button("Find another way in"))
+    await screen.findByRole("heading", {
+      name: "What’s making this difficult right now?",
+    })
+    await user.click(await button("Want a fuller plan?"))
     expect(saved().tasks[0].status).toBe("needs-recovery")
 
     // 7. Request a recovery plan after getting stuck. No task data changes yet.
@@ -332,10 +336,7 @@ describe("with Live AI", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Live AI" })).toHaveAttribute(
-        "aria-pressed",
-        "true"
-      )
+      expect(document.querySelector('[data-mode="live"]')).toBeTruthy()
     )
     await user.click(await button("Get a recovery plan"))
     await screen.findByRole("heading", { name: "From the AI" })
@@ -354,10 +355,7 @@ describe("with Live AI", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Live AI" })).toHaveAttribute(
-        "aria-pressed",
-        "true"
-      )
+      expect(document.querySelector('[data-mode="live"]')).toBeTruthy()
     )
     await user.click(await button("Get a recovery plan"))
     await screen.findByText(/built-in template/)
@@ -379,10 +377,7 @@ describe("with Live AI", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Live AI" })).toHaveAttribute(
-        "aria-pressed",
-        "true"
-      )
+      expect(document.querySelector('[data-mode="live"]')).toBeTruthy()
     )
     await user.click(await button("Get a recovery plan"))
     expect(await screen.findByRole("alert")).toHaveTextContent(

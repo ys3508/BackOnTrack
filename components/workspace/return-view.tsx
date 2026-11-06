@@ -31,6 +31,15 @@ export function ReturnView({ summary }: { summary: ReturnSummary }) {
           )}
         </div>
 
+        {summary.resumeNote && (
+          <div className="rounded-xl bg-sage-soft p-3">
+            <h2 className="text-sm font-medium text-sage">Pick up here</h2>
+            <p className="mt-0.5 font-heading text-xl leading-snug break-words">
+              {summary.resumeNote}
+            </p>
+          </div>
+        )}
+
         <ul className="space-y-1 text-[15px]">
           {summary.lastFinished && (
             <li>Last step you finished: {summary.lastFinished}</li>

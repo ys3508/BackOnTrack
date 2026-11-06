@@ -4,15 +4,22 @@ import { useStore } from "@/components/workspace/store"
 import {
   formatClockTime,
   formatDuration,
+  formatTimeRange,
   rangeStats,
-  taskColor,
+  sessionsFrom,
 } from "@/lib/calendar/derived"
 import type { CalendarSession } from "@/lib/calendar/derived"
 import { addDays, shortDate } from "@/lib/workspace/dates"
 import { cn } from "@/lib/utils"
 
 const describe = (session: CalendarSession) =>
-  `${session.title}, ${formatDuration(session.minutes)}, ${formatClockTime(session.start)} to ${formatClockTime(session.end)}`
+  `${session.kind === "planned" ? "Planned" : "Focus"}: ${session.title}, ${formatDuration(session.minutes)}, ${formatTimeRange(session.start, session.end)}`
+
+/** The same two looks as the calendar: dashed for planned, solid for focus. */
+const KIND_STYLE = {
+  planned: "border border-dashed border-sage bg-sage-soft",
+  actual: "bg-primary",
+}
 
 /** Hover or keyboard focus shows the details. A title alone wouldn't reach keys. */
 function Segment({
@@ -29,9 +36,12 @@ function Segment({
       tabIndex={0}
       role="img"
       aria-label={describe(session)}
-      style={{ ...style, backgroundColor: taskColor(session.taskId) }}
+      data-kind={session.kind}
+      style={style}
       className={cn(
         "group outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+        KIND_STYLE[session.kind],
+        session.outcome === "didnt" && "opacity-50",
         className
       )}
     >
@@ -40,8 +50,8 @@ function Segment({
         className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-max max-w-56 -translate-x-1/2 rounded-lg bg-foreground px-2 py-1 text-xs text-background group-hover:block group-focus-visible:block"
       >
         <span className="block font-medium break-words">{session.title}</span>
-        {formatDuration(session.minutes)} · {formatClockTime(session.start)}–
-        {formatClockTime(session.end)}
+        {formatDuration(session.minutes)} ·{" "}
+        {formatTimeRange(session.start, session.end)}
       </span>
     </span>
   )
@@ -49,20 +59,23 @@ function Segment({
 
 const hoursOf = (date: Date) => date.getHours() + date.getMinutes() / 60
 
-function DayStrip({ sessions }: { sessions: CalendarSession[] }) {
-  // Normal waking hours, stretched only if a session falls outside them.
-  const first = Math.floor(
-    Math.min(6, ...sessions.map((s) => hoursOf(s.start)))
-  )
-  const last = Math.ceil(Math.max(22, ...sessions.map((s) => hoursOf(s.end))))
+function DayStrip({
+  sessions,
+  first,
+  last,
+}: {
+  sessions: CalendarSession[]
+  first: number
+  last: number
+}) {
   const span = Math.max(1, last - first)
   const label = (hour: number) =>
-    formatClockTime(new Date(2000, 0, 1, hour % 24)).replace(":00", "")
+    formatClockTime(new Date(2000, 0, 1, hour % 24))
   return (
     <div>
       <div
         data-testid="day-strip"
-        className="relative h-5 rounded-full bg-secondary"
+        className="relative h-5 rounded-md bg-secondary"
       >
         {sessions.map((session) => {
           const left = ((hoursOf(session.start) - first) / span) * 100
@@ -75,7 +88,11 @@ function DayStrip({ sessions }: { sessions: CalendarSession[] }) {
             <Segment
               key={session.id}
               session={session}
-              className="absolute inset-y-0 min-w-1 rounded-sm"
+              className={cn(
+                "absolute min-w-1 rounded-sm",
+                // Focus sits on top, so it shows where the two overlap.
+                session.kind === "actual" ? "inset-y-0 z-1" : "inset-y-0.5"
+              )}
               style={{ left: `${left}%`, width: `${width}%` }}
             />
           )
@@ -102,7 +119,7 @@ function WeekBars({ from }: { from: string }) {
         <li key={day.date} className="flex flex-col items-center gap-1">
           <div
             data-testid="week-bar"
-            className="flex h-14 w-full max-w-10 flex-col-reverse rounded-md bg-secondary"
+            className="flex h-14 w-full max-w-10 flex-col-reverse gap-px rounded-md bg-secondary"
           >
             {day.actual.map((session) => (
               <Segment
@@ -131,10 +148,12 @@ export function CalendarDashboard({
   from,
   until,
   week,
+  hours,
 }: {
   from: string
   until: string
   week: boolean
+  hours: { first: number; last: number }
 }) {
   const { state } = useStore()
   const stats = rangeStats(state, from, until)
@@ -143,6 +162,31 @@ export function CalendarDashboard({
     { label: "Tasks completed", value: String(stats.tasksCompleted) },
     { label: "Time planned", value: formatDuration(stats.plannedMinutes) },
   ]
+  // Planned time that became focus is drawn once, as the focus it turned into.
+  const onStrip = sessionsFrom(state).filter(
+    (item) =>
+      item.timed &&
+      item.date >= from &&
+      item.date < until &&
+      !(item.kind === "planned" && item.outcome === "did")
+  )
+  // Nothing to report isn't worth a panel full of zeros.
+  if (
+    !onStrip.length &&
+    stats.focusMinutes < 1 &&
+    !stats.tasksCompleted &&
+    !stats.plannedMinutes
+  ) {
+    return (
+      <p
+        role="region"
+        aria-label={week ? "This week at a glance" : "This day at a glance"}
+        className="text-sm text-muted-foreground"
+      >
+        Nothing recorded yet {week ? "this week" : "today"}.
+      </p>
+    )
+  }
   return (
     <section
       aria-label={week ? "This week at a glance" : "This day at a glance"}
@@ -156,7 +200,11 @@ export function CalendarDashboard({
           </div>
         ))}
       </dl>
-      {week ? <WeekBars from={from} /> : <DayStrip sessions={stats.actual} />}
+      {week ? (
+        <WeekBars from={from} />
+      ) : (
+        <DayStrip sessions={onStrip} first={hours.first} last={hours.last} />
+      )}
     </section>
   )
 }

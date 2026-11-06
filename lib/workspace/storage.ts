@@ -14,6 +14,9 @@ import {
   FrictionEventSchema,
   LearningSchema,
   DailyPlanSchema,
+  ParkedThoughtSchema,
+  ProgressEventSchema,
+  RecoverySchema,
   RoutinePlacementSchema,
   RoutineSchema,
 } from "@/lib/workspace/schemas"
@@ -46,6 +49,7 @@ export function restoreWorkspace(raw: unknown): Workspace {
   const settings = SettingsSchema.safeParse(saved.settings)
   const learning = LearningSchema.safeParse(saved.learning)
   const dailyPlan = DailyPlanSchema.safeParse(saved.dailyPlan)
+  const recovery = RecoverySchema.safeParse(saved.recovery)
   const focusSessions = validItems(saved.focusSessions, (item) =>
     FocusSessionSchema.safeParse(item)
   )
@@ -95,6 +99,16 @@ export function restoreWorkspace(raw: unknown): Workspace {
     routinePlacements: validItems(saved.routinePlacements, (item) =>
       RoutinePlacementSchema.safeParse(item)
     ),
+    parkingLot: validItems(saved.parkingLot, (item) =>
+      ParkedThoughtSchema.safeParse(item)
+    ),
+    progressEvents: validItems(saved.progressEvents, (item) =>
+      ProgressEventSchema.safeParse(item)
+    ),
+    recovery: recovery.success ? recovery.data : null,
+    remindedBlocks: Array.isArray(saved.remindedBlocks)
+      ? saved.remindedBlocks.filter((item) => typeof item === "string")
+      : [],
   }
 }
 
@@ -143,6 +157,10 @@ export function taskFromSession(
       recoveryAttempts: [],
       recoveryCase: null,
       quick: false,
+      firstStep: "",
+      resumeNote: "",
+      link: "",
+      minimumVersion: "",
     },
     at,
     "created",

@@ -50,7 +50,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/today"
+  window.location.hash = "#/plan"
   window.scrollTo = vi.fn() as typeof window.scrollTo
 })
 
@@ -141,6 +141,10 @@ describe("definition of done", () => {
       "I don't understand what they want"
     )
     await user.click(await button("Find another way in"))
+    await screen.findByRole("heading", {
+      name: "What’s making this difficult right now?",
+    })
+    await user.click(await button("Want a fuller plan?"))
     await user.click(await button("Get a recovery plan"))
     const first = (await screen.findByRole("heading", { level: 1 })).textContent
     expect(first).toMatch(/Pull out what/)
@@ -183,7 +187,7 @@ describe("definition of done", () => {
     expect(task.completedAt).toBeNull()
 
     // 11. Return later, and resume from the saved position.
-    window.location.hash = "#/today"
+    window.location.hash = "#/plan"
     unmount()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Continue where you left off" })
@@ -240,7 +244,7 @@ describe("focus inside the task", () => {
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"))
     })
-    await screen.findByText("Did you make progress?")
+    await screen.findByLabelText("Where should you start next time?")
   }
 
   it("shows the current step beside the document, without leaving the page", async () => {
@@ -253,11 +257,11 @@ describe("focus inside the task", () => {
     vi.useRealTimers()
   })
 
-  it("answers Yes: offers the step, but never completes anything by itself", async () => {
+  it("answers that it made progress: offers the step, but never completes anything by itself", async () => {
     render(<WorkspaceApp />)
     await finishSession()
     expect(saved().tasks[0].subtasks[0].done).toBe(false)
-    fireEvent.click(await button("Yes"))
+    fireEvent.click(await button("I started / made progress"))
     expect(saved().focusSessions[0].progressReport).toBe("yes")
     expect(saved().tasks[0].status).toBe("in-progress")
     expect(saved().tasks[0].subtasks[0].done).toBe(false)
@@ -272,7 +276,8 @@ describe("focus inside the task", () => {
     fireEvent.click(await button("I got stuck"))
     expect(saved().tasks[0].status).toBe("needs-recovery")
     expect(saved().focusSessions[0].progressReport).toBe("stuck")
-    await waitFor(() => expect(window.location.hash).toBe("#/recover/a"))
+    await waitFor(() => expect(window.location.hash).toBe("#/"))
+    expect(saved().recovery).toMatchObject({ taskId: "a", reason: null })
     vi.useRealTimers()
   })
 })

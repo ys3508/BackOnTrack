@@ -280,6 +280,43 @@ All were found in a real browser, since unit tests replace FullCalendar with a m
 - The selected-day outline boxed the entire column in Day view.
 - Switching from Month to Day left the grid scrolled to 12am.
 
+## Calendar duration, routines, and block prompts
+
+### Decisions
+
+- **A single click stays exactly 25 minutes.** "Last used, or the task's estimate" applies to the "Add to" button and tray drops. Only task sessions set "last used", so editing a routine doesn't change it.
+- **"Did it" is marked as reported.** It counts as focus time, but history says the user reported it, it can be taken back, and it isn't called time "on the timer".
+- **A timer started from a block answers for it,** so nothing is counted twice. An interrupted attempt doesn't answer, so the block still asks.
+- **"All future" keeps the old rule, ended the day before.** Past weeks and their done marks stay as they were.
+- **One colour per kind,** in blocks, legend, and dashboard, instead of per task. Routines keep their own colour.
+- **Popovers read their block's real position** and follow it, rather than storing where the click happened.
+
+### Problems found by testing
+
+Found in a real browser, since unit tests mock FullCalendar.
+
+- The reported popover mismatch: it was placed once and never moved, so scrolling the grid left "5:15 PM" next to 9 AM.
+- A popover starts hidden while measuring itself, and a hidden field can't take focus, so typing went nowhere.
+- The custom minutes field snapped back when cleared, so a new number couldn't be typed.
+
+## Final MVP: Start, Get Stuck, Recover, Continue
+
+### Decisions
+
+- **Recovery lives in the Now card.** A `recovery` record in the workspace says who's in recovery and why, so a reload lands in the same place. The four reasons reuse the existing recovery engine.
+- **Restarts are counted where a timer really starts.** Viewing a card, clicking a suggestion, pausing, resuming, or reloading can't add one, because none of them start a new timer.
+- **`Session` and `Block` aren't separate stores.** They're views over the existing planned and focus records, so the numbers can't disagree. The `deadline` field is the hard deadline, and rescheduling never writes to it.
+- **Minimum is not completion.** It records its own event, leaves the task open, and isn't listed as done.
+- **The clock stops when ending a session,** so answering the questions adds no focus time, and "Keep going" resumes it.
+- **Reminders are off by default,** and permission is only requested after the user reads the limits and turns them on.
+
+### Problems found by testing
+
+- Plan B opened in edit mode, hiding the suggestion, because the plan arrived just after the card appeared.
+- A popover's field couldn't take focus while the popover was hidden for measuring.
+- Today hid routines when there were no tasks.
+- "You said you made progress" appeared for minimum and completed outcomes in focus history.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

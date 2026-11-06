@@ -26,39 +26,41 @@ BackOnTrack isn't a treatment for ADHD or anything else, and its effect hasn't b
 
 ## What it does
 
-The home page asks one question: "What's something you've been putting off?" From there, BackOnTrack follows **Understand → Act → Recover**:
+BackOnTrack is a failure-aware action system. Most tools help you plan. This one is for what happens when you can't start, abandon something, or the plan stops working: **Plan → Start → Get Stuck → Recover → Continue.**
 
-1. Say what's going on, in your own words. A simple errand like "Buy lunch" stays a one-tap quick item.
-2. Pick what's making it difficult. The app may point at the closest match, but you always choose, and you can change it any time without losing work.
-3. Work in one Recovery Workspace, whose tools follow that choice, with one next action at a time:
+Open **Today** and the **Now card** shows one next action with one main button. It adapts to what's true right now: something coming up, a session running or paused, a planned start that has passed, or nothing scheduled.
 
-| What's in the way | Tools |
+When you're stuck, or you've been avoiding something you never scheduled, recovery happens right there in the card. It asks "What's making this difficult right now?":
+
+| What's in the way | What you get |
 | --- | --- |
-| "I don't know where to start." | One-Step Breakdown: one step, and "Make it smaller". Later steps stay hidden until you ask or finish this one. |
-| "I know what to do, but I can't start." | Micro-action, plus an optional 2 or 5 minute timer. A timer finishing never marks anything done. |
-| "I'm worried about what might happen." | Reality Gap: four editable lists separating facts from fears, plus an optional message draft. It never invents a policy or consequence. |
-| "I'm already behind, or my plan didn't work." | Reality Check, then Finish, Reduce, or Release, which you choose. Release on something consequential explains the uncertainty first. |
+| "I know what to do, but I can't start" | One 2 to 5 minute action, with Start. |
+| "I don't know where to begin" | One first step, with the next ones only when you ask. |
+| "I'm worried about the outcome or someone's reaction" | Reality Gap: Known Facts, Worries / Assumptions, Unknowns, and Possible Actions, all editable. It never invents a policy or consequence. |
+| "I don't have enough time anymore" | Finish, Reduce, or Release. Release says plainly that it only changes BackOnTrack and doesn't cancel anything outside it. |
 
-"I'm stuck" asks what happened and adapts (Plan B), never repeating a suggestion and never deleting finished work. After a few days away, it asks neutrally whether to continue, make the next step smaller, or reconsider the plan.
+Each ends in a Plan B: an action you can edit, a short time, and Start. A missed block can also move to a buffer or be rescheduled, and neither ever changes a hard deadline. Ending a session asks where to pick up next time, and whether you made progress, met the minimum version, or finished the original task, which stay separate. "Restarted" counts sessions that really began, never cards that were looked at.
 
-The earlier dashboard (suggested task and daily plan) is still there, under "Today's plan and suggested task" on the home page. The tools below all still work:
+The navigation is Today, Calendar, Routines, and Settings. All tasks, the suggested daily plan, and focus history are linked from Today.
 
 | Area | What you can do |
 | --- | --- |
-| **Workspace** | See "Your next small step", or "Continue where you left off", with one click to the task, its document, or a short focus session. Lists stay short, with an option to expand. |
+| **Plan my day** | "Plan my day" asks how much time you have, and optionally your energy, then proposes a realistic plan from your tasks. It gives each item a reason, says what's left out, and warns about deadlines at risk. This is calculated, not AI, and it never moves a deadline. |
 | **Today** | "Plan my day" asks how much time you have, and optionally your energy, then proposes a realistic plan from your tasks. It gives each item a reason, says what's left out, and warns about deadlines at risk. You can reorder, remove, or add before using it. This is calculated, not AI, and it never moves a deadline. |
 | **Suggested order** | Tasks are ordered by deadline, priority, progress, and plans, with the reason shown. You can turn this off, and change a task's priority or time estimate. |
 | **Learning what helps** | BackOnTrack notices when work stalls, such as getting stuck on empty documents, and whether accepted help was followed by progress. Then it changes which help comes first, and says why. It needs at least 3 separate moments before claiming anything. In Settings, you can see every record, say "This isn't right", delete anything, state a preference, or switch it off. |
-| **Coming back** | After a few days away, home shows one way back in: where you stopped, and a "Continue working" button. It shows no overdue counts, backlog, or streaks. |
+| **Coming back** | After a few days away, Today shows one way back in, leading with the note you left yourself. It shows no overdue counts, backlog, or streaks. |
 | **Zero-Start** | "Set up my workspace" prepares a document with what's being asked, questions to answer, an outline, and an editable first section. Choose where to begin, and the first [placeholder] is selected so you can type over it. It's structure, not research. |
 | **Help starting** | Each step has "Help me do this", which gives one concrete first action and something to start from: an outline, a draft, a checklist, or code to copy. Code hasn't been run, and BackOnTrack can't run it. A new task can set up its first workspace from your instructions. "Start 5 minutes" opens the document for that step, with a small timer on top. |
 | **Task workspace** | Add instructions by pasting them or uploading a PDF, .txt, or .md file. Get an editable breakdown into small steps. Write in a rich-text document with autosave, and get writing help you preview, then accept or reject. Keep the timer beside your work. |
 | **Tasks** | Create, edit, delete, complete, pause, and resume tasks. Set deadlines and, if you want, a priority, track progress, add steps and notes, and view history. Use a list or a Kanban board with six states. |
 | **Focus** | Run 5, 10, or 25 minute sessions linked to a task, with pause, resume, reset, optional breaks, and history. A session stopped in under a minute is an interrupted attempt, and doesn't count as focus time. Timing uses wall-clock timestamps, so it stays right in background tabs and after a reload. Finishing a session never completes the task. |
-| **Calendar** | Day (the default), Week, Month, and a Year view that shows only a heatmap of focus time. Click a month day to add a task, or a time slot to add a 25-minute session, typing the title in place. Drag blocks to reschedule and drag a session's bottom edge to resize it. Click a block for Start focus, Done, Change time, and Open. Planned work is dashed, real focus is solid, and deadlines are small chips, which only move after you confirm. A "Not started yet" tray collects unfinished tasks from past days, in grey and never red. Routines such as "Gym, Mon/Wed/Fri 7am" appear by themselves and fill in when done, with no streaks. Day and Week show focus time, tasks completed, and time planned. |
-| **Recovery** | When stuck, get a plan based on the task's real data: title, deadline, status, attempts, finished actions, focus sessions, and obstacles. It produces something usable, such as a draft email, worksheet, or schedule. You preview and edit it, and nothing changes unless you accept it. |
-
-Reality Check, Finish/Reduce/Release, and Plan B are all part of Recovery. The original step-by-step wizard is still available as a guided check-in.
+| **Calendar** | Day (the default, opening at the current time), Week, Month, and a Year heatmap of focus. Click a month day to add a task. In Day and Week, click a slot for a session of your last-used length, or drag across slots for any length, then type to find a task or name a new one. Drag to move, and use the bottom grip to resize. Click a block for Start focus, Done, Change time, Open, Open link, and Delete. Planned work is dashed, real focus is solid, deadlines are chips, and flexible work sits in the untimed row. Past items are never red. |
+| **Buffers** | Time kept free for catching up, by default 30 minutes at 3:00 PM. Set the number, the length, and an optional gap between work blocks in Settings. Unused buffers never count as missed. |
+| **Routines** | Fixed or flexible, with an optional minimum version. Each occurrence can be ● Full, ◐ Minimum, or skipped, and these are counted apart. Edit one occurrence or all future ones. No streaks. |
+| **Reminders** | Optional, about five minutes before a scheduled block. They only work while BackOnTrack is open in a tab, and aren't push notifications. |
+| **Calendar export** | A one-time `.ics` file of upcoming planned blocks and deadlines. There's no syncing. |
+| **Fuller recovery plan** | From the recovery card, "Want a fuller plan?" opens the earlier plan view, with an editable draft, steps, and work sessions you preview before accepting. |
 
 | | |
 | --- | --- |
@@ -161,6 +163,10 @@ This repository does not yet have its own license for the original BackOnTrack c
 
 ## Known limitations
 
+- Reminders depend on an open browser tab, and browsers can delay them in the background. There's no push service, so a closed tab means no reminder.
+- The `.ics` file has only been checked for correct format by tests, not imported into a real calendar app.
+- Buffer times are fixed slots (3 PM, then 5 PM, 11 AM, and 7 PM). You choose how many and how long, not when.
+- The earlier recovery screens (`#/avoid`, `#/case`, `#/recover`) still exist alongside the Now card, so nothing is lost. Only the fuller plan is linked from the main flow.
 - Recovery cases are saved only in this browser, along with everything else. Clearing browser data deletes them, so use Export in Settings to keep a backup.
 - In Demo Mode, the blocker suggestion, errand detection, Reality Gap sorting, and next steps come from wording rules and templates. They handle any text, but only generally, and can sort a sentence wrongly. Everything is editable, and each suggestion says it isn't AI.
 - Crisis wording is matched by rules, so it can miss phrasing or misfire. Live AI can flag it too, and someone who isn't in danger can continue. BackOnTrack is not a crisis service.
@@ -174,8 +180,10 @@ This repository does not yet have its own license for the original BackOnTrack c
 - Two tabs open on the same task can overwrite each other's document changes.
 - PDFs must contain real text. Scanned PDFs, images, and Word files aren't read.
 - The timer stays accurate, but it can't alert you with a sound or notification when it ends.
-- Calendar items are hard to read on a phone-width month view. Tapping a day lists its items in full below the calendar.
-- Dragging on the calendar was tested with a mouse, not on a touch screen. Keyboard users have buttons instead: "Add to" a day, "Schedule" in the tray, and "Change time" in a block's popover. Blocks themselves can't be reached by keyboard.
+- Calendar items are hard to read on a phone-width month view, and there's no longer a list of a day's items below the calendar.
+- Dragging on the calendar was tested with a mouse, not on a touch screen. Blocks open with Enter from the keyboard, and "Add to" a day, "Schedule" in the tray, and "Change time" in a popover replace dragging, but drag-select has no keyboard version.
+- The calendar shows 6 AM to 11 PM, stretching only for things outside those hours. To add something earlier or later, add it and change its start time in the popover.
+- Week view has no prompt words on narrow columns, only ✓ and ✕, and its bars show focus only, not planned time.
 - The calendar always opens on Day, and doesn't remember the last view.
 - Demo Mode uses fixed templates and simple text rules, so it can't understand a task or explain text the way an AI model could.
 - Vague-advice, repeat, and high-stakes checks use wording rules, so they can miss cases or flag them wrongly.

@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor, within } from "@testing-library/react"
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MockLanguageModelV4 } from "ai/test"
 import axe from "axe-core"
@@ -78,7 +85,7 @@ const context = (
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/"
+  window.location.hash = "#/avoid"
   // Demo Mode: no live key.
   vi.stubGlobal(
     "fetch",
@@ -543,24 +550,20 @@ describe("Test D: fear of consequences", () => {
     )
     await chooseBlocker(user, /I’m worried about what might happen\./)
     await screen.findByRole("heading", { name: "Reality Gap" })
-    expect(screen.getByLabelText("What I know, item 1")).toHaveValue(
+    expect(screen.getByLabelText("Known Facts, item 1")).toHaveValue(
       "I missed my assignment"
     )
-    expect(screen.getByLabelText("What I’m worried about, item 1")).toHaveValue(
+    expect(screen.getByLabelText("Worries / Assumptions, item 1")).toHaveValue(
       "My professor might fail me"
     )
     expect(
-      (
-        screen.getByLabelText(
-          "What I don’t know yet, item 1"
-        ) as HTMLTextAreaElement
-      ).value
+      (screen.getByLabelText("Unknowns, item 1") as HTMLTextAreaElement).value
     ).toMatch(/whether late submissions/i)
     expect(await nextAction()).toHaveTextContent(/course policy/i)
     expect(screen.getAllByTestId("next-action")).toHaveLength(1)
 
     // Every section can be corrected, and it's saved right away.
-    const known = screen.getByLabelText("What I know, item 1")
+    const known = screen.getByLabelText("Known Facts, item 1")
     await user.clear(known)
     await user.type(known, "It was due Monday")
     await waitFor(() =>
@@ -902,9 +905,11 @@ describe("Test G: returning after days away", () => {
     expect((await nextAction()).textContent).toBe(next)
     await screen.findByText(/I don’t know where to start\./)
 
-    await user.click(await screen.findByRole("button", { name: "Tasks" }))
+    await user.click(await screen.findByRole("button", { name: "Today" }))
+    await user.click(await button("All tasks"))
     expect(await screen.findByText(/My room is a mess/)).toBeTruthy()
-    await user.click(await screen.findByRole("button", { name: "Workspace" }))
+    await user.click(await screen.findByRole("button", { name: "Today" }))
+    window.location.hash = "#/avoid"
     const resume = await button("Resume My room is a mess")
     expect(await screen.findByText(next!)).toBeTruthy()
     await user.click(resume)
@@ -952,7 +957,7 @@ describe("Test G: returning after days away", () => {
 })
 
 const cleanupAndRender = (hash: string) => {
-  document.body.innerHTML = ""
+  cleanup()
   window.location.hash = hash
   render(<WorkspaceApp />)
 }
@@ -989,7 +994,7 @@ describe("Test H: the user corrects the system", () => {
     expect(screen.queryByText("Reality Check")).toBeNull()
 
     // And back: what was drafted is still there.
-    const known = screen.getByLabelText("What I know, item 1")
+    const known = screen.getByLabelText("Known Facts, item 1")
     await user.clear(known)
     await user.type(known, "edited by me")
     await user.click(await button("Change this"))
@@ -998,7 +1003,7 @@ describe("Test H: the user corrects the system", () => {
     expect(screen.queryByRole("heading", { name: "Reality Gap" })).toBeNull()
     await user.click(await button("Change this"))
     await user.click(await button(/I’m worried about what might happen\./))
-    expect(await screen.findByLabelText("What I know, item 1")).toHaveValue(
+    expect(await screen.findByLabelText("Known Facts, item 1")).toHaveValue(
       "edited by me"
     )
   })
@@ -1333,7 +1338,7 @@ describe("audited bugs", () => {
       },
     ])
     seed(state)
-    window.location.hash = "#/today"
+    window.location.hash = "#/plan"
     render(<WorkspaceApp />)
     expect(await button("Open the running 10-minute timer")).toBeTruthy()
     expect(

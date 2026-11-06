@@ -36,7 +36,9 @@ import {
   DeadlineChip,
   ProgressBar,
   StatusBadge,
+  TaskLink,
   fieldClass,
+  safeLink,
 } from "@/components/workspace/parts"
 import {
   PlanSessionForm,
@@ -49,7 +51,12 @@ import {
   useWorkingEditor,
 } from "@/components/workspace/working-editor"
 import { useTaskHelp } from "@/components/workspace/step-help"
-import { newId, nowIso, useStore } from "@/components/workspace/store"
+import {
+  newId,
+  nowIso,
+  useEnterRecovery,
+  useStore,
+} from "@/components/workspace/store"
 import type { TaskSection } from "@/components/workspace/store"
 import { cn } from "@/lib/utils"
 import { formatDateTime, shortDate } from "@/lib/workspace/dates"
@@ -116,6 +123,7 @@ export function TaskDetail({
 
 function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
   const { state, dispatch, navigate, mode } = useStore()
+  const enterRecovery = useEnterRecovery()
   const statusChange = useStatusChange()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { editor, dirty } = useWorkingEditor(task, section === "doc")
@@ -222,9 +230,9 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
           <Button
             type="button"
             size="xl"
-            onClick={() => navigate({ view: "case", id: task.id })}
+            onClick={() => enterRecovery(task.id)}
           >
-            Open recovery workspace
+            Open recovery
           </Button>
         </Card>
       )}
@@ -251,7 +259,7 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
                 if (hint.action === "setup") help.requestSetup()
                 else if (hint.action === "help") help.requestStep()
                 else if (hint.action === "editor") editor?.commands.focus()
-                else navigate({ view: "recover", taskId: task.id })
+                else enterRecovery(task.id)
               }}
             />
           )}
@@ -325,7 +333,8 @@ function CurrentStepCard({
   onHelp: () => void
   helpLabel: string
 }) {
-  const { dispatch, navigate } = useStore()
+  const { dispatch } = useStore()
+  const enterRecovery = useEnterRecovery()
   const hasStep = Boolean(task.nextAction || currentSubtask(task))
   return (
     <Card className="space-y-3">
@@ -361,17 +370,12 @@ function CurrentStepCard({
             Mark this step done
           </Button>
         )}
+        <TaskLink task={task} className="px-2" />
         <Button
           type="button"
           size="xl"
           variant={task.status === "needs-recovery" ? "default" : "outline"}
-          onClick={() =>
-            navigate(
-              task.recoveryCase
-                ? { view: "case", id: task.id, intent: "stuck" }
-                : { view: "recover", taskId: task.id }
-            )
-          }
+          onClick={() => enterRecovery(task.id)}
         >
           <LifeBuoy aria-hidden />
           {task.recovery ? "See your recovery plan" : "I’m stuck"}
@@ -576,6 +580,70 @@ function ProgressCard({ task }: { task: Task }) {
   )
 }
 
+/** All optional. Each saves as it's typed, so a refresh can't lose it. */
+function StartCueFields({ task }: { task: Task }) {
+  const { dispatch } = useStore()
+  const save = (
+    patch: Partial<Pick<Task, "firstStep" | "link" | "minimumVersion">>
+  ) => dispatch({ type: "edit-task", id: task.id, at: nowIso(), patch })
+  const linkProblem = task.link.trim() && !safeLink(task.link)
+  return (
+    <div className="space-y-3">
+      <div>
+        <label
+          htmlFor="task-first-step"
+          className="mb-1 block text-sm font-medium"
+        >
+          What will you do first? (optional)
+        </label>
+        <Input
+          id="task-first-step"
+          value={task.firstStep}
+          maxLength={300}
+          placeholder="Open the Google Doc and write the title."
+          onChange={(event) => save({ firstStep: event.target.value })}
+          className="h-11"
+        />
+      </div>
+      <div>
+        <label
+          htmlFor="task-minimum"
+          className="mb-1 block text-sm font-medium"
+        >
+          Minimum version (optional)
+        </label>
+        <Input
+          id="task-minimum"
+          value={task.minimumVersion}
+          maxLength={300}
+          placeholder="The smallest version that would still count."
+          onChange={(event) => save({ minimumVersion: event.target.value })}
+          className="h-11"
+        />
+      </div>
+      <div>
+        <label htmlFor="task-link" className="mb-1 block text-sm font-medium">
+          Link (optional)
+        </label>
+        <Input
+          id="task-link"
+          value={task.link}
+          maxLength={500}
+          inputMode="url"
+          placeholder="docs.google.com/..."
+          onChange={(event) => save({ link: event.target.value })}
+          className="h-11"
+        />
+        {linkProblem && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            This doesn’t look like a web address, so it won’t open.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function DetailsCard({
   task,
   onStatus,
@@ -590,6 +658,7 @@ function DetailsCard({
   return (
     <Card className="space-y-3">
       <SectionTitle>Details</SectionTitle>
+      <StartCueFields task={task} />
       <div>
         <label
           htmlFor="task-estimate"

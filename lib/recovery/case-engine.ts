@@ -60,7 +60,7 @@ const capitalize = (text: string) =>
 const LEAD_INS =
   /^(i('m| am) (trying|supposed|meant) to|i was (supposed|meant|going) to|i (really )?(need|have|want|ought|planned|meant) to|i should( really)?|i must|i've got to|i have been putting off|i've been putting off|i've been avoiding|i keep avoiding|i keep putting off|i'm avoiding|i am avoiding)\s+/i
 const TRAILING_TIME =
-  /\s+(yesterday|today|tonight|last (night|week|month)|this (morning|week|month)|for (days|weeks|months)|in (days|weeks|months|ages))$/i
+  /\s+(yesterday|today|tonight|last (night|week|month)|this (morning|week|month)|for (\w+ )?(days|weeks|months)|in (days|weeks|months|ages))$/i
 /** Text that describes the difficulty only, with no responsibility named. */
 const ONLY_THE_BLOCK =
   /^(i know what (to do|i need to do)|i can'?t (start|begin|do (it|this))|i don'?t know (where to (start|begin)|what to do)|i just can'?t|i'?m stuck)\b/i
@@ -393,6 +393,14 @@ export function draftRealityGap(text: string): RealityGap {
   const worried: string[] = []
   for (const clause of splitClauses(text)) {
     if (WORRY_CLAUSE.test(clause)) {
+      // "Afraid to open my email" names an action, and no outcome. It stays open.
+      const toDo = clause.match(
+        /\b(?:afraid|scared|terrified|nervous|anxious|worried)\s+to\s+(.+)$/i
+      )
+      if (toDo) {
+        worried.push(`Something might go badly if I ${toDo[1]}`)
+        continue
+      }
       const cleaned = clause
         .replace(WORRY_LEAD, "")
         .replace(/\bwill\b/gi, "might")
