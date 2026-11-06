@@ -261,6 +261,25 @@ The first three came from trying the flow in a real browser after the automated 
 - "Continue" on the resume prompt was followed by the same question inside the case.
 - Finishing the last quick item removed the list holding its "Undo".
 
+## Calendar upgrade
+
+### Decisions
+
+- **`Session` is derived, not stored.** `lib/calendar/derived.ts` builds it from the existing planned sessions and focus records, so numbers and blocks can't disagree and nothing needed migrating. Only routines are new in storage.
+- **"Tasks completed" comes from tasks,** since finishing a task isn't recorded on a session. The other numbers come from sessions, and interrupted attempts aren't counted.
+- **Moving one routine occurrence** excludes that date from the series and adds a one-off, so the rest of the routine stays put.
+- **Deadlines still ask before moving.** Dragging a chip opens the existing confirmation, and scheduling from the tray never changes a deadline.
+- **Paused and undated tasks stay out of the tray.** A pause was on purpose, and a task with no date hasn't been put off from anything.
+- **Plugins are pinned to 6.1.22,** because the 7.x plugins need a different FullCalendar core.
+
+### Problems found by testing
+
+All were found in a real browser, since unit tests replace FullCalendar with a mock.
+
+- The heatmap's color on today was hidden by FullCalendar's own "today" background.
+- The selected-day outline boxed the entire column in Day view.
+- Switching from Month to Day left the grid scrolled to 12am.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

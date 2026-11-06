@@ -13,6 +13,8 @@ import type {
   RealityGap,
   RecoveryCase,
   RecoveryPath,
+  Routine,
+  RoutinePlacement,
 } from "@/lib/workspace/schemas"
 import {
   BLOCKER_LABEL,
@@ -165,6 +167,27 @@ export type WorkspaceAction =
       time: string | null
     }
   | { type: "remove-planned"; at: string; id: string }
+  | { type: "resize-planned"; at: string; id: string; minutes: number }
+  | { type: "add-routine"; routine: Routine }
+  | {
+      type: "update-routine"
+      id: string
+      patch: Partial<
+        Pick<Routine, "name" | "color" | "emoji" | "rrule" | "duration">
+      >
+    }
+  | { type: "delete-routine"; id: string }
+  | { type: "toggle-routine-done"; routineId: string; date: string }
+  | { type: "place-routine"; placement: RoutinePlacement }
+  | {
+      type: "move-routine-occurrence"
+      routineId: string
+      fromDate: string
+      placement: RoutinePlacement
+    }
+  | { type: "move-placement"; id: string; date: string; time: string }
+  | { type: "toggle-placement"; id: string }
+  | { type: "remove-placement"; id: string }
   | { type: "toggle-planned"; id: string }
   | {
       type: "set-recovery"
@@ -1015,6 +1038,110 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
         planned: state.planned.filter((item) => item.id !== action.id),
       }
     }
+
+    case "resize-planned": {
+      const session = state.planned.find((item) => item.id === action.id)
+      const minutes = Math.max(5, Math.round(action.minutes))
+      if (!session || session.minutes === minutes) return state
+      return {
+        ...mapTask(state, session.taskId, (task) =>
+          withEvent(
+            task,
+            action.at,
+            "schedule",
+            `Work session changed to ${minutes} min`
+          )
+        ),
+        planned: state.planned.map((item) =>
+          item.id === action.id ? { ...item, minutes } : item
+        ),
+      }
+    }
+
+    case "add-routine":
+      return { ...state, routines: [...state.routines, action.routine] }
+
+    case "update-routine":
+      return {
+        ...state,
+        routines: state.routines.map((routine) =>
+          routine.id === action.id ? { ...routine, ...action.patch } : routine
+        ),
+      }
+
+    case "delete-routine":
+      return {
+        ...state,
+        routines: state.routines.filter((item) => item.id !== action.id),
+        routinePlacements: state.routinePlacements.filter(
+          (item) => item.routineId !== action.id
+        ),
+      }
+
+    case "toggle-routine-done":
+      return {
+        ...state,
+        routines: state.routines.map((routine) =>
+          routine.id === action.routineId
+            ? {
+                ...routine,
+                doneDates: routine.doneDates.includes(action.date)
+                  ? routine.doneDates.filter((date) => date !== action.date)
+                  : [...routine.doneDates, action.date],
+              }
+            : routine
+        ),
+      }
+
+    case "place-routine":
+      return {
+        ...state,
+        routinePlacements: [...state.routinePlacements, action.placement],
+      }
+
+    case "move-routine-occurrence":
+      // Moving one occurrence leaves the rest of the routine where it is.
+      return {
+        ...state,
+        routines: state.routines.map((routine) =>
+          routine.id === action.routineId
+            ? {
+                ...routine,
+                exdates: [...new Set([...routine.exdates, action.fromDate])],
+                doneDates: routine.doneDates.filter(
+                  (date) => date !== action.fromDate
+                ),
+              }
+            : routine
+        ),
+        routinePlacements: [...state.routinePlacements, action.placement],
+      }
+
+    case "move-placement":
+      return {
+        ...state,
+        routinePlacements: state.routinePlacements.map((item) =>
+          item.id === action.id
+            ? { ...item, date: action.date, time: action.time }
+            : item
+        ),
+      }
+
+    case "toggle-placement":
+      return {
+        ...state,
+        routinePlacements: state.routinePlacements.map((item) =>
+          item.id === action.id ? { ...item, done: !item.done } : item
+        ),
+      }
+
+    case "remove-placement":
+      return {
+        ...state,
+        routinePlacements: state.routinePlacements.filter(
+          (item) => item.id !== action.id
+        ),
+      }
 
     case "toggle-planned":
       return {

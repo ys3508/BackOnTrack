@@ -155,12 +155,14 @@
   color: var(--foreground);
 }
 
-/* Deadlines are solid with a thick bar. Planned work is dashed and lighter. */
+/* Deadlines are small chips at the top of the day. Planned work is dashed. */
 .fc .bot-deadline {
   background: var(--sand-soft);
   border: 1px solid var(--sand);
-  border-left-width: 4px;
-  font-weight: 600;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .fc .bot-deadline-passed {
@@ -186,9 +188,82 @@
   text-decoration: line-through;
 }
 
+/* Focus that really happened is solid. */
 .fc .bot-focused {
-  background: var(--indigo-soft);
-  border: 1px solid transparent;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.fc .bot-focused .fc-event-title,
+.fc .bot-focused .fc-event-time {
+  color: var(--primary-foreground);
+}
+
+/* A routine is a light block in its colour, and fills in when it's done. */
+.fc .bot-routine {
+  background: color-mix(in oklch, var(--routine) 14%, var(--card));
+  border: 1px solid color-mix(in oklch, var(--routine) 45%, var(--card));
+}
+
+.fc .bot-routine-done {
+  background: var(--routine);
+  border-color: var(--routine);
+}
+
+.fc .bot-routine-done .fc-event-title,
+.fc .bot-routine-done .fc-event-time {
+  color: white;
+}
+
+/* Time that went by without it: a faint outline, never red. */
+.fc .bot-missed {
+  background: transparent;
+  border: 1px dashed var(--input);
+  opacity: 0.6;
+}
+
+.fc .bot-missed .fc-event-title,
+.fc .bot-missed .fc-event-time {
+  color: var(--muted-foreground);
+}
+
+/* Blocks need room for a title, and a bottom edge that can be grabbed. */
+.fc .fc-timegrid-slot {
+  height: 1.75rem;
+}
+
+/* The year: how focus was spread, from nothing to a lot. */
+/* Today isn't tinted here, because every colour on this view means focus. */
+.fc-multiMonthYear-view .fc-daygrid-day.fc-day-today {
+  background: transparent;
+}
+
+.fc .fc-multimonth-daygrid .fc-daygrid-day-frame {
+  min-height: 1.75rem;
+}
+
+.fc .fc-daygrid-day.bot-heat-1,
+.bot-heat-swatch-1 {
+  background: oklch(0.92 0.04 155);
+}
+
+.fc .fc-daygrid-day.bot-heat-2,
+.bot-heat-swatch-2 {
+  background: oklch(0.82 0.07 155);
+}
+
+.fc .fc-daygrid-day.bot-heat-3,
+.bot-heat-swatch-3 {
+  background: oklch(0.66 0.09 155);
+}
+
+.fc .fc-daygrid-day.bot-heat-4,
+.bot-heat-swatch-4 {
+  background: oklch(0.5 0.08 155);
+}
+
+.fc .fc-daygrid-day.bot-heat-4 .fc-daygrid-day-number {
+  color: white;
 }
 
 /* The working document. */

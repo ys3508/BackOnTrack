@@ -375,6 +375,34 @@ export const DailyPlanItemSchema = z.object({
 })
 export type DailyPlanItem = z.infer<typeof DailyPlanItemSchema>
 
+/** Recurs by an iCal rule. Routines never count streaks. */
+export const RoutineSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  color: z.string(),
+  emoji: z.string().default(""),
+  /** DTSTART and RRULE in local time, with no time zone. */
+  rrule: z.string(),
+  /** Length in minutes. */
+  duration: z.number().positive(),
+  /** Dates whose occurrence was moved elsewhere. */
+  exdates: z.array(z.string()).catch([]).default([]),
+  /** Dates whose regular occurrence the user marked done. */
+  doneDates: z.array(z.string()).catch([]).default([]),
+  createdAt: z.string(),
+})
+export type Routine = z.infer<typeof RoutineSchema>
+
+/** A one-off occurrence: dragged from the sidebar, or moved from its usual time. */
+export const RoutinePlacementSchema = z.object({
+  id: z.string(),
+  routineId: z.string(),
+  date: DateString,
+  time: z.string(),
+  done: z.boolean().default(false),
+})
+export type RoutinePlacement = z.infer<typeof RoutinePlacementSchema>
+
 export const ENERGY_LEVELS = ["low", "okay", "good"] as const
 export type Energy = (typeof ENERGY_LEVELS)[number]
 
@@ -474,10 +502,14 @@ export type Workspace = {
   dailyPlan: DailyPlan | null
   /** What's typed on the home page, kept until it's submitted. */
   intakeDraft: string
+  routines: Routine[]
+  routinePlacements: RoutinePlacement[]
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
   intakeDraft: "",
+  routines: [],
+  routinePlacements: [],
   version: 2,
   tasks: [],
   focusSessions: [],

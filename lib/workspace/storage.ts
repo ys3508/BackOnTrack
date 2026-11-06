@@ -14,6 +14,8 @@ import {
   FrictionEventSchema,
   LearningSchema,
   DailyPlanSchema,
+  RoutinePlacementSchema,
+  RoutineSchema,
 } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
 
@@ -87,6 +89,12 @@ export function restoreWorkspace(raw: unknown): Workspace {
     learning: learning.success ? learning.data : DEFAULT_LEARNING,
     dailyPlan: dailyPlan.success ? dailyPlan.data : null,
     intakeDraft: typeof saved.intakeDraft === "string" ? saved.intakeDraft : "",
+    routines: validItems(saved.routines, (item) =>
+      RoutineSchema.safeParse(item)
+    ),
+    routinePlacements: validItems(saved.routinePlacements, (item) =>
+      RoutinePlacementSchema.safeParse(item)
+    ),
   }
 }
 

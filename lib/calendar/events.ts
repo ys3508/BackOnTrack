@@ -2,7 +2,8 @@ import { addDays, localToday } from "@/lib/workspace/dates"
 import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type { PlannedSession, Workspace } from "@/lib/workspace/schemas"
 
-export type CalendarItemKind = "deadline" | "planned" | "focused"
+export type CalendarItemKind =
+  "deadline" | "planned" | "focused" | "routine" | "routine-placement"
 
 export type CalendarItem = {
   id: string
@@ -11,12 +12,13 @@ export type CalendarItem = {
   end?: string
   allDay: boolean
   editable: boolean
-  durationEditable: false
+  durationEditable: boolean
   classNames: string[]
   extendedProps: {
     kind: CalendarItemKind
     taskId: string | null
     refId: string
+    color?: string
   }
 }
 
@@ -28,10 +30,18 @@ function plannedEnd(session: PlannedSession) {
   return `${addDays(session.date, dayOffset)}T${clock}`
 }
 
+/** Time that went by without this happening. It's shown faintly, never in red. */
+function isMissed(session: PlannedSession, today: string, now: number) {
+  if (session.done) return false
+  if (!session.time) return session.date < today
+  return new Date(plannedEnd(session)).getTime() < now
+}
+
 /** Deadlines, planned work, and past focus sessions are visibly separate kinds. */
 export function buildCalendarItems(
   state: Workspace,
-  today: string
+  today: string,
+  now = Date.now()
 ): CalendarItem[] {
   const titleOf = (taskId: string | null) =>
     state.tasks.find((task) => task.id === taskId)?.title
@@ -75,10 +85,13 @@ export function buildCalendarItems(
         end: session.time ? plannedEnd(session) : undefined,
         allDay: !session.time,
         editable: !session.done,
-        durationEditable: false,
+        // An untimed session has no length to drag on the calendar.
+        durationEditable: !session.done && Boolean(session.time),
         classNames: session.done
           ? ["bot-planned", "bot-planned-done"]
-          : ["bot-planned"],
+          : isMissed(session, today, now)
+            ? ["bot-planned", "bot-missed"]
+            : ["bot-planned"],
         extendedProps: {
           kind: "planned",
           taskId: session.taskId,

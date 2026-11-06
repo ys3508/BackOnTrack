@@ -364,3 +364,11 @@ The last command needs an API key in `.env.local`.
 Also run by hand in the built app, in Demo Mode, in a real browser: intake, all four blockers, Plan B, a 2-minute timer including pause and running out during a reload, Finish/Reduce/Release, notes through an immediate reload, changing the blocker, the crisis interruption, the resume prompt, the calendar's selected day, and phone width (375 px, no sideways scrolling).
 
 Not tested: the recovery stage against a real AI model, since no key is configured locally, and any use by real people.
+
+## Calendar upgrade
+
+`tests/calendar.test.tsx` calls FullCalendar's callbacks against a mock, because FullCalendar needs real layout.
+
+Also run with a real mouse in the built app, in Demo Mode: creating from a slot and a month day, moving a block, resizing a block, the popover, dragging from the tray and from My routines, moving one routine occurrence, marking a routine done, Week and Year views, a reload, and phone width.
+
+Not tested: dragging on a touch screen, and time zones other than the one the browser was in (US Central). Daylight saving changes haven't been checked for routines.

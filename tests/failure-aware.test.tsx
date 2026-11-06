@@ -25,7 +25,14 @@ import { exportWorkspace, parseImport } from "@/lib/workspace/storage"
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
 vi.mock("@fullcalendar/timegrid", () => ({ default: {} }))
-vi.mock("@fullcalendar/interaction", () => ({ default: {} }))
+vi.mock("@fullcalendar/interaction", () => ({
+  default: {},
+  Draggable: class {
+    destroy() {}
+  },
+}))
+vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
+vi.mock("@fullcalendar/rrule", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 // Real dates, because patterns only look at the last 60 days.

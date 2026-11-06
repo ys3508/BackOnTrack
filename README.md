@@ -55,7 +55,7 @@ The earlier dashboard (suggested task and daily plan) is still there, under "Tod
 | **Task workspace** | Add instructions by pasting them or uploading a PDF, .txt, or .md file. Get an editable breakdown into small steps. Write in a rich-text document with autosave, and get writing help you preview, then accept or reject. Keep the timer beside your work. |
 | **Tasks** | Create, edit, delete, complete, pause, and resume tasks. Set deadlines and, if you want, a priority, track progress, add steps and notes, and view history. Use a list or a Kanban board with six states. |
 | **Focus** | Run 5, 10, or 25 minute sessions linked to a task, with pause, resume, reset, optional breaks, and history. A session stopped in under a minute is an interrupted attempt, and doesn't count as focus time. Timing uses wall-clock timestamps, so it stays right in background tabs and after a reload. Finishing a session never completes the task. |
-| **Calendar** | See month and week views using FullCalendar's MIT packages. "Plan remaining work" suggests sessions for open steps, calculated from the time you say you have. You confirm them, and it can't change a deadline. Deadlines look different from optional planned work. Work sessions move freely, but a deadline only moves after you confirm. "Replan" sets a new work day and leaves the deadline alone. |
+| **Calendar** | Day (the default), Week, Month, and a Year view that shows only a heatmap of focus time. Click a month day to add a task, or a time slot to add a 25-minute session, typing the title in place. Drag blocks to reschedule and drag a session's bottom edge to resize it. Click a block for Start focus, Done, Change time, and Open. Planned work is dashed, real focus is solid, and deadlines are small chips, which only move after you confirm. A "Not started yet" tray collects unfinished tasks from past days, in grey and never red. Routines such as "Gym, Mon/Wed/Fri 7am" appear by themselves and fill in when done, with no streaks. Day and Week show focus time, tasks completed, and time planned. |
 | **Recovery** | When stuck, get a plan based on the task's real data: title, deadline, status, attempts, finished actions, focus sessions, and obstacles. It produces something usable, such as a draft email, worksheet, or schedule. You preview and edit it, and nothing changes unless you accept it. |
 
 Reality Check, Finish/Reduce/Release, and Plan B are all part of Recovery. The original step-by-step wizard is still available as a guided check-in.
@@ -175,6 +175,8 @@ This repository does not yet have its own license for the original BackOnTrack c
 - PDFs must contain real text. Scanned PDFs, images, and Word files aren't read.
 - The timer stays accurate, but it can't alert you with a sound or notification when it ends.
 - Calendar items are hard to read on a phone-width month view. Tapping a day lists its items in full below the calendar.
+- Dragging on the calendar was tested with a mouse, not on a touch screen. Keyboard users have buttons instead: "Add to" a day, "Schedule" in the tray, and "Change time" in a block's popover. Blocks themselves can't be reached by keyboard.
+- The calendar always opens on Day, and doesn't remember the last view.
 - Demo Mode uses fixed templates and simple text rules, so it can't understand a task or explain text the way an AI model could.
 - Vague-advice, repeat, and high-stakes checks use wording rules, so they can miss cases or flag them wrongly.
 - BackOnTrack is not medical, legal, financial, or mental-health advice.
