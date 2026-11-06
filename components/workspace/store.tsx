@@ -28,8 +28,13 @@ import {
 /** Where a task opens: its document, or straight into getting help. */
 export type TaskSection = "doc" | "help" | "setup"
 
+/** A choice made before opening a case, such as from the resume prompt. */
+export type CaseIntent = "smaller" | "reconsider" | "stuck"
+
 export type Route =
   | { view: "workspace" }
+  | { view: "today" }
+  | { view: "case"; id: string; intent?: CaseIntent }
   | { view: "tasks" }
   | { view: "task"; id: string; section?: TaskSection }
   | { view: "calendar" }
@@ -45,6 +50,8 @@ export function parseHash(hash: string): Route {
       ? { view: "task", id, section }
       : { view: "task", id }
   }
+  if (view === "case" && id) return { view: "case", id }
+  if (view === "today") return { view: "today" }
   if (view === "focus") return { view: "focus", taskId: id }
   if (view === "recover") return { view: "recover", taskId: id }
   if (
@@ -63,6 +70,8 @@ export function routeHash(route: Route) {
     return `#/tasks/${route.id}${route.section ? `/${route.section}` : ""}`
   }
   if (route.view === "workspace") return "#/"
+  // A choice like "make it smaller" happens once, so a reload can't repeat it.
+  if (route.view === "case") return `#/case/${route.id}`
   if (route.view === "recover") {
     return route.taskId ? `#/recover/${route.taskId}` : "#/recover"
   }

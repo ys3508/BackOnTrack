@@ -241,6 +241,26 @@ Both were found by trying a realistic scenario in a real browser, after all auto
 - A high-priority task due tomorrow, needing 4 hours, got 10 minutes because it had been missed before, while 40 minutes went to tasks that could wait. Urgent work now gets the time.
 - A 5-minute email was described as "Break it into small steps". Tasks with no steps are now named plainly.
 
+## Phase 1: Adaptive Recovery Workspace
+
+### Decisions
+
+- **A recovery case is a field on the task, not a new store.** Status, deadline, document, timer, history, and Calendar all keep working, with no migration. Older saved data restores with no case. A damaged case is dropped without losing the task.
+- **One status.** A case's status is worked out from the task, so Recovery and Tasks can't disagree. The task's next action and the case's current step are kept the same.
+- **One workspace.** Tools are chosen from the blocker, plus any a Plan B opened. Changing the blocker changes only which tools show.
+- **Rules decide what must hold.** A model can't skip the user's choice of Finish, Reduce, or Release. Claimed facts must come from the user's text, and repeats, vague steps, and invented rules get one retry, then a labeled template.
+- **A "make it smaller" choice stays out of the URL,** so a reload or the back button can't repeat it.
+- **The old dashboard moved to `#/today`** rather than being removed.
+
+### Problems found by testing
+
+The first three came from trying the flow in a real browser after the automated tests passed. The last was caught by a new test.
+
+- A Plan B step threw away the plan's later steps, so finishing the smaller step led to a dead end. Swapping a step now leaves the later ones alone.
+- "Make it smaller" from the resume prompt stayed in the URL, so reloading would have shrunk the step again.
+- "Continue" on the resume prompt was followed by the same question inside the case.
+- Finishing the last quick item removed the list holding its "Undo".
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).

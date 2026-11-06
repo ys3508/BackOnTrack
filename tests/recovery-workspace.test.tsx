@@ -52,7 +52,7 @@ function seed(title: string, deadline: string | null = null) {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = ""
+  window.location.hash = "#/today"
   window.scrollTo = vi.fn() as typeof window.scrollTo
 })
 

@@ -7,6 +7,8 @@ import { RecoveryApp } from "@/components/recovery-app"
 import { CalendarView } from "@/components/workspace/calendar-view"
 import { FocusView, useNow } from "@/components/workspace/focus-view"
 import { RecoverView } from "@/components/workspace/recover-view"
+import { RecoveryHome } from "@/components/workspace/recovery-home"
+import { RecoveryWorkspace } from "@/components/workspace/recovery-workspace"
 import { SettingsView } from "@/components/workspace/settings-view"
 import {
   WorkspaceProvider,
@@ -35,9 +37,13 @@ const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
   {
     label: "Workspace",
     route: { view: "workspace" },
-    match: ["workspace", "guided", "recover"],
+    match: ["workspace", "guided", "recover", "case"],
   },
-  { label: "Tasks", route: { view: "tasks" }, match: ["tasks", "task"] },
+  {
+    label: "Tasks",
+    route: { view: "tasks" },
+    match: ["tasks", "task", "today"],
+  },
   { label: "Calendar", route: { view: "calendar" }, match: ["calendar"] },
   { label: "Focus", route: { view: "focus" }, match: ["focus"] },
 ]
@@ -55,9 +61,11 @@ function Shell() {
   const routeKey =
     route.view === "task"
       ? `task-${route.id}`
-      : route.view === "recover"
-        ? `recover-${route.taskId ?? ""}`
-        : route.view
+      : route.view === "case"
+        ? `case-${route.id}`
+        : route.view === "recover"
+          ? `recover-${route.taskId ?? ""}`
+          : route.view
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -138,14 +146,18 @@ function Shell() {
           key={routeKey}
           className="animate-in duration-300 fade-in slide-in-from-bottom-1"
         >
-          {route.view === "workspace" && <WorkspaceView />}
+          {route.view === "workspace" && <RecoveryHome />}
+          {route.view === "today" && <WorkspaceView />}
+          {route.view === "case" && (
+            <RecoveryWorkspace id={route.id} intent={route.intent} />
+          )}
           {route.view === "tasks" && <TasksView />}
           {route.view === "task" && (
             <TaskDetail id={route.id} section={route.section} />
           )}
           {route.view === "calendar" && <CalendarView />}
           {route.view === "focus" && <FocusView />}
-          {route.view === "recover" && <RecoverView taskId={route.taskId} />}
+          {route.view === "recover" && <RecoverRoute taskId={route.taskId} />}
           {route.view === "settings" && <SettingsView />}
           {route.view === "guided" && <GuidedView />}
         </div>
@@ -159,6 +171,17 @@ function Shell() {
   )
 }
 
+/** A task being worked on in Recovery keeps all of its recovery in one place. */
+function RecoverRoute({ taskId }: { taskId?: string }) {
+  const { state } = useStore()
+  const task = state.tasks.find((item) => item.id === taskId)
+  return task?.recoveryCase ? (
+    <RecoveryWorkspace id={task.id} intent="stuck" />
+  ) : (
+    <RecoverView taskId={taskId} />
+  )
+}
+
 /** Keeps the running timer one click away from every view. */
 function TimerPill() {
   const { state, route, navigate } = useStore()
@@ -167,30 +190,39 @@ function TimerPill() {
   const remaining = timer ? remainingSeconds(timer, now) : 0
   const clock = formatClock(remaining)
 
+  const paused = timer?.runningSince === null
+
   useEffect(() => {
-    document.title = timer ? `${clock} · BackOnTrack` : "BackOnTrack AI"
-  }, [timer, clock])
+    document.title = timer
+      ? `${paused ? "Paused" : clock} · BackOnTrack`
+      : "BackOnTrack AI"
+  }, [timer, clock, paused])
 
   // These views already show the timer.
   const shownHere =
     route.view === "focus" ||
-    (route.view === "task" && route.id === timer?.taskId)
+    (route.view === "task" && route.id === timer?.taskId) ||
+    (route.view === "case" && route.id === timer?.taskId)
   if (!timer || shownHere) return null
+  const timerTask = state.tasks.find((task) => task.id === timer.taskId)
   return (
     <button
       type="button"
-      aria-label={`Open focus timer, ${clock} remaining`}
+      aria-label={`Open focus timer, ${paused ? "paused at " : ""}${clock}${paused ? "" : " remaining"}`}
       onClick={() =>
         navigate(
-          timer.taskId
-            ? { view: "task", id: timer.taskId, section: "doc" }
-            : { view: "focus" }
+          timerTask?.recoveryCase
+            ? { view: "case", id: timerTask.id }
+            : timer.taskId
+              ? { view: "task", id: timer.taskId, section: "doc" }
+              : { view: "focus" }
         )
       }
       className="flex min-h-10 items-center gap-1.5 rounded-lg bg-sage-soft px-2.5 text-sm font-medium text-sage tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
     >
       <Timer className="size-4" aria-hidden />
       {clock}
+      {paused && <span className="font-normal"> paused</span>}
     </button>
   )
 }

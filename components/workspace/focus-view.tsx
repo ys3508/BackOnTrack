@@ -23,10 +23,16 @@ export const FOCUS_OPTIONS = [
 const BREAK_MINUTES = 5
 
 const OUTCOME_LABEL: Record<FocusSession["outcome"], string> = {
-  completed: "Finished",
+  completed: "Ran the full time",
   "continue-later": "Will continue later",
   stuck: "Got stuck",
 }
+
+const REPORT_LABEL = {
+  yes: "You said you made progress",
+  "a-little": "You said you made a little progress",
+  stuck: "You said you got stuck",
+} as const
 
 /** Re-renders every second while running, and right after returning to the tab. */
 export function useNow(active: boolean) {
@@ -67,12 +73,38 @@ export function useStartFocus({ stay = false } = {}) {
     if (stay) return
     // Focus opens the work itself. Only a session with no task stays on Focus.
     const running = state.timer?.taskId ?? (state.timer ? null : taskId)
+    const onCase = state.tasks.find((item) => item.id === running)?.recoveryCase
     navigate(
       running
-        ? { view: "task", id: running, section: "doc" }
+        ? onCase
+          ? { view: "case", id: running }
+          : { view: "task", id: running, section: "doc" }
         : { view: "focus" }
     )
   }
+}
+
+/**
+ * What a start button should say. With a timer already going, it can't start a
+ * new one, so it says it opens that one instead of promising a different length.
+ */
+export function startLabel(timer: TimerState | null, minutes: number) {
+  if (!timer) return `Start ${minutes} minutes`
+  const length = timer.plannedSeconds / 60
+  return `Open the ${timer.runningSince === null ? "paused" : "running"} ${length}-minute ${timer.kind === "break" ? "break" : "timer"}`
+}
+
+/** One accurate line about a session, without implying the work got finished. */
+export function describeSession(session: FocusSession) {
+  const where = session.taskId === null ? "no specific task" : session.taskTitle
+  const length = formatMinutes(session.actualSeconds)
+  const summary = isInterrupted(session)
+    ? `Interrupted attempt, not counted as focus time: ${length} of ${session.plannedMinutes} min on ${where}`
+    : session.outcome === "completed"
+      ? `Ran the full ${session.plannedMinutes} min on ${where}`
+      : `Stopped after ${length} of ${session.plannedMinutes} min on ${where}. ${OUTCOME_LABEL[session.outcome]}`
+  const report = session.progressReport && REPORT_LABEL[session.progressReport]
+  return report ? `${summary}. ${report}` : summary
 }
 
 export function FocusView() {
@@ -94,11 +126,16 @@ export function FocusView() {
               size="xl"
               className="w-full sm:w-auto"
               onClick={() =>
-                navigate({
-                  view: "task",
-                  id: state.timer!.taskId!,
-                  section: "doc",
-                })
+                navigate(
+                  state.tasks.find((task) => task.id === state.timer!.taskId)
+                    ?.recoveryCase
+                    ? { view: "case", id: state.timer!.taskId! }
+                    : {
+                        view: "task",
+                        id: state.timer!.taskId!,
+                        section: "doc",
+                      }
+                )
               }
             >
               Open my work
@@ -544,7 +581,13 @@ export function FinishedPanel({
                 status: "completed",
               })
               acknowledge()
-              if (!onTask) navigate({ view: "task", id: task.id })
+              if (!onTask) {
+                navigate(
+                  task.recoveryCase
+                    ? { view: "case", id: task.id }
+                    : { view: "task", id: task.id }
+                )
+              }
             }}
           >
             The task is finished
@@ -558,7 +601,11 @@ export function FinishedPanel({
             acknowledge()
             if (!onTask) {
               navigate(
-                task ? { view: "task", id: task.id } : { view: "workspace" }
+                task?.recoveryCase
+                  ? { view: "case", id: task.id }
+                  : task
+                    ? { view: "task", id: task.id }
+                    : { view: "workspace" }
               )
             }
           }}
@@ -579,13 +626,7 @@ export function SessionList({ sessions }: { sessions: FocusSession[] }) {
       empty="No focus sessions yet."
       render={(session) => (
         <li key={session.id} className="text-sm">
-          <span className="font-medium">
-            {formatMinutes(session.actualSeconds)}
-          </span>{" "}
-          of {session.plannedMinutes} min on {session.taskTitle} ·{" "}
-          {isInterrupted(session)
-            ? "Interrupted attempt, not counted as focus time"
-            : OUTCOME_LABEL[session.outcome]}
+          {describeSession(session)}
           {session.note && `: ${session.note}`}
           <span className="block text-xs text-muted-foreground">
             {formatDateTime(session.endedAt)}

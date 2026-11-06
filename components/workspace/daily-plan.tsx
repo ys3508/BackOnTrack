@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, CalendarCheck, Check, Play, X } from "lucide-react"
 
 import { Card } from "@/components/shared"
 import { Button } from "@/components/ui/button"
-import { useStartFocus } from "@/components/workspace/focus-view"
+import { startLabel, useStartFocus } from "@/components/workspace/focus-view"
 import { nowIso, useStore } from "@/components/workspace/store"
 import { buildDailyPlan, type NotToday } from "@/lib/planning/daily-plan"
 import type { DailyPlan, DailyPlanItem, Energy } from "@/lib/workspace/schemas"
@@ -379,11 +379,11 @@ export function TodayPlan({ plan }: { plan: DailyPlan }) {
                 <Button
                   type="button"
                   size="lg"
-                  aria-label={`Start ${item.minutes} minutes: ${item.title}`}
+                  aria-label={`${startLabel(state.timer, item.minutes)}: ${item.title}`}
                   onClick={() => startFocus(item.taskId, item.minutes)}
                 >
                   <Play aria-hidden />
-                  Start {item.minutes} minutes
+                  {startLabel(state.timer, item.minutes)}
                 </Button>
               )}
               <Button

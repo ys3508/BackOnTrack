@@ -41,16 +41,16 @@ export function reasonsFor(task: Task, state: Workspace, today: string) {
     } else if (days === 0) reasons.push("Due today")
     else if (days === 1) reasons.push("Due tomorrow")
     else if (days <= 7) reasons.push(`Due in ${days} days`)
+    else reasons.push(`Due ${shortDate(task.deadline)}, so there’s time`)
   }
   if (task.priority === "high") reasons.push("You marked it high priority")
   if (task.priority === "medium") reasons.push("You marked it medium priority")
+  if (task.priority === "low") reasons.push("You marked it low priority")
   if (task.status === "needs-recovery") {
     reasons.push("It’s waiting for a new approach")
   }
   if (task.status === "in-progress") reasons.push("You’ve already started it")
-  return reasons.length
-    ? reasons
-    : ["No deadline or priority yet, so it comes after the others"]
+  return reasons.length ? reasons : ["No deadline or priority set"]
 }
 
 export type RankedTask = {

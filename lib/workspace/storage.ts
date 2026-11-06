@@ -86,6 +86,7 @@ export function restoreWorkspace(raw: unknown): Workspace {
     ),
     learning: learning.success ? learning.data : DEFAULT_LEARNING,
     dailyPlan: dailyPlan.success ? dailyPlan.data : null,
+    intakeDraft: typeof saved.intakeDraft === "string" ? saved.intakeDraft : "",
   }
 }
 
@@ -132,6 +133,8 @@ export function taskFromSession(
       currentSubtaskId: null,
       lastWorkedAt: null,
       recoveryAttempts: [],
+      recoveryCase: null,
+      quick: false,
     },
     at,
     "created",

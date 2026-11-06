@@ -373,7 +373,7 @@ describe("in the app", () => {
   })
 
   it("resumes without repeating a Reality Check", async () => {
-    window.location.hash = "#/"
+    window.location.hash = "#/today"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Continue where you left off" })

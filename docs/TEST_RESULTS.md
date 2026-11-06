@@ -356,3 +356,11 @@ npm run test:live
 ```
 
 The last command needs an API key in `.env.local`.
+
+## Phase 1: Adaptive Recovery Workspace
+
+`tests/recovery-case.test.tsx` covers acceptance scenarios A to H, the definition of done, safety, the Live AI guards against a mocked model, and the audited bugs.
+
+Also run by hand in the built app, in Demo Mode, in a real browser: intake, all four blockers, Plan B, a 2-minute timer including pause and running out during a reload, Finish/Reduce/Release, notes through an immediate reload, changing the blocker, the crisis interruption, the resume prompt, the calendar's selected day, and phone width (375 px, no sideways scrolling).
+
+Not tested: the recovery stage against a real AI model, since no key is configured locally, and any use by real people.

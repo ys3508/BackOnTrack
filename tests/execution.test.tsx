@@ -43,7 +43,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = ""
+  window.location.hash = "#/today"
   window.scrollTo = vi.fn() as typeof window.scrollTo
 })
 
@@ -176,7 +176,7 @@ describe("definition of done", () => {
     expect(task.completedAt).toBeNull()
 
     // 11. Return later, and resume from the saved position.
-    window.location.hash = "#/"
+    window.location.hash = "#/today"
     unmount()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Continue where you left off" })

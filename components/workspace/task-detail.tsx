@@ -196,7 +196,9 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
               Resume
             </Button>
           ) : (
-            isActive(task) && (
+            // Something never started has nothing to pause yet.
+            (task.status === "in-progress" ||
+              task.status === "needs-recovery") && (
               <Button
                 type="button"
                 size="xl"
@@ -211,17 +213,32 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
         </div>
       </div>
 
+      {task.recoveryCase && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 bg-secondary">
+          <p className="min-w-0 text-[15px]">
+            You’re working on this in Recovery. Its next step and notes are the
+            same in both places.
+          </p>
+          <Button
+            type="button"
+            size="xl"
+            onClick={() => navigate({ view: "case", id: task.id })}
+          >
+            Open recovery workspace
+          </Button>
+        </Card>
+      )}
+
       {timerHere && <ActiveTimer timer={timerHere} compact />}
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div
-          className={cn(
-            "space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:overflow-y-auto lg:pr-1",
-            working && "order-2 lg:order-none"
-          )}
-        >
+        <div className={cn("space-y-4", working && "order-2 lg:order-none")}>
           {isActive(task) && (
-            <CurrentStepCard task={task} onHelp={help.requestStep} />
+            <CurrentStepCard
+              task={task}
+              onHelp={brandNew ? help.requestSetup : help.requestStep}
+              helpLabel={brandNew ? "Set up my workspace" : "Help me do this"}
+            />
           )}
           <InstructionsPanel
             task={task}
@@ -239,20 +256,11 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
             />
           )}
           {brandNew && (
-            <Card className="space-y-2">
-              <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-                Set this up for me
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {mode === "live"
-                  ? "AI reads what this asks for, and prepares steps and a place to start. You check everything first."
-                  : "Demo Mode uses templates and your instructions, not AI, to prepare steps and a place to start. You check everything first."}
-              </p>
-              <Button type="button" size="xl" onClick={help.requestSetup}>
-                <Sparkles aria-hidden />
-                Set up my workspace
-              </Button>
-            </Card>
+            <p className="px-1 text-sm text-muted-foreground">
+              {mode === "live"
+                ? "“Set up my workspace” uses AI to read what this asks for, and prepares steps and a place to start. You check everything first."
+                : "“Set up my workspace” uses Demo Mode templates and your instructions, not AI, to prepare steps and a place to start. You check everything first."}
+            </p>
           )}
           <BreakdownPanel task={task} guard={consent.guard} />
         </div>
@@ -308,7 +316,15 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
   )
 }
 
-function CurrentStepCard({ task, onHelp }: { task: Task; onHelp: () => void }) {
+function CurrentStepCard({
+  task,
+  onHelp,
+  helpLabel,
+}: {
+  task: Task
+  onHelp: () => void
+  helpLabel: string
+}) {
   const { dispatch, navigate } = useStore()
   const hasStep = Boolean(task.nextAction || currentSubtask(task))
   return (
@@ -326,7 +342,7 @@ function CurrentStepCard({ task, onHelp }: { task: Task; onHelp: () => void }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button type="button" size="xl" onClick={onHelp}>
           <Sparkles aria-hidden />
-          Help me do this
+          {helpLabel}
         </Button>
         {hasStep && (
           <Button
@@ -349,7 +365,13 @@ function CurrentStepCard({ task, onHelp }: { task: Task; onHelp: () => void }) {
           type="button"
           size="xl"
           variant={task.status === "needs-recovery" ? "default" : "outline"}
-          onClick={() => navigate({ view: "recover", taskId: task.id })}
+          onClick={() =>
+            navigate(
+              task.recoveryCase
+                ? { view: "case", id: task.id, intent: "stuck" }
+                : { view: "recover", taskId: task.id }
+            )
+          }
         >
           <LifeBuoy aria-hidden />
           {task.recovery ? "See your recovery plan" : "I’m stuck"}
@@ -434,7 +456,9 @@ function FocusCard({ task }: { task: Task }) {
       <Card>
         <SectionTitle>Focus on this</SectionTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          A session is already running on something else.
+          A session is already{" "}
+          {timer.runningSince === null ? "paused" : "running"} on something
+          else.
         </p>
         <Button
           type="button"
@@ -444,7 +468,7 @@ function FocusCard({ task }: { task: Task }) {
           onClick={() => navigate({ view: "focus" })}
         >
           <Timer aria-hidden />
-          Open the running timer
+          Open the {timer.runningSince === null ? "paused" : "running"} timer
         </Button>
       </Card>
     )
@@ -778,6 +802,22 @@ function DocumentEditor({ task, doc }: { task: Task; doc: TaskDocument }) {
       })
     }
   }
+
+  // Saves while typing, so a refresh can't lose a note that was never blurred.
+  useEffect(() => {
+    if (title === doc.title && body === doc.body) return
+    const timer = window.setTimeout(() => {
+      dispatch({
+        type: "save-document",
+        id: task.id,
+        at: nowIso(),
+        docId: doc.id,
+        title: title.trim() || "Notes",
+        body,
+      })
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [title, body, doc.title, doc.body, doc.id, task.id, dispatch])
 
   return (
     <div className="rounded-xl border border-border p-3">

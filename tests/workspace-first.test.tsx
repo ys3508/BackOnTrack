@@ -111,7 +111,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = ""
+  window.location.hash = "#/today"
   window.scrollTo = vi.fn() as typeof window.scrollTo
   vi.stubGlobal(
     "fetch",
@@ -399,7 +399,7 @@ describe("in the app", () => {
 
   it("opens the task and starts helping from the home page", async () => {
     seed(withSteps())
-    window.location.hash = "#/"
+    window.location.hash = "#/today"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Help me do this"))
@@ -409,7 +409,7 @@ describe("in the app", () => {
 
   it("offers workspace setup from the home page for a new task", async () => {
     seed(mlTask())
-    window.location.hash = "#/"
+    window.location.hash = "#/today"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Set up my workspace"))
@@ -418,7 +418,7 @@ describe("in the app", () => {
 
   it("opens the document with the timer when starting focus from home", async () => {
     seed(withSteps())
-    window.location.hash = "#/"
+    window.location.hash = "#/today"
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Start 5 minutes"))

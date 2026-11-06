@@ -482,7 +482,123 @@ export type WritingAssistResult = WritingAssistOutput & {
   usedFallback?: boolean
 }
 
+/* ---------- Recovery case ---------- */
+
+const CaseBlocker = z.enum([
+  "dont-know-start",
+  "cant-start",
+  "worried",
+  "behind",
+])
+const CaseListSchema = z.array(z.string().trim().max(LIMITS.listItem)).max(12)
+
+export const CaseRequestSchema = z.object({
+  stage: z.literal("recovery-case"),
+  purpose: z.enum([
+    "understand",
+    "initial",
+    "path",
+    "smaller",
+    "another",
+    "stuck",
+  ]),
+  originalInput: z
+    .string()
+    .trim()
+    .min(1)
+    .max(LIMITS.responsibility * 2),
+  title: z.string().trim().max(200),
+  blocker: CaseBlocker.nullable(),
+  path: z.enum(["finish", "reduce", "release"]).nullable(),
+  current: z.string().trim().max(LIMITS.listItem),
+  alternatives: CaseListSchema,
+  completed: z
+    .array(z.string().trim().max(LIMITS.listItem))
+    .max(LIMITS.history),
+  tried: z.array(z.string().trim().max(LIMITS.listItem)).max(40),
+  stuckReason: z
+    .enum([
+      "too-big",
+      "dont-know-how",
+      "worried",
+      "low-energy",
+      "not-viable",
+      "other",
+    ])
+    .nullable(),
+  stuckDetail: z.string().trim().max(LIMITS.note),
+  realityGap: z
+    .object({
+      known: CaseListSchema,
+      worried: CaseListSchema,
+      unknown: CaseListSchema,
+      can: CaseListSchema,
+    })
+    .nullable(),
+  realityCheck: z
+    .object({
+      expected: z.string().trim().max(LIMITS.note),
+      happened: z.string().trim().max(LIMITS.note),
+      done: z.string().trim().max(LIMITS.note),
+      opportunity: z.enum(["yes", "no", "unsure"]).nullable(),
+      constraints: z.string().trim().max(LIMITS.note),
+    })
+    .nullable(),
+})
+export type CaseRequest = z.infer<typeof CaseRequestSchema>
+
+export const CaseOutputSchema = z.object({
+  title: z
+    .string()
+    .describe("A short name for the responsibility, in the user's terms."),
+  suggestedBlocker: CaseBlocker.nullable().describe(
+    "Closest match for what's in the way, or null if the text doesn't say."
+  ),
+  action: z
+    .string()
+    .describe(
+      "One specific physical next action. Empty only if a detail is needed."
+    ),
+  why: z.string().describe("One short sentence on why this step, or empty."),
+  laterSteps: z
+    .array(z.string())
+    .describe("Up to 4 later steps, kept hidden until needed."),
+  alternatives: z
+    .array(z.string())
+    .describe("Up to 4 different, smaller ways in."),
+  realityGap: z.object({
+    known: z.array(z.string()).describe("Only facts the user stated."),
+    worried: z
+      .array(z.string())
+      .describe("Predictions and feared outcomes, worded as possibilities."),
+    unknown: z
+      .array(z.string())
+      .describe("Things that need finding out. Never answer them."),
+    can: z
+      .array(z.string())
+      .describe("Realistic options, the recommended one first."),
+  }),
+  messageDraft: z
+    .string()
+    .describe(
+      "A short editable message with [brackets] for unknowns, or empty if nobody needs contacting."
+    ),
+  note: z
+    .string()
+    .describe("One calm sentence on what changed and why, or empty."),
+  missingDetail: z
+    .string()
+    .describe("One question for the detail needed to be useful, or empty."),
+  supportConcern: z
+    .boolean()
+    .describe(
+      "True if the user mentions self-harm, suicide, or being in crisis."
+    ),
+})
+export type CaseOutput = z.infer<typeof CaseOutputSchema>
+
 export const RecoveryRequestSchema = z.discriminatedUnion("stage", [
+  CaseRequestSchema,
   AnalyzeRequestSchema,
   NextStepRequestSchema,
   TaskRecoveryRequestSchema,

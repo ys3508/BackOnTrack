@@ -26,6 +26,23 @@ BackOnTrack isn't a treatment for ADHD or anything else, and its effect hasn't b
 
 ## What it does
 
+The home page asks one question: "What's something you've been putting off?" From there, BackOnTrack follows **Understand → Act → Recover**:
+
+1. Say what's going on, in your own words. A simple errand like "Buy lunch" stays a one-tap quick item.
+2. Pick what's making it difficult. The app may point at the closest match, but you always choose, and you can change it any time without losing work.
+3. Work in one Recovery Workspace, whose tools follow that choice, with one next action at a time:
+
+| What's in the way | Tools |
+| --- | --- |
+| "I don't know where to start." | One-Step Breakdown: one step, and "Make it smaller". Later steps stay hidden until you ask or finish this one. |
+| "I know what to do, but I can't start." | Micro-action, plus an optional 2 or 5 minute timer. A timer finishing never marks anything done. |
+| "I'm worried about what might happen." | Reality Gap: four editable lists separating facts from fears, plus an optional message draft. It never invents a policy or consequence. |
+| "I'm already behind, or my plan didn't work." | Reality Check, then Finish, Reduce, or Release, which you choose. Release on something consequential explains the uncertainty first. |
+
+"I'm stuck" asks what happened and adapts (Plan B), never repeating a suggestion and never deleting finished work. After a few days away, it asks neutrally whether to continue, make the next step smaller, or reconsider the plan.
+
+The earlier dashboard (suggested task and daily plan) is still there, under "Today's plan and suggested task" on the home page. The tools below all still work:
+
 | Area | What you can do |
 | --- | --- |
 | **Workspace** | See "Your next small step", or "Continue where you left off", with one click to the task, its document, or a short focus session. Lists stay short, with an option to expand. |
@@ -144,6 +161,10 @@ This repository does not yet have its own license for the original BackOnTrack c
 
 ## Known limitations
 
+- Recovery cases are saved only in this browser, along with everything else. Clearing browser data deletes them, so use Export in Settings to keep a backup.
+- In Demo Mode, the blocker suggestion, errand detection, Reality Gap sorting, and next steps come from wording rules and templates. They handle any text, but only generally, and can sort a sentence wrongly. Everything is editable, and each suggestion says it isn't AI.
+- Crisis wording is matched by rules, so it can miss phrasing or misfire. Live AI can flag it too, and someone who isn't in danger can continue. BackOnTrack is not a crisis service.
+- The Live AI recovery stage has only been tested against a mocked model, not a real one.
 - The suggested order and daily plan use fixed rules with chosen weights, not AI, and the weights haven't been tested with users. Time estimates are rough, and steps without an estimate are assumed to take 25 minutes.
 - Learning what helps is simple counting, and hasn't been tried with real use over time. Progress after some help doesn't prove that the help caused it.
 - BackOnTrack hasn't been tried on a real assignment yet. See the real-case test in [docs/DESIGN_THINKING.md](docs/DESIGN_THINKING.md).

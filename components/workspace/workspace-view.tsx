@@ -15,7 +15,7 @@ import {
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
-import { useStartFocus } from "@/components/workspace/focus-view"
+import { startLabel, useStartFocus } from "@/components/workspace/focus-view"
 import {
   DeadlineChip,
   ExpandableList,
@@ -225,7 +225,7 @@ export function WorkspaceView() {
               onClick={() => startFocus(recommended.id, defaultMinutes)}
             >
               <Play aria-hidden />
-              Start {defaultMinutes} minutes
+              {startLabel(state.timer, defaultMinutes)}
             </Button>
             <Button
               type="button"

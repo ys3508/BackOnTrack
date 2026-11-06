@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import type { DateClickArg } from "@fullcalendar/interaction"
@@ -21,7 +21,7 @@ import {
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { buildCalendarItems, droppedSlot } from "@/lib/calendar/events"
 import type { CalendarItemKind } from "@/lib/calendar/events"
-import { shortDate } from "@/lib/workspace/dates"
+import { localToday, shortDate } from "@/lib/workspace/dates"
 import type { Task } from "@/lib/workspace/schemas"
 import { deadlinePassed } from "@/lib/workspace/selectors"
 
@@ -30,6 +30,9 @@ type DeadlineMove = { task: Task; date: string }
 export function CalendarView() {
   const { state, dispatch, navigate, today } = useStore()
   const [selected, setSelected] = useState(today)
+  const calendar = useRef<FullCalendar>(null)
+  const selectedDay = (date: Date) =>
+    localToday(date) === selected ? ["bot-selected-day"] : []
   const [deadlineMove, setDeadlineMove] = useState<DeadlineMove | null>(null)
   const [replanning, setReplanning] = useState<Task | null>(null)
 
@@ -104,6 +107,9 @@ export function CalendarView() {
 
       <Card className="p-3 sm:p-4">
         <FullCalendar
+          ref={calendar}
+          dayCellClassNames={(info) => selectedDay(info.date)}
+          dayHeaderClassNames={(info) => selectedDay(info.date)}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="dayGridMonth"
           headerToolbar={{
@@ -139,7 +145,10 @@ export function CalendarView() {
               max="9999-12-31"
               value={selected}
               onChange={(event) => {
-                if (event.target.value) setSelected(event.target.value)
+                if (event.target.value) {
+                  setSelected(event.target.value)
+                  calendar.current?.getApi().gotoDate(event.target.value)
+                }
               }}
               className="mt-1 h-10 rounded-lg border border-input bg-card px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
             />

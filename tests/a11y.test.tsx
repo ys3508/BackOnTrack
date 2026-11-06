@@ -97,7 +97,8 @@ beforeEach(() => {
 
 describe("automated accessibility scan", () => {
   it.each([
-    ["workspace home", "#/", /Your next small step/],
+    ["today", "#/today", /Your next small step/],
+    ["home", "#/", /putting off/],
     ["tasks list", "#/tasks", /Tasks/],
     ["task detail", "#/tasks/a", /Biology homework/],
     ["calendar", "#/calendar", /Calendar/],

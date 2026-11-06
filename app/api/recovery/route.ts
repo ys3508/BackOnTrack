@@ -1,4 +1,5 @@
 import { getLiveConfig, getLiveModel } from "@/lib/ai/provider"
+import { generateCasePlan } from "@/lib/ai/case-assist"
 import { checkRateLimit } from "@/lib/ai/rate-limit"
 import { generateAnalysis, generateNextStep } from "@/lib/ai/recovery"
 import {
@@ -75,6 +76,10 @@ export async function POST(request: Request) {
     if (data.stage === "analyze") {
       const analysis = await generateAnalysis(model, data.intake)
       return Response.json({ analysis, model: config.modelId })
+    }
+    if (data.stage === "recovery-case") {
+      const result = await generateCasePlan(model, data)
+      return Response.json({ ...result, model: config.modelId })
     }
     if (data.stage === "step-help") {
       const result = await generateStepHelp(model, data)

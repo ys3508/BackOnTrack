@@ -139,6 +139,131 @@ export const StoredRecoverySchema = z.object({
 })
 export type StoredRecovery = z.infer<typeof StoredRecoverySchema>
 
+/* ---------- Recovery cases ---------- */
+
+export const BLOCKERS = [
+  "dont-know-start",
+  "cant-start",
+  "worried",
+  "behind",
+] as const
+export type Blocker = (typeof BLOCKERS)[number]
+
+/** The user's own words for what's in the way. These are never diagnoses. */
+export const BLOCKER_LABEL: Record<Blocker, string> = {
+  "dont-know-start": "I don’t know where to start.",
+  "cant-start": "I know what to do, but I can’t start.",
+  worried: "I’m worried about what might happen.",
+  behind: "I’m already behind, or my plan didn’t work.",
+}
+
+export const STUCK_REASONS = [
+  "too-big",
+  "dont-know-how",
+  "worried",
+  "low-energy",
+  "not-viable",
+  "other",
+] as const
+export type StuckReason = (typeof STUCK_REASONS)[number]
+
+export const STUCK_LABEL: Record<StuckReason, string> = {
+  "too-big": "The step feels too big.",
+  "dont-know-how": "I don’t know how to do it.",
+  worried: "I’m worried about the outcome.",
+  "low-energy": "I don’t have enough time or energy.",
+  "not-viable": "This plan won’t work anymore.",
+  other: "Something else.",
+}
+
+export const RECOVERY_PATHS = ["finish", "reduce", "release"] as const
+export type RecoveryPath = (typeof RECOVERY_PATHS)[number]
+
+export const CASE_TOOLS = ["reality-gap", "paths"] as const
+export type CaseTool = (typeof CASE_TOOLS)[number]
+
+/** Where a suggestion came from, so a template is never presented as AI. */
+export const ActionOrigin = z.enum(["live", "demo", "user"])
+export type ActionOrigin = z.infer<typeof ActionOrigin>
+
+export const CaseActionSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  why: z.string().default(""),
+  origin: ActionOrigin.default("demo"),
+  createdAt: z.string(),
+  /** When the user said they were beginning it. Starting isn't finishing. */
+  startedAt: z.string().nullable().default(null),
+})
+export type CaseAction = z.infer<typeof CaseActionSchema>
+
+export const RealityGapSchema = z.object({
+  known: z.array(z.string()).default([]),
+  worried: z.array(z.string()).default([]),
+  unknown: z.array(z.string()).default([]),
+  can: z.array(z.string()).default([]),
+})
+export type RealityGap = z.infer<typeof RealityGapSchema>
+
+export const RealityCheckSchema = z.object({
+  expected: z.string().default(""),
+  happened: z.string().default(""),
+  done: z.string().default(""),
+  opportunity: z.enum(["yes", "no", "unsure"]).nullable().default(null),
+  constraints: z.string().default(""),
+})
+export type RealityCheckAnswers = z.infer<typeof RealityCheckSchema>
+
+export const CaseFeedbackSchema = z.object({
+  kind: z.enum(["did-it", "stuck", "another"]),
+  reason: z.enum(STUCK_REASONS).nullable().default(null),
+  detail: z.string().default(""),
+  at: z.string(),
+})
+export type CaseFeedback = z.infer<typeof CaseFeedbackSchema>
+
+/**
+ * The recovery work on one responsibility. It lives on the task, so the task's
+ * status, deadline, document, timer, and history are never kept twice.
+ */
+export const RecoveryCaseSchema = z.object({
+  originalInput: z.string(),
+  blocker: z.enum(BLOCKERS).nullable().default(null),
+  suggestedBlocker: z.enum(BLOCKERS).nullable().catch(null).default(null),
+  current: CaseActionSchema.nullable().catch(null).default(null),
+  /** Later steps, kept back so that only one is ever shown. */
+  queue: z.array(z.string()).catch([]).default([]),
+  /** Other ways in for "Try another approach". */
+  alternatives: z.array(z.string()).catch([]).default([]),
+  completed: z
+    .array(z.object({ id: z.string(), text: z.string(), at: z.string() }))
+    .catch([])
+    .default([]),
+  /** Suggestions that didn't get done. They're never offered again. */
+  tried: z.array(z.string()).catch([]).default([]),
+  realityGap: RealityGapSchema.nullable().catch(null).default(null),
+  realityCheck: RealityCheckSchema.nullable().catch(null).default(null),
+  path: z.enum(RECOVERY_PATHS).nullable().catch(null).default(null),
+  messageDraft: z.string().catch("").default(""),
+  /** Tools opened by a Plan B, on top of the ones for the current blocker. */
+  openTools: z.array(z.enum(CASE_TOOLS)).catch([]).default([]),
+  /** The one detail needed for a useful suggestion, and why it's being asked. */
+  missingDetail: z.string().catch("").default(""),
+  /** What changed after the last "I'm stuck", in plain words. */
+  adaptationNote: z.string().catch("").default(""),
+  lastFeedback: CaseFeedbackSchema.nullable().catch(null).default(null),
+  lastActivity: z
+    .object({ at: z.string(), text: z.string() })
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** When the user last chose how to come back, so they're asked only once. */
+  resumedAt: z.string().nullable().catch(null).default(null),
+  /** True when the user chose to stop for now on purpose. */
+  pausedOnPurpose: z.boolean().catch(false).default(false),
+})
+export type RecoveryCase = z.infer<typeof RecoveryCaseSchema>
+
 export const TaskSchema = z.object({
   id: z.string(),
   title: z.string().min(1),
@@ -168,6 +293,10 @@ export const TaskSchema = z.object({
   recoveryAttempts: z.array(RecoveryAttemptSchema).catch([]).default([]),
   /** The user's rough guess at the whole task, in minutes. Optional. */
   estimateMinutes: z.number().positive().nullable().catch(null).default(null),
+  /** Present when this responsibility is being worked on in Recovery. */
+  recoveryCase: RecoveryCaseSchema.nullable().catch(null).default(null),
+  /** A simple errand from the home page, which needs no recovery workflow. */
+  quick: z.boolean().catch(false).default(false),
 })
 export type Task = z.infer<typeof TaskSchema>
 
@@ -343,9 +472,12 @@ export type Workspace = {
   frictionLog: FrictionEvent[]
   learning: Learning
   dailyPlan: DailyPlan | null
+  /** What's typed on the home page, kept until it's submitted. */
+  intakeDraft: string
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
+  intakeDraft: "",
   version: 2,
   tasks: [],
   focusSessions: [],

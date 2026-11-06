@@ -13,7 +13,7 @@ const saved = () => JSON.parse(window.localStorage.getItem(STORAGE)!)
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = ""
+  window.location.hash = "#/today"
   window.scrollTo = vi.fn() as typeof window.scrollTo
   vi.stubGlobal(
     "fetch",
@@ -81,6 +81,12 @@ describe("tasks", () => {
     const heading = await screen.findByRole("heading", { name: "Pay rent" })
     expect(heading).toBeInTheDocument()
 
+    // A task that was never started has nothing to pause.
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull()
+    await user.selectOptions(
+      screen.getByLabelText("Status"),
+      "in-progress"
+    )
     await user.click(await button("Pause"))
     expect(saved().tasks[0].status).toBe("paused")
     await user.click(await button("Resume"))
@@ -198,7 +204,7 @@ describe("persistence and data", () => {
         name: "Delete everything",
       })
     )
-    await screen.findByRole("heading", { name: /on your plate/i })
+    await screen.findByRole("heading", { name: /putting off/i })
     await act(async () => {})
     expect(JSON.stringify(saved())).not.toContain("Private thing")
   })

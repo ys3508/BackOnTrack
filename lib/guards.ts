@@ -13,7 +13,17 @@ const HIGH_STAKES =
   /\b(court|lawsuit|legal|lawyer|subpoena|contract|tax(es)?|irs|visa|immigration|loans?|debts?|mortgage|rent|eviction|bills?|insurance|medical|doctor|surgery|medication|prescription|diagnosis|exams?|essays?|homework|midterms?|quiz(zes)?|coursework|assignments?|thesis|dissertation|degree|tuition|scholarship|professor|finals?)\b/i
 
 const CRISIS =
-  /(kill(ing)? myself|suicid|end(ing)? my life|want to die|self[- ]?harm|hurt(ing)? myself|no reason to live)/i
+  /(kill(ing)? myself|suicid|end(ing)? (my life|it all)|want(ed)? to die|wish i (was|were) dead|self[- ]?harm|hurt(ing)? myself|no reason to live|better off without me|don'?t want to (be here|live|exist)( anymore)?)/i
+
+/** True for text describing self-harm risk. Wording rules can miss or misfire. */
+export function isCrisisText(text: string) {
+  return CRISIS.test(text.replace(/[’‘]/g, "'"))
+}
+
+/** True for text that may involve a legal, financial, medical or academic duty. */
+export function isHighStakesText(text: string) {
+  return HIGH_STAKES.test(text)
+}
 
 export const DEFAULT_CAUTION =
   "This looks like it may involve a legal, financial, medical or academic obligation. Before dropping it, check with the person or office responsible what stopping would actually mean."
