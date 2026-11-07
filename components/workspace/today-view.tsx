@@ -36,7 +36,6 @@ import {
   formatClockTime,
   formatDuration,
   occurrenceOutcome,
-  rangeStats,
   trayItems,
 } from "@/lib/calendar/derived"
 import { taskColorVars } from "@/lib/calendar/task-colors"
@@ -50,6 +49,7 @@ import {
   sessionMinutes,
   splitTasks,
 } from "@/lib/today/now"
+import { focusByDay } from "@/lib/calendar/overview"
 import {
   allOccurrences,
   colorOf,
@@ -648,7 +648,7 @@ function WinMoment() {
 
 function Summary() {
   const { state, today } = useStore()
-  const { focusMinutes } = rangeStats(state, today, addDays(today, 1))
+  const focusMinutes = focusByDay(state.activity).get(today) ?? 0
   const restarts = restartsOn(state, today)
   const parts = [
     focusMinutes >= 1 && `Focused ${formatDuration(focusMinutes)}`,

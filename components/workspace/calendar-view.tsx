@@ -26,7 +26,6 @@ import type {
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { AuraStar } from "@/components/workspace/aura"
-import { CalendarDashboard } from "@/components/workspace/calendar-dashboard"
 import { BlockPopover } from "@/components/workspace/calendar-overlays"
 import type { BlockRef } from "@/components/workspace/calendar-overlays"
 import {
@@ -40,18 +39,20 @@ import type {
   EventDraft,
 } from "@/components/workspace/event-editor"
 import { ConfirmDialog } from "@/components/workspace/parts"
+import { Overview } from "@/components/workspace/overview"
 import { useCalendarEvents } from "@/components/workspace/use-calendar-events"
 import { ReplanDialog } from "@/components/workspace/schedule"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import {
   defaultSessionMinutes,
-  focusMinutesByDay,
   formatClockTime,
   formatDuration,
   heatLevel,
   hourRange,
 } from "@/lib/calendar/derived"
 import { droppedSlot } from "@/lib/calendar/events"
+import { focusByDay } from "@/lib/calendar/overview"
+import type { PeriodKind } from "@/lib/calendar/overview"
 import {
   addClock,
   minutesBetween,
@@ -80,7 +81,21 @@ type AskingScope = {
   patch: EventPatch
 }
 type Open = { block: BlockRef; element: Element }
-type Shown = { type: string; from: string; until: string }
+type Shown = {
+  type: string
+  from: string
+  until: string
+  /** The period itself: a Month's grid also shows days around it. */
+  periodFrom: string
+  periodUntil: string
+}
+
+const PERIOD_OF: Record<string, PeriodKind> = {
+  [DAY_VIEW]: "day",
+  [WEEK_VIEW]: "week",
+  [MONTH_VIEW]: "month",
+  [YEAR_VIEW]: "year",
+}
 
 const pad = (value: number) => String(value).padStart(2, "0")
 
@@ -115,6 +130,8 @@ export function CalendarView() {
     type: DAY_VIEW,
     from: today,
     until: addDays(today, 1),
+    periodFrom: today,
+    periodUntil: addDays(today, 1),
   })
   const calendar = useRef<FullCalendar>(null)
 
@@ -127,7 +144,7 @@ export function CalendarView() {
   }, [])
   const closeOpened = useCallback(() => setOpened(null), [])
 
-  const heat = useMemo(() => focusMinutesByDay(state), [state])
+  const heat = useMemo(() => focusByDay(state.activity), [state.activity])
   const hours = useMemo(
     () => hourRange(state, shown.from, shown.until),
     [state, shown.from, shown.until]
@@ -427,6 +444,8 @@ export function CalendarView() {
       type: info.view.type,
       from,
       until: localToday(info.end),
+      periodFrom: localToday(info.view.currentStart ?? info.start),
+      periodUntil: localToday(info.view.currentEnd ?? info.end),
     })
     // In Day view, the day on screen is the chosen day.
     if (info.view.type === DAY_VIEW) setSelected(from)
@@ -529,14 +548,11 @@ export function CalendarView() {
         </p>
       )}
 
-      {isTimed && (
-        <CalendarDashboard
-          from={shown.from}
-          until={shown.until}
-          week={shown.type === WEEK_VIEW}
-          hours={hours}
-        />
-      )}
+      <Overview
+        kind={PERIOD_OF[shown.type] ?? "day"}
+        from={shown.periodFrom}
+        until={shown.periodUntil}
+      />
 
       <div
         className={

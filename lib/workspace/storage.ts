@@ -1,8 +1,10 @@
+import { seedActivity } from "@/lib/calendar/activity"
 import { migrateCalendar, restoreEvents } from "@/lib/calendar/migrate"
 import { clearSession, loadSession } from "@/lib/session"
 import type { Session } from "@/lib/session"
 import { inferEventKind, withEvent } from "@/lib/workspace/reducer"
 import {
+  ActivityEntrySchema,
   DEFAULT_SETTINGS,
   EMPTY_WORKSPACE,
   FocusSessionSchema,
@@ -18,7 +20,7 @@ import {
   ProgressEventSchema,
   RecoverySchema,
 } from "@/lib/workspace/schemas"
-import type { Task, Workspace } from "@/lib/workspace/schemas"
+import type { ActivityEntry, Task, Workspace } from "@/lib/workspace/schemas"
 
 const STORAGE_KEY = "backontrack.workspace.v1"
 const BACKUP_KEY = "backontrack.workspace.backup"
@@ -73,8 +75,21 @@ export function restoreWorkspace(raw: unknown): Workspace {
           tasks
         )
 
+  const unreadable: Workspace["unmigrated"] = []
+  const savedLog = Array.isArray(saved.activity) ? saved.activity : null
+  const activity: ActivityEntry[] = savedLog
+    ? savedLog.flatMap((record) => {
+        if (ActivityEntrySchema.safeParse(record).success) {
+          return [record as ActivityEntry]
+        }
+        unreadable.push({ source: "activity", record })
+        return []
+      })
+    : seedActivity({ events: calendar.events, tasks, focusSessions })
+
   return {
     version: WORKSPACE_VERSION,
+    activity,
     // Version 1 events had no kind, so it's worked out from what they recorded.
     tasks:
       saved.version === 1
@@ -93,6 +108,7 @@ export function restoreWorkspace(raw: unknown): Workspace {
         ? (saved.unmigrated as Workspace["unmigrated"])
         : []),
       ...calendar.unmigrated,
+      ...unreadable,
     ],
     timer: timer.success ? timer.data : null,
     finishedSessionId: finished ? (saved.finishedSessionId as string) : null,

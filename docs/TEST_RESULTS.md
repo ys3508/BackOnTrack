@@ -477,3 +477,17 @@ Automated: 771 tests pass. Run in the development server in the built-in browser
 | Click the empty part of an occupied buffer | Opens Edit and Delete, and Delete works |
 
 Not tested: touch dragging the chip, which has no fallback other than the editor's toggle on a phone.
+
+## Calendar v2, Phase C
+
+Automated: 790 tests pass. Run in the development server in the built-in browser with real clicks. The timer was wound forward in saved data rather than waited out, and blocks were placed in the past the same way.
+
+| Check | Result |
+| --- | --- |
+| 25-minute focus started 12 minutes after the planned start | Day shows 25 min focus and 12 min start delay. Week's bar for that day reads 25 min planned, 25 min focus |
+| Recovery shown for two blocks, one restarted | Comebacks 1, Recovery-to-Action 50% |
+| A range with no data (September 2026) | A dash and a reason on each figure, no errors |
+| Month with under 3 points | A dash and a reason in place of each chart |
+| Year and Month charts with enough data | Covered by automated tests only, and not looked at in a browser |
+
+Not tested: months of real use, or how the log grows in browser storage.

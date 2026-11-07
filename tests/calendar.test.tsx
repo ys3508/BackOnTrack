@@ -6,12 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import { buildCalendarItems, droppedSlot } from "@/lib/calendar/events"
 import {
-  focusMinutesByDay,
   heatLevel,
   formatTimeRange,
   hourRange,
   placePopover,
-  rangeStats,
   routineWeek,
   trayItems,
   weekStart,
@@ -21,6 +19,7 @@ import { restoreWorkspace } from "@/lib/workspace/storage"
 import { eventOf } from "./event-fixtures"
 import type { Workspace } from "@/lib/workspace/schemas"
 import { addDays, localToday } from "@/lib/workspace/dates"
+import { focusByDay, overviewOf } from "@/lib/calendar/overview"
 import { workspaceReducer } from "@/lib/workspace/reducer"
 import type { WorkspaceAction } from "@/lib/workspace/reducer"
 import { EMPTY_WORKSPACE } from "@/lib/workspace/schemas"
@@ -318,13 +317,19 @@ describe("derived numbers", () => {
       ],
       withFocus()
     )
-    const stats = rangeStats(state, TODAY, addDays(TODAY, 1))
+    const stats = overviewOf(state.activity, {
+      from: TODAY,
+      until: addDays(TODAY, 1),
+    })
     expect(stats.focusMinutes).toBe(30)
     expect(stats.plannedMinutes).toBe(40)
-    expect(stats.tasksCompleted).toBe(1)
-    expect(stats.actual.map((item) => item.id)).toEqual(["f"])
+    expect(stats.tasks.completed).toBe(1)
+    expect(stats.focusSessions).toBe(1)
     expect(
-      rangeStats(state, addDays(TODAY, 1), addDays(TODAY, 2)).focusMinutes
+      overviewOf(state.activity, {
+        from: addDays(TODAY, 1),
+        until: addDays(TODAY, 2),
+      }).focusSessions
     ).toBe(0)
   })
 
@@ -402,7 +407,7 @@ describe("derived numbers", () => {
     expect([0, 10, 25, 26, 60, 61, 120, 121].map(heatLevel)).toEqual([
       0, 1, 1, 2, 2, 3, 3, 4,
     ])
-    expect(focusMinutesByDay(withFocus()).get(TODAY)).toBe(30)
+    expect(focusByDay(withFocus().activity).get(TODAY)).toBe(30)
   })
 })
 
@@ -745,7 +750,7 @@ describe("routines", () => {
   })
 })
 
-describe("mini dashboard", () => {
+describe("the Overview strip", () => {
   beforeEach(() => {
     window.localStorage.clear()
     window.location.hash = "#/calendar"
@@ -755,55 +760,12 @@ describe("mini dashboard", () => {
     )
   })
 
-  it("shows the day's numbers and one segment per session", async () => {
+  it("shows the day's numbers, and keeps the grid on the calendar's hours", async () => {
     render(<WorkspaceApp />)
-    const panel = await screen.findByRole("region", {
-      name: "This day at a glance",
-    })
+    const panel = await screen.findByRole("region", { name: "Overview" })
     expect(within(panel).getByText("Focus time").nextSibling).toHaveTextContent(
       "30 min"
     )
-    const segments = within(screen.getByTestId("day-strip")).getAllByRole("img")
-    expect(segments).toHaveLength(1)
-    expect(segments[0]).toHaveAccessibleName(
-      "Focus: Essay, 30 min, 9:00 – 9:30 AM"
-    )
-    expect(segments[0]).toHaveAttribute("data-kind", "actual")
-  })
-
-  it("draws planned time as dashed and focus as solid, on the calendar's hours", async () => {
-    const state = run(
-      [
-        {
-          type: "add-planned",
-          at: AT,
-          session: {
-            id: "p",
-            taskId: "a",
-            date: TODAY,
-            time: "15:00",
-            minutes: 45,
-            label: "",
-            done: false,
-          },
-        },
-      ],
-      withFocus()
-    )
-    window.localStorage.setItem(
-      STORAGE,
-      JSON.stringify({ ...state, legacyMigrated: true })
-    )
-    render(<WorkspaceApp />)
-    const strip = await screen.findByTestId("day-strip")
-    const kinds = within(strip)
-      .getAllByRole("img")
-      .map((item) => item.getAttribute("data-kind"))
-    expect(kinds.sort()).toEqual(["actual", "planned"])
-    const planned = within(strip)
-      .getAllByRole("img")
-      .find((item) => item.getAttribute("data-kind") === "planned")!
-    expect(planned.className).toContain("border-dashed")
     const hours = hourRange(saved(), TODAY, addDays(TODAY, 1))
     expect(props().slotMinTime).toBe(
       `${String(hours.first).padStart(2, "0")}:00:00`
@@ -820,15 +782,16 @@ describe("mini dashboard", () => {
     expect(within(key).queryByText("Routine")).toBeNull()
   })
 
-  it("shows seven bars in the week view, and no dashboard in month", async () => {
+  it("shows seven bars in the week view, and none in month", async () => {
     render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: "Calendar" })
+    await screen.findByRole("region", { name: "Overview" })
     const from = weekStart(TODAY)
     showView("timeGridWeek", from, addDays(from, 7))
-    await screen.findByRole("region", { name: "This week at a glance" })
-    expect(screen.getAllByTestId("week-bar")).toHaveLength(7)
+    await waitFor(() =>
+      expect(screen.getAllByTestId("week-bar")).toHaveLength(7)
+    )
     showView("dayGridMonth")
-    expect(screen.queryByRole("region", { name: /at a glance/ })).toBeNull()
+    await waitFor(() => expect(screen.queryByTestId("week-bar")).toBeNull())
     expect(screen.queryByText("Not started yet")).toBeNull()
     expect(screen.getByText("My routines")).toBeTruthy()
   })

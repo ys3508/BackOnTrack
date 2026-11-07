@@ -1,3 +1,4 @@
+import { observeActivity } from "@/lib/calendar/activity"
 import {
   applyEventDelete,
   applyEventEdit,
@@ -682,9 +683,13 @@ export function workspaceReducer(
   state: Workspace,
   action: WorkspaceAction
 ): Workspace {
-  return observeProgress(
+  return observeActivity(
     state,
-    observeFriction(state, applyAction(state, action), action),
+    observeProgress(
+      state,
+      observeFriction(state, applyAction(state, action), action),
+      action
+    ),
     action
   )
 }

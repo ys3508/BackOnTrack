@@ -407,6 +407,8 @@ export const SettingsSchema = z.object({
   bufferGapMinutes: z.number().min(0).catch(0).default(0),
   /** Off until the user chooses, after being told what they can and can't do. */
   remindersEnabled: z.boolean().catch(false).default(false),
+  /** Whether the calendar's Overview strip is folded away. */
+  overviewCollapsed: z.boolean().catch(false).default(false),
   /** The one-time note that everything is saved in this browser. */
   storageNoticeSeen: z.boolean().catch(false).default(false),
 })
@@ -420,6 +422,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bufferMinutes: 30,
   bufferGapMinutes: 0,
   remindersEnabled: false,
+  overviewCollapsed: false,
   storageNoticeSeen: false,
 }
 
@@ -560,6 +563,85 @@ export const CalendarEventSchema = z.object({
   createdAt: z.string().catch("").default(""),
 })
 export type CalendarEvent = z.infer<typeof CalendarEventSchema>
+
+/**
+ * What happened, in order. It's only ever added to, and the Overview's numbers
+ * are all worked out from it.
+ */
+export type ActivityEntry = { at: string } & (
+  | {
+      type: "block_planned"
+      eventId: string
+      /** Where the block stood after this change. */
+      schedule: {
+        kind: CalendarEvent["kind"]
+        date: string
+        start: string
+        end: string
+        flexible: boolean
+        repeat: EventRepeat | null
+        overrides: Record<string, EventOverride>
+      }
+      created: boolean
+    }
+  | { type: "block_removed"; eventId: string }
+  | {
+      type: "focus_started"
+      sessionId: string
+      taskId: string | null
+      plannedId: string | null
+      /** When the block was meant to start, as it stood at the time. */
+      plannedAt: string | null
+    }
+  | { type: "focus_paused"; sessionId: string }
+  | { type: "focus_resumed"; sessionId: string }
+  | {
+      type: "focus_ended"
+      sessionId: string
+      taskId: string | null
+      plannedId: string | null
+      startedAt: string
+      seconds: number
+      interrupted: boolean
+      reported: boolean
+    }
+  | { type: "focus_undone"; sessionId: string }
+  | {
+      type: "occurrence_outcome"
+      eventId: string
+      key: string
+      outcome: EventOutcome | null
+      series: string
+      title: string
+      routine: boolean
+      minutes: number
+    }
+  | { type: "recovery_shown"; taskId: string; plannedId: string | null }
+  | { type: "recovery_option"; taskId: string; option: string }
+  | { type: "stuck_reason"; taskId: string | null; label: string }
+  | { type: "restarted"; taskId: string }
+  | { type: "minimum_met"; taskId: string }
+  | { type: "task_created"; taskId: string }
+  | { type: "task_first_started"; taskId: string }
+  | { type: "task_completed"; taskId: string }
+  | { type: "task_reduced"; taskId: string }
+  | { type: "task_released"; taskId: string }
+  | { type: "task_reopened"; taskId: string }
+  | {
+      type: "moved_to_buffer"
+      eventId: string
+      taskId: string
+      bufferId: string
+      date: string
+    }
+  | { type: "deadline_met"; taskId: string; deadline: string }
+  | { type: "deadline_missed"; taskId: string; deadline: string }
+)
+
+export const ActivityEntrySchema = z.looseObject({
+  at: z.string(),
+  type: z.string(),
+})
 
 /** A saved record that couldn't be read, kept rather than thrown away. */
 export type UnmigratedRecord = { source: string; record: unknown }
@@ -712,6 +794,8 @@ export type Workspace = {
   focusSessions: FocusSession[]
   /** Everything on the calendar except deadlines and past focus time. */
   events: CalendarEvent[]
+  /** What happened, added to and never rewritten. */
+  activity: ActivityEntry[]
   /** Saved records that couldn't be read, kept so nothing is ever lost. */
   unmigrated: UnmigratedRecord[]
   timer: TimerState | null
@@ -745,6 +829,7 @@ export const EMPTY_WORKSPACE: Workspace = {
   tasks: [],
   focusSessions: [],
   events: [],
+  activity: [],
   unmigrated: [],
   timer: null,
   finishedSessionId: null,

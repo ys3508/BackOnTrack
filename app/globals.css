@@ -1415,26 +1415,47 @@ html[data-focusing] [data-app-shell] {
 
 .fc .fc-daygrid-day.bot-heat-1,
 .bot-heat-swatch-1 {
-  background: #ffe6cf;
+  background: #dbe7f7;
 }
 
 .fc .fc-daygrid-day.bot-heat-2,
 .bot-heat-swatch-2 {
-  background: #ffc79a;
+  background: #a9c6ec;
 }
 
 .fc .fc-daygrid-day.bot-heat-3,
 .bot-heat-swatch-3 {
-  background: #f8965f;
+  background: #5f93d8;
 }
 
 .fc .fc-daygrid-day.bot-heat-4,
 .bot-heat-swatch-4 {
-  background: #e4582c;
+  background: #0b4fb3;
 }
 
 .fc .fc-daygrid-day.bot-heat-4 .fc-daygrid-day-number {
   color: white;
+}
+
+/* ---------- Overview ---------- */
+.bot-bar-planned {
+  border: 1.5px dashed #c07a12;
+  background: color-mix(in srgb, #c07a12 14%, white);
+}
+
+.bot-bar-focus {
+  background: var(--primary);
+}
+
+.bot-bar-planned,
+.bot-bar-focus {
+  border-radius: 4px 4px 0 0;
+}
+
+.bot-heat-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--secondary);
 }
 
 /* ---------- The working document ---------- */

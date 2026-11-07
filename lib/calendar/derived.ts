@@ -75,38 +75,6 @@ export function sessionsFrom(state: Workspace): CalendarSession[] {
   return [...planned, ...actual]
 }
 
-export type RangeStats = {
-  focusMinutes: number
-  plannedMinutes: number
-  tasksCompleted: number
-  actual: CalendarSession[]
-}
-
-/** Numbers for the dates from `from` up to, but not including, `until`. */
-export function rangeStats(
-  state: Workspace,
-  from: string,
-  until: string
-): RangeStats {
-  const within = (date: string) => date >= from && date < until
-  const sessions = sessionsFrom(state).filter((item) => within(item.date))
-  const actual = sessions
-    .filter((item) => item.kind === "actual")
-    .sort((a, b) => a.start.getTime() - b.start.getTime())
-  const sum = (items: CalendarSession[]) =>
-    items.reduce((total, item) => total + item.minutes, 0)
-  return {
-    focusMinutes: sum(actual),
-    plannedMinutes: sum(sessions.filter((item) => item.kind === "planned")),
-    // Finishing a task is the one number that isn't recorded on a session.
-    tasksCompleted: state.tasks.filter(
-      (task) =>
-        task.completedAt && within(localToday(new Date(task.completedAt)))
-    ).length,
-    actual,
-  }
-}
-
 export function formatDuration(minutes: number) {
   const total = Math.round(minutes)
   if (total < 60) return `${total} min`
@@ -212,16 +180,7 @@ export function placePopover(
   }
 }
 
-/* ---------- Year heatmap ---------- */
-
-export function focusMinutesByDay(state: Workspace) {
-  const days = new Map<string, number>()
-  for (const item of sessionsFrom(state)) {
-    if (item.kind !== "actual") continue
-    days.set(item.date, (days.get(item.date) ?? 0) + item.minutes)
-  }
-  return days
-}
+/* ---------- Heatmaps ---------- */
 
 export function heatLevel(minutes: number) {
   if (minutes <= 0) return 0

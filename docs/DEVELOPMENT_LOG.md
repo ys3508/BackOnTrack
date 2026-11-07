@@ -383,6 +383,20 @@ The automatic daily buffer, its fixed 3:00 PM start, and the count setting are g
 
 A buffer holding something can't be dragged or resized until it's empty, only edited from its popover.
 
+## Calendar v2, Phase C: Overview, from a log
+
+`state.activity` is an append-only log, written by `observeActivity` around the reducer from what really changed, so no screen can record something twice or forget to. Every number in the Overview strip is worked out from it in `lib/calendar/overview.ts`. The old `CalendarDashboard` and `rangeStats`, which read stored totals, are gone.
+
+| Decision | Reason |
+| --- | --- |
+| The first load builds the log from existing tasks, focus sessions, outcomes, and events | Real history keeps its real times, and no start delay is invented for older sessions |
+| Planned time is replayed from schedule snapshots | A moved block counts where it ended up, and a deleted routine still counts for the days before it was deleted |
+| A delay uses the block's planned start as it stood when focus began | Moving a block into a buffer gives it a new plan, so only lateness against that plan counts |
+| "Fewer than 3 points" applies to the Month and Year charts, and any figure with at least one point is shown | The acceptance tests ask for a 12-minute delay from one start, and a rate from two showings, so a blanket rule would contradict them |
+| Heat colours moved to a single blue ramp | The brief says no red, and the old ramp ended in red-orange |
+
+Start delay only covers one-off task blocks: repeating events don't carry an occurrence through the timer yet.
+
 ## Known limitations
 
 - **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.

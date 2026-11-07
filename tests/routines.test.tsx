@@ -462,12 +462,13 @@ describe("gaps between work blocks", () => {
 })
 
 describe("calendar cleanup", () => {
-  it("collapses a day with nothing into one quiet line", async () => {
+  it("shows a dash and a reason for a day with nothing, never a zero", async () => {
     seed(EMPTY_WORKSPACE)
     window.location.hash = "#/calendar"
     render(<WorkspaceApp />)
-    await screen.findByText("Nothing recorded yet today.")
-    expect(screen.queryByText("Focus time")).toBeNull()
+    await screen.findByText("No focus sessions this day yet.")
+    expect(screen.getByText("Nothing tracked yet")).toBeTruthy()
+    expect(screen.queryByText("0 min")).toBeNull()
   })
 
   it("names the legend the way you asked", async () => {

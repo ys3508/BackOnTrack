@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
-import { rangeStats } from "@/lib/calendar/derived"
 import { buildCalendarItems } from "@/lib/calendar/events"
 import {
   applyEventEdit,
@@ -13,6 +12,7 @@ import {
   plannedSessions,
   routinesOf,
 } from "@/lib/calendar/model"
+import { overviewOf } from "@/lib/calendar/overview"
 import { dueReminders } from "@/lib/today/reminders"
 import { hasScheduleToday, todayAgenda } from "@/lib/today/timeline"
 import { addDays, localToday } from "@/lib/workspace/dates"
@@ -230,7 +230,9 @@ describe("an unused buffer", () => {
 
   it("isn't planned work, in stats or anywhere that reads planned blocks", () => {
     expect(plannedSessions(state)).toEqual([])
-    expect(rangeStats(state, past, TODAY).plannedMinutes).toBe(0)
+    expect(
+      overviewOf(state.activity, { from: past, until: TODAY }).plannedMinutes
+    ).toBe(0)
   })
 
   it("doesn't make a day count as scheduled, or remind", () => {
