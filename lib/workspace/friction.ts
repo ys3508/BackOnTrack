@@ -1,3 +1,4 @@
+import { plannedSession } from "@/lib/calendar/model"
 import type { WorkspaceAction } from "@/lib/workspace/reducer"
 import {
   isFocusTime,
@@ -152,7 +153,7 @@ export function observeFriction(
     case "decline-recovery":
       return resolveHelp(next, action.id, "stuck")
     case "move-planned": {
-      const session = before.planned.find((item) => item.id === action.id)
+      const session = plannedSession(before, action.id)
       const task = before.tasks.find((item) => item.id === session?.taskId)
       if (!session || !task || action.date <= session.date) return next
       return add(next, event(next, task, action.at, { kind: "moved" }))

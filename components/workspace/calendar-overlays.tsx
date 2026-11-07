@@ -20,34 +20,30 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { EventEditor, ScopeChoice } from "@/components/workspace/event-editor"
 import { startLabel, useStartFocus } from "@/components/workspace/focus-view"
 import { TaskLink } from "@/components/workspace/parts"
-import { RescheduleForm } from "@/components/workspace/reschedule-form"
 import {
-  newId,
   nowIso,
   useEnterRecovery,
   useStore,
 } from "@/components/workspace/store"
 import {
-  endOf,
-  formatClockTime,
   formatDuration,
   formatTimeRange,
-  placePopover,
-  blockOutcome,
   occurrenceOutcome,
-  routineTime,
-  ruleFrom,
+  placePopover,
 } from "@/lib/calendar/derived"
 import type { RoutineOutcome } from "@/lib/calendar/derived"
+import { occurrenceAt, plannedSession } from "@/lib/calendar/model"
 import { shortDate } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
 import type { Task } from "@/lib/workspace/schemas"
 import { cn } from "@/lib/utils"
 
-export const DURATION_CHIPS = [15, 25, 45, 60, 90]
-export const ROUTINE_MINUTES = [15, 30, 45, 60, 90]
+export const DURATION_CHIPS = [15, 30, 45, 60, 90]
+
+const SHEET_BELOW_PX = 640
 
 /**
  * Stays attached to what it's about. It reads the anchor's real position, again
@@ -58,14 +54,24 @@ export function Floating({
   label,
   onClose,
   children,
+  wide = false,
+  sheetWhenNarrow = false,
 }: {
   anchor: () => Element | null
   label: string
   onClose: () => void
   children: React.ReactNode
+  /** Has a whole form in it, so it needs the room. */
+  wide?: boolean
+  /** On a phone it rises from the bottom, where a thumb can reach it. */
+  sheetWhenNarrow?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [place, setPlace] = useState<{ left: number; top: number } | null>(null)
+  const [place, setPlace] = useState<{
+    left: number
+    top: number
+    sheet?: boolean
+  } | null>(null)
   const misses = useRef(0)
 
   const update = useCallback(() => {
@@ -74,7 +80,8 @@ export function Floating({
     if (!box) return
     const size = { width: box.offsetWidth, height: box.offsetHeight }
     const viewport = { width: window.innerWidth, height: window.innerHeight }
-    if (!element) {
+    const sheet = sheetWhenNarrow && viewport.width < SHEET_BELOW_PX
+    if (!element && !sheet) {
       // A new block takes a moment to draw. If it never does, it's still usable.
       misses.current += 1
       if (misses.current > 2) {
@@ -89,11 +96,13 @@ export function Floating({
       return
     }
     misses.current = 0
-    const next = placePopover(element.getBoundingClientRect(), size, viewport)
+    const next = sheet
+      ? { left: 0, top: 0, sheet }
+      : placePopover(element!.getBoundingClientRect(), size, viewport)
     setPlace((old) =>
       old?.left === next.left && old?.top === next.top ? old : next
     )
-  }, [anchor])
+  }, [anchor, sheetWhenNarrow])
 
   // It can't take focus while hidden, so this waits until it's been placed.
   const placed = place !== null
@@ -139,12 +148,19 @@ export function Floating({
       ref={ref}
       role="dialog"
       aria-label={label}
+      data-sheet={place?.sheet ? "" : undefined}
       style={{
-        left: place?.left ?? 0,
-        top: place?.top ?? 0,
+        // Solid, so the calendar's text can't show through what's being read.
+        background: "var(--card)",
+        ...(place?.sheet
+          ? { left: 0, right: 0, bottom: 0, width: "100%", maxWidth: "none" }
+          : { left: place?.left ?? 0, top: place?.top ?? 0 }),
         visibility: place ? "visible" : "hidden",
       }}
-      className="fixed z-40 max-h-[calc(100svh-1rem)] w-72 max-w-[calc(100vw-1rem)] overflow-x-hidden overflow-y-auto bot-card p-3 text-foreground [&_[data-slot=button]]:h-auto [&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:px-4 [&_[data-slot=button]]:whitespace-normal"
+      className={cn(
+        "fixed z-40 max-h-[calc(100svh-1rem)] max-w-[calc(100vw-1rem)] overflow-x-hidden overflow-y-auto bot-card p-3 text-foreground [&_[data-slot=button]]:h-auto [&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:px-4 [&_[data-slot=button]]:whitespace-normal",
+        wide ? "w-[22rem]" : "w-72"
+      )}
     >
       {children}
     </div>,
@@ -273,6 +289,7 @@ export function TaskCombobox({
   label = "Task for this time",
   placeholder = "Find a task, or name a new one",
   maxLength = 200,
+  quiet = false,
 }: {
   value: string
   onChange: (text: string) => void
@@ -280,9 +297,11 @@ export function TaskCombobox({
   label?: string
   placeholder?: string
   maxLength?: number
+  /** Stays closed until something is typed, so a form isn't pushed down. */
+  quiet?: boolean
 }) {
   const { state } = useStore()
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(!quiet)
   const [active, setActive] = useState(-1)
   const text = value.trim().toLowerCase()
   const matches = state.tasks
@@ -374,145 +393,12 @@ export function TaskCombobox({
   )
 }
 
-/** Month: a title and Enter makes a task due that day. */
-export function CreateTask({
-  anchor,
-  date,
-  onCreate,
-  onClose,
-}: {
-  anchor: () => Element | null
-  date: string
-  onCreate: (title: string) => void
-  onClose: () => void
-}) {
-  const [title, setTitle] = useState("")
-  const label = `New task due ${shortDate(date)}`
-  return (
-    <Floating anchor={anchor} label={label} onClose={onClose}>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (title.trim()) onCreate(title.trim())
-        }}
-      >
-        <label
-          htmlFor="calendar-inline"
-          className="mb-1 block text-xs font-medium text-muted-foreground"
-        >
-          {label}
-        </label>
-        <Input
-          id="calendar-inline"
-          autoFocus
-          value={title}
-          maxLength={200}
-          placeholder="Task title"
-          onChange={(event) => setTitle(event.target.value)}
-          className="h-11"
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Press Enter to add, Esc to cancel.
-        </p>
-      </form>
-    </Floating>
-  )
-}
-
-/** Day and Week: what this time is for, how long, and when it would end. */
-export function CreateSession({
-  anchor,
-  date,
-  time,
-  minutes,
-  onMinutes,
-  onPickTask,
-  onCreate,
-  onClose,
-}: {
-  anchor: () => Element | null
-  date: string
-  time: string | null
-  minutes: number
-  onMinutes: (minutes: number) => void
-  onPickTask: (task: Task | null) => void
-  onCreate: (title: string, firstStep: string) => void
-  onClose: () => void
-}) {
-  const [title, setTitle] = useState("")
-  const [firstStep, setFirstStep] = useState("")
-  const [more, setMore] = useState(false)
-  return (
-    <Floating anchor={anchor} label="New session" onClose={onClose}>
-      <form
-        className="space-y-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (title.trim()) onCreate(title.trim(), firstStep.trim())
-        }}
-      >
-        <p className="text-sm font-medium">
-          {shortDate(date)}
-          {time && (
-            <>
-              {", "}
-              <span data-testid="session-range">
-                {formatTimeRange(
-                  new Date(`${date}T${time}:00`),
-                  endOf(date, time, minutes)
-                )}
-              </span>
-            </>
-          )}
-        </p>
-        <TaskCombobox value={title} onChange={setTitle} onPick={onPickTask} />
-        <button
-          type="button"
-          aria-expanded={more}
-          onClick={() => setMore(!more)}
-          className="min-h-9 rounded-md text-xs font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
-        >
-          Length and first step
-          <span className="font-normal text-muted-foreground">
-            {" "}
-            · {formatDuration(minutes)}
-          </span>
-        </button>
-        {more && (
-          <div className="space-y-2">
-            <DurationChips value={minutes} onChange={onMinutes} />
-            <label className="block text-xs font-medium">
-              What will you do first? (optional)
-              <Input
-                value={firstStep}
-                maxLength={300}
-                onChange={(event) => setFirstStep(event.target.value)}
-                className="mt-0.5 h-10"
-              />
-            </label>
-          </div>
-        )}
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
-            Enter to add, Esc to cancel.
-          </p>
-          <Button
-            type="submit"
-            size="lg"
-            className="min-h-10"
-            disabled={!title.trim()}
-          >
-            Add
-          </Button>
-        </div>
-      </form>
-    </Floating>
-  )
-}
-
 export type BlockRef = {
-  kind: "deadline" | "planned" | "focused" | "routine" | "routine-placement"
+  kind: "deadline" | "planned" | "focused" | "routine" | "buffer"
+  /** The event, the deadline's task, or the focus session. */
   refId: string
+  /** Which occurrence, by the date it's stored under. */
+  occurrence?: string
   taskId: string | null
   title: string
   /** The local date of the occurrence that was clicked. */
@@ -521,125 +407,7 @@ export type BlockRef = {
   end: Date | null
 }
 
-export function EditTime({
-  date,
-  time,
-  minutes,
-  allowNoTime,
-  routine,
-  chips,
-  onSave,
-  onCancel,
-}: {
-  date: string
-  time: string | null
-  minutes: number
-  allowNoTime?: boolean
-  /** A regular occurrence, so it matters how far the change reaches. */
-  routine?: boolean
-  chips?: number[]
-  onSave: (
-    date: string,
-    time: string | null,
-    minutes: number,
-    scope: "one" | "future"
-  ) => void
-  onCancel: () => void
-}) {
-  const [day, setDay] = useState(date)
-  const [clock, setClock] = useState(time ?? "")
-  const [length, setLength] = useState(minutes)
-  const [scope, setScope] = useState<"one" | "future">("one")
-  const whichOnes = (
-    [
-      ["one", "This one only"],
-      ["future", "All future"],
-    ] as const
-  ).map(([value, label]) => (
-    <button
-      key={value}
-      type="button"
-      aria-pressed={scope === value}
-      onClick={() => setScope(value)}
-      className={cn(
-        "min-h-9 flex-1 rounded-md px-2 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        scope === value ? "bg-card shadow-sm" : "text-muted-foreground"
-      )}
-    >
-      {label}
-    </button>
-  ))
-  return (
-    <form
-      className="space-y-2"
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (day && (clock || allowNoTime) && length > 0) {
-          onSave(day, clock || null, length, scope)
-        }
-      }}
-    >
-      {routine && (
-        <div
-          role="group"
-          aria-label="Change which ones"
-          className="flex rounded-lg bg-secondary p-0.5"
-        >
-          {whichOnes}
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        {scope === "one" && (
-          <label className="block">
-            <span className="mb-0.5 block text-xs font-medium">Day</span>
-            <Input
-              type="date"
-              value={day}
-              max="9999-12-31"
-              onChange={(event) => setDay(event.target.value)}
-              className="h-10 px-2"
-            />
-          </label>
-        )}
-        {!allowNoTime && (
-          <label className="block">
-            <span className="mb-0.5 block text-xs font-medium">Start</span>
-            <Input
-              type="time"
-              value={clock}
-              onChange={(event) => setClock(event.target.value)}
-              className="h-10 px-2"
-            />
-          </label>
-        )}
-      </div>
-      <DurationChips value={length} onChange={setLength} options={chips} />
-      {clock && day && (
-        <p className="text-xs text-muted-foreground">
-          Ends {formatClockTime(endOf(day, clock, length))}
-          {scope === "future" &&
-            ", from this one onward. Earlier weeks stay as they were."}
-        </p>
-      )}
-      <div className="flex gap-2">
-        <Button type="submit" size="lg" className="min-h-10">
-          Save
-        </Button>
-        <Button
-          type="button"
-          size="lg"
-          variant="ghost"
-          className="min-h-10"
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-/** Start focus, Done, Change time, Open: what each means depends on the block. */
+/** Start focus, Done, Edit, Open: what each means depends on the block. */
 export function BlockPopover({
   block,
   anchor,
@@ -651,34 +419,27 @@ export function BlockPopover({
   anchor: () => Element | null
   onClose: () => void
   onChangeDeadline: (taskId: string) => void
-  onOpenRoutine: (routineId: string) => void
+  onOpenRoutine: (eventId: string) => void
 }) {
   const { state, dispatch, navigate } = useStore()
   const startFocus = useStartFocus()
   const enterRecovery = useEnterRecovery()
-  const [changing, setChanging] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const task = state.tasks.find((item) => item.id === block.taskId)
+  const event = state.events.find((item) => item.id === block.refId)
   const session =
-    block.kind === "planned"
-      ? state.planned.find((item) => item.id === block.refId)
-      : undefined
-  const placement =
-    block.kind === "routine-placement"
-      ? state.routinePlacements.find((item) => item.id === block.refId)
-      : undefined
-  const routine = state.routines.find(
-    (item) => item.id === (placement?.routineId ?? block.refId)
-  )
+    block.kind === "planned" ? plannedSession(state, block.refId) : undefined
+  const key = block.occurrence ?? block.date
   const reported =
     block.kind === "focused" &&
     state.focusSessions.find((item) => item.id === block.refId)?.reported
-  const isRoutine =
-    block.kind === "routine" || block.kind === "routine-placement"
+  const isRoutine = block.kind === "routine" && Boolean(event)
+  const occurrence = event ? occurrenceAt(event, key) : null
 
-  const routineResult = isRoutine
-    ? blockOutcome(state, block.kind, block.refId, block.date)
-    : null
+  const routineResult =
+    isRoutine && event ? occurrenceOutcome(event, key) : null
   const done = session
     ? session.done
     : isRoutine
@@ -701,23 +462,15 @@ export function BlockPopover({
   }
 
   function setOutcome(outcome: RoutineOutcome) {
-    if (!routine) return
-    dispatch({
-      type: "routine-outcome",
-      routineId: routine.id,
-      date: block.date,
-      placementId: placement?.id ?? null,
-      outcome,
-    })
+    if (!event) return
+    dispatch({ type: "occurrence-outcome", id: event.id, key, outcome })
     onClose()
   }
 
   const open = () => {
     onClose()
-    if (isRoutine && routine) onOpenRoutine(routine.id)
-    else if (task) {
-      navigate({ view: "task", id: task.id })
-    }
+    if (isRoutine && event) onOpenRoutine(event.id)
+    else if (task) navigate({ view: "task", id: task.id })
   }
 
   const blockMinutes =
@@ -725,55 +478,13 @@ export function BlockPopover({
       ? (block.end.getTime() - block.start.getTime()) / 60_000
       : null
   const focusMinutes = Math.round(
-    session?.minutes ?? blockMinutes ?? routine?.duration ?? 25
+    session?.minutes ?? blockMinutes ?? occurrence?.minutes ?? 25
   )
   const canStart = block.kind !== "focused" && !done
-  const canChange = block.kind !== "focused" && !done
+  const canEdit = block.kind !== "focused" && !done
 
-  function saveRoutine(
-    date: string,
-    time: string | null,
-    minutes: number,
-    scope: "one" | "future"
-  ) {
-    if (!routine) return
-    const flexible = routine.kind === "flexible"
-    if (!time && !flexible) return
-    const changed = minutes !== routine.duration ? minutes : null
-    if (placement) {
-      dispatch({
-        type: "update-placement",
-        id: placement.id,
-        date,
-        time: time ?? "",
-        minutes: changed,
-      })
-    } else if (scope === "future") {
-      dispatch({
-        type: "update-routine-future",
-        id: routine.id,
-        fromDate: block.date,
-        rrule: ruleFrom(routine.rrule, block.date, time ?? "00:00"),
-        duration: minutes,
-      })
-    } else {
-      dispatch({
-        type: "move-routine-occurrence",
-        routineId: routine.id,
-        fromDate: block.date,
-        placement: {
-          id: newId(),
-          routineId: routine.id,
-          date,
-          time: time ?? "",
-          minutes: changed,
-          adjusted: true,
-          done: routine.doneDates.includes(block.date),
-          result: occurrenceOutcome(routine, block.date),
-        },
-      })
-    }
-    onClose()
+  if (editing && event) {
+    return <EventEditor event={event} occurrence={key} anchor={anchor} onClose={onClose} />
   }
 
   return (
@@ -785,55 +496,18 @@ export function BlockPopover({
           block.end &&
           `, ${formatTimeRange(block.start, block.end)}`}
         {blockMinutes !== null && ` · ${formatDuration(blockMinutes)}`}
-        {placement?.adjusted && " · adjusted"}
+        {isRoutine && occurrence?.adjusted && " · adjusted"}
         {reported && " · you said you did this"}
       </p>
-      {changing ? (
-        session ? (
-          <>
-            {task && (
-              <label className="mb-2 block text-xs font-medium">
-                What will you do first? (optional)
-                <Input
-                  value={task.firstStep}
-                  maxLength={300}
-                  onChange={(event) =>
-                    dispatch({
-                      type: "edit-task",
-                      id: task.id,
-                      at: nowIso(),
-                      patch: { firstStep: event.target.value },
-                    })
-                  }
-                  className="mt-0.5 h-10"
-                />
-              </label>
-            )}
-            <RescheduleForm
-              task={task!}
-              session={session}
-              minutes={session.minutes}
-              onDone={onClose}
-            />
-          </>
-        ) : (
-          routine && (
-            <EditTime
-              date={block.date}
-              time={
-                routine.kind === "flexible"
-                  ? null
-                  : (placement?.time ?? routineTime(routine))
-              }
-              allowNoTime={routine.kind === "flexible"}
-              chips={ROUTINE_MINUTES}
-              minutes={Math.round(blockMinutes ?? routine.duration)}
-              routine={block.kind === "routine"}
-              onCancel={() => setChanging(false)}
-              onSave={saveRoutine}
-            />
-          )
-        )
+      {deleting && event?.repeat ? (
+        <ScopeChoice
+          question="Delete which ones?"
+          onChoose={(scope) => {
+            dispatch({ type: "delete-event", id: event.id, key, scope })
+            onClose()
+          }}
+          onCancel={() => setDeleting(false)}
+        />
       ) : (
         <div className="grid gap-1">
           {canStart && (
@@ -852,11 +526,11 @@ export function BlockPopover({
                 : "Start focus"}
             </Button>
           )}
-          {isRoutine && routine && (
+          {isRoutine && event && (
             <div className="space-y-1 pb-1">
-              {routine.minimumVersion && (
+              {event.minimum && (
                 <p className="text-xs text-muted-foreground">
-                  Minimum: {routine.minimumVersion}
+                  Minimum: {event.minimum}
                 </p>
               )}
               <div
@@ -915,7 +589,7 @@ export function BlockPopover({
               {done ? "Not done yet" : "Done"}
             </Button>
           )}
-          {canChange && (
+          {canEdit && (
             <Button
               type="button"
               size="lg"
@@ -925,15 +599,11 @@ export function BlockPopover({
                 if (block.kind === "deadline" && block.taskId) {
                   onClose()
                   onChangeDeadline(block.taskId)
-                } else setChanging(true)
+                } else setEditing(true)
               }}
             >
               <Clock aria-hidden />
-              {block.kind === "deadline"
-                ? "Change date"
-                : isRoutine
-                  ? "Change time or length"
-                  : "Change time"}
+              {block.kind === "deadline" ? "Change date" : "Edit"}
             </Button>
           )}
           {task && <TaskLink task={task} className="px-3" />}
@@ -982,7 +652,7 @@ export function BlockPopover({
               <Trash2 aria-hidden />I didn’t actually do this
             </Button>
           )}
-          {(session || placement) && (
+          {(session || isRoutine) && (
             <Button
               type="button"
               size="lg"
@@ -995,10 +665,18 @@ export function BlockPopover({
                     at: nowIso(),
                     id: session.id,
                   })
-                } else if (placement) {
-                  dispatch({ type: "remove-placement", id: placement.id })
+                  onClose()
+                } else if (event?.repeat) {
+                  setDeleting(true)
+                } else if (event) {
+                  dispatch({
+                    type: "delete-event",
+                    id: event.id,
+                    key,
+                    scope: "all",
+                  })
+                  onClose()
                 }
-                onClose()
               }}
             >
               <Trash2 aria-hidden />

@@ -1,5 +1,6 @@
 "use client"
 
+import { plannedSession } from "@/lib/calendar/model"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -53,7 +54,7 @@ export function RescheduleForm({
 }) {
   const { state, dispatch, today } = useStore()
   const block =
-    session ?? state.planned.find((item) => item.id === plannedId) ?? undefined
+    session ?? plannedSession(state, plannedId)
   const [now] = useState(() => Date.now())
   const [date, setDate] = useState(block?.date ?? today)
   const [when, setWhen] = useState<When>(

@@ -1,4 +1,11 @@
-import { endRoutineRule, parseRoutineRule } from "@/lib/calendar/derived"
+import {
+  applyEventDelete,
+  applyEventEdit,
+  eventFromPlanned,
+  mapPlanned,
+  plannedSession,
+} from "@/lib/calendar/model"
+import type { EventPatch, EventScope } from "@/lib/calendar/model"
 import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
 import type { CasePlan } from "@/lib/recovery/case-engine"
 import { shortDate } from "@/lib/workspace/dates"
@@ -17,8 +24,7 @@ import type {
   RealityGap,
   RecoveryCase,
   RecoveryPath,
-  Routine,
-  RoutinePlacement,
+  CalendarEvent,
 } from "@/lib/workspace/schemas"
 import {
   BLOCKER_LABEL,
@@ -46,12 +52,6 @@ import type {
 } from "@/lib/workspace/schemas"
 
 const MAX_HISTORY = 200
-
-type PlacementInput = Omit<
-  RoutinePlacement,
-  "minutes" | "adjusted" | "result"
-> &
-  Partial<Pick<RoutinePlacement, "minutes" | "adjusted" | "result">>
 
 export type WorkspaceAction =
   | {
@@ -223,69 +223,24 @@ export type WorkspaceAction =
     }
   | { type: "remove-planned"; at: string; id: string }
   | { type: "resize-planned"; at: string; id: string; minutes: number }
+  | { type: "add-event"; event: CalendarEvent }
   | {
-      type: "add-routine"
-      routine: Omit<
-        Routine,
-        | "priorRules"
-        | "kind"
-        | "minimumVersion"
-        | "minimumDates"
-        | "skippedDates"
-      > &
-        Partial<Routine>
-    }
-  | {
-      type: "update-routine-future"
+      type: "edit-event"
       id: string
-      /** The first date the change applies to. Earlier weeks keep their rule. */
-      fromDate: string
-      rrule: string
-      duration: number
+      /** The occurrence being edited, by the date it's stored under. */
+      key: string
+      scope: EventScope
+      patch: EventPatch
+      /** For the later part, when "This and following" splits a series. */
+      newId: string
     }
+  | { type: "delete-event"; id: string; key: string; scope: EventScope }
   | {
-      type: "update-placement"
+      type: "occurrence-outcome"
       id: string
-      date: string
-      time: string
-      minutes: number | null
-    }
-  | {
-      type: "update-routine"
-      id: string
-      patch: Partial<
-        Pick<
-          Routine,
-          | "name"
-          | "color"
-          | "emoji"
-          | "rrule"
-          | "duration"
-          | "kind"
-          | "minimumVersion"
-        >
-      >
-    }
-  | { type: "delete-routine"; id: string }
-  | { type: "toggle-routine-done"; routineId: string; date: string }
-  | {
-      type: "routine-outcome"
-      routineId: string
-      date: string
-      /** The one-off this applies to, if it isn't a regular occurrence. */
-      placementId?: string | null
+      key: string
       outcome: "full" | "minimum" | "skipped" | null
     }
-  | { type: "place-routine"; placement: PlacementInput }
-  | {
-      type: "move-routine-occurrence"
-      routineId: string
-      fromDate: string
-      placement: PlacementInput
-    }
-  | { type: "move-placement"; id: string; date: string; time: string }
-  | { type: "toggle-placement"; id: string }
-  | { type: "remove-placement"; id: string }
   | { type: "toggle-planned"; id: string }
   | {
       type: "set-recovery"
@@ -924,7 +879,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
       return {
         ...state,
         tasks: state.tasks.filter((task) => task.id !== action.id),
-        planned: state.planned.filter((item) => item.taskId !== action.id),
+        events: state.events.filter((item) => item.taskId !== action.id),
         dailyPlan: state.dailyPlan && {
           ...state.dailyPlan,
           items: state.dailyPlan.items.filter(
@@ -1248,7 +1203,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
       )
 
     case "planned-outcome": {
-      const session = state.planned.find((item) => item.id === action.id)
+      const session = plannedSession(state, action.id)
       if (!session || session.outcome) return state
       const task = state.tasks.find((item) => item.id === session.taskId)
       if (action.outcome === "didnt") {
@@ -1261,7 +1216,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
               `Didn’t do a planned session (${session.minutes} min)`
             )
           ),
-          planned: state.planned.map((item) =>
+          events: mapPlanned(state.events, (item) =>
             item.id === action.id
               ? { ...item, outcome: "didnt" as const }
               : item
@@ -1299,7 +1254,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             ? setTaskStatus(logged, "in-progress", action.at)
             : logged
         }),
-        planned: state.planned.map((item) =>
+        events: mapPlanned(state.events, (item) =>
           item.id === action.id
             ? { ...item, done: true, outcome: "did" as const }
             : item
@@ -1317,7 +1272,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
       const undone: Workspace = {
         ...state,
         focusSessions: state.focusSessions.filter((item) => item !== record),
-        planned: state.planned.map((item) =>
+        events: mapPlanned(state.events, (item) =>
           item.id === record.plannedId
             ? { ...item, done: false, outcome: null }
             : item
@@ -1335,7 +1290,10 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
         : undone
     }
 
-    case "add-planned":
+    case "add-planned": {
+      const title =
+        state.tasks.find((task) => task.id === action.session.taskId)?.title ??
+        ""
       return {
         ...mapTask(state, action.session.taskId, (task) =>
           withEvent(
@@ -1345,14 +1303,15 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             `Work session planned for ${shortDate(action.session.date)} (${action.session.minutes} min)`
           )
         ),
-        planned: [
-          ...state.planned,
-          { outcome: null, window: null, ...action.session },
+        events: [
+          ...state.events,
+          eventFromPlanned(action.session, title, action.at),
         ],
       }
+    }
 
     case "move-planned": {
-      const session = state.planned.find((item) => item.id === action.id)
+      const session = plannedSession(state, action.id)
       if (!session) return state
       return {
         ...mapTask(state, session.taskId, (task) =>
@@ -1363,7 +1322,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             `Work session moved from ${shortDate(session.date)} to ${shortDate(action.date)}`
           )
         ),
-        planned: state.planned.map((item) =>
+        events: mapPlanned(state.events, (item) =>
           item.id === action.id
             ? {
                 ...item,
@@ -1379,7 +1338,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
     }
 
     case "remove-planned": {
-      const session = state.planned.find((item) => item.id === action.id)
+      const session = plannedSession(state, action.id)
       if (!session) return state
       return {
         ...mapTask(state, session.taskId, (task) =>
@@ -1390,12 +1349,12 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             `Removed work session on ${shortDate(session.date)}`
           )
         ),
-        planned: state.planned.filter((item) => item.id !== action.id),
+        events: state.events.filter((item) => item.id !== action.id),
       }
     }
 
     case "resize-planned": {
-      const session = state.planned.find((item) => item.id === action.id)
+      const session = plannedSession(state, action.id)
       const minutes = Math.max(5, Math.round(action.minutes))
       if (!session || session.minutes === minutes) return state
       return {
@@ -1407,209 +1366,56 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             `Work session changed to ${minutes} min`
           )
         ),
-        planned: state.planned.map((item) =>
+        events: mapPlanned(state.events, (item) =>
           item.id === action.id ? { ...item, minutes } : item
         ),
       }
     }
 
-    case "add-routine":
+    case "add-event":
+      return { ...state, events: [...state.events, action.event] }
+
+    case "edit-event":
       return {
         ...state,
-        routines: [
-          ...state.routines,
-          {
-            priorRules: [],
-            kind: "fixed" as const,
-            minimumVersion: "",
-            minimumDates: [],
-            skippedDates: [],
-            ...action.routine,
-          },
-        ],
+        events: applyEventEdit(
+          state.events,
+          action.id,
+          action.key,
+          action.scope,
+          action.patch,
+          action.newId
+        ),
       }
 
-    case "update-routine-future":
+    case "delete-event":
       return {
         ...state,
-        routines: state.routines.map((routine) => {
-          if (routine.id !== action.id) return routine
-          const { startDate } = parseRoutineRule(routine.rrule)
-          // Nothing has happened under the old rule yet, so there's nothing to keep.
-          const keepsHistory = startDate < action.fromDate
-          return {
-            ...routine,
-            rrule: action.rrule,
-            duration: action.duration,
-            priorRules: keepsHistory
-              ? [
-                  ...routine.priorRules,
-                  {
-                    rrule: endRoutineRule(routine.rrule, action.fromDate),
-                    duration: routine.duration,
-                  },
-                ]
-              : routine.priorRules,
-          }
+        events: applyEventDelete(
+          state.events,
+          action.id,
+          action.key,
+          action.scope
+        ),
+      }
+
+    case "occurrence-outcome":
+      return {
+        ...state,
+        events: state.events.map((event) => {
+          if (event.id !== action.id) return event
+          // Each date has one outcome. Minimum is never stored as full.
+          const outcomes = { ...event.outcomes }
+          if (action.outcome) outcomes[action.key] = action.outcome
+          else delete outcomes[action.key]
+          return { ...event, outcomes }
         }),
-      }
-
-    case "update-placement":
-      return {
-        ...state,
-        routinePlacements: state.routinePlacements.map((item) =>
-          item.id === action.id
-            ? {
-                ...item,
-                date: action.date,
-                time: action.time,
-                minutes: action.minutes,
-                adjusted: true,
-              }
-            : item
-        ),
-      }
-
-    case "update-routine":
-      return {
-        ...state,
-        routines: state.routines.map((routine) =>
-          routine.id === action.id ? { ...routine, ...action.patch } : routine
-        ),
-      }
-
-    case "delete-routine":
-      return {
-        ...state,
-        routines: state.routines.filter((item) => item.id !== action.id),
-        routinePlacements: state.routinePlacements.filter(
-          (item) => item.routineId !== action.id
-        ),
-      }
-
-    case "toggle-routine-done":
-      return {
-        ...state,
-        routines: state.routines.map((routine) =>
-          routine.id === action.routineId
-            ? {
-                ...routine,
-                doneDates: routine.doneDates.includes(action.date)
-                  ? routine.doneDates.filter((date) => date !== action.date)
-                  : [...routine.doneDates, action.date],
-              }
-            : routine
-        ),
-      }
-
-    case "routine-outcome": {
-      if (action.placementId) {
-        return {
-          ...state,
-          routinePlacements: state.routinePlacements.map((item) =>
-            item.id === action.placementId
-              ? {
-                  ...item,
-                  result: action.outcome,
-                  done: action.outcome === "full",
-                }
-              : item
-          ),
-        }
-      }
-      // Each date has one outcome. Minimum is never stored as full.
-      const without = (dates: string[]) =>
-        dates.filter((date) => date !== action.date)
-      return {
-        ...state,
-        routines: state.routines.map((routine) =>
-          routine.id === action.routineId
-            ? {
-                ...routine,
-                doneDates:
-                  action.outcome === "full"
-                    ? [...without(routine.doneDates), action.date]
-                    : without(routine.doneDates),
-                minimumDates:
-                  action.outcome === "minimum"
-                    ? [...without(routine.minimumDates), action.date]
-                    : without(routine.minimumDates),
-                skippedDates:
-                  action.outcome === "skipped"
-                    ? [...without(routine.skippedDates), action.date]
-                    : without(routine.skippedDates),
-              }
-            : routine
-        ),
-      }
-    }
-
-    case "place-routine":
-      return {
-        ...state,
-        routinePlacements: [
-          ...state.routinePlacements,
-          { minutes: null, adjusted: false, result: null, ...action.placement },
-        ],
-      }
-
-    case "move-routine-occurrence":
-      // Moving one occurrence leaves the rest of the routine where it is.
-      return {
-        ...state,
-        routines: state.routines.map((routine) =>
-          routine.id === action.routineId
-            ? {
-                ...routine,
-                exdates: [...new Set([...routine.exdates, action.fromDate])],
-                doneDates: routine.doneDates.filter(
-                  (date) => date !== action.fromDate
-                ),
-                minimumDates: routine.minimumDates.filter(
-                  (date) => date !== action.fromDate
-                ),
-                skippedDates: routine.skippedDates.filter(
-                  (date) => date !== action.fromDate
-                ),
-              }
-            : routine
-        ),
-        routinePlacements: [
-          ...state.routinePlacements,
-          { minutes: null, adjusted: true, result: null, ...action.placement },
-        ],
-      }
-
-    case "move-placement":
-      return {
-        ...state,
-        routinePlacements: state.routinePlacements.map((item) =>
-          item.id === action.id
-            ? { ...item, date: action.date, time: action.time, adjusted: true }
-            : item
-        ),
-      }
-
-    case "toggle-placement":
-      return {
-        ...state,
-        routinePlacements: state.routinePlacements.map((item) =>
-          item.id === action.id ? { ...item, done: !item.done } : item
-        ),
-      }
-
-    case "remove-placement":
-      return {
-        ...state,
-        routinePlacements: state.routinePlacements.filter(
-          (item) => item.id !== action.id
-        ),
       }
 
     case "toggle-planned":
       return {
         ...state,
-        planned: state.planned.map((item) =>
+        events: mapPlanned(state.events, (item) =>
           item.id === action.id ? { ...item, done: !item.done } : item
         ),
       }
@@ -1758,7 +1564,19 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
           action.at
         )
       })
-      return { ...next, planned: [...next.planned, ...planned] }
+      return {
+        ...next,
+        events: [
+          ...next.events,
+          ...planned.map((item) =>
+            eventFromPlanned(
+              item,
+              next.tasks.find((task) => task.id === action.id)?.title ?? "",
+              action.at
+            )
+          ),
+        ],
+      }
     }
 
     case "timer-start": {
@@ -2488,14 +2306,14 @@ function recordSession(
     focusSessions: [...state.focusSessions, session],
     finishedSessionId: session.id,
     // Real focus answers the question, so the block won't ask "Did it?" later.
-    planned:
+    events:
       timer.plannedId && !interrupted
-        ? state.planned.map((item) =>
+        ? mapPlanned(state.events, (item) =>
             item.id === timer.plannedId
               ? { ...item, done: true, outcome: "did" as const }
               : item
           )
-        : state.planned,
+        : state.events,
   }
   if (!task) return next
   return mapTask(next, task.id, (item) => {

@@ -1,3 +1,4 @@
+import { plannedSessions } from "@/lib/calendar/model"
 import { formatClockTime } from "@/lib/calendar/derived"
 import { isActive } from "@/lib/workspace/schemas"
 import type { PlannedSession, Workspace } from "@/lib/workspace/schemas"
@@ -21,7 +22,7 @@ export type Reminder = {
  */
 export function dueReminders(state: Workspace, now: number): Reminder[] {
   if (!state.settings.remindersEnabled) return []
-  return state.planned.flatMap((session): Reminder[] => {
+  return plannedSessions(state).flatMap((session): Reminder[] => {
     if (!session.time || session.done || session.outcome) return []
     if (state.remindedBlocks.includes(reminderKey(session))) return []
     const start = new Date(`${session.date}T${session.time}:00`)

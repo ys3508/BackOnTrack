@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { plannedSessions } from "@/lib/calendar/model"
 import { initialSession } from "@/lib/session"
 import { EMPTY_INTAKE } from "@/lib/intake"
 import { addDays, deadlineText, localToday } from "@/lib/workspace/dates"
@@ -164,7 +165,7 @@ describe("task tracker", () => {
       { type: "delete-task", id: "a" },
     ])
     expect(state.tasks).toEqual([])
-    expect(state.planned).toEqual([])
+    expect(plannedSessions(state)).toEqual([])
   })
 
   it("saves and edits documents", () => {
@@ -266,7 +267,7 @@ describe("saved data", () => {
     }
   })
 
-  it("drops only the damaged items", () => {
+  it("sets aside only the damaged items", () => {
     const good = task(run([create("a")]))
     const restored = restoreWorkspace({
       version: 1,
@@ -279,7 +280,11 @@ describe("saved data", () => {
     })
     expect(restored.tasks).toEqual([good])
     expect(restored.focusSessions).toEqual([])
-    expect(restored.planned).toEqual([])
+    expect(restored.events).toEqual([])
+    // A record that can't be read isn't used, and isn't thrown away either.
+    expect(restored.unmigrated).toEqual([
+      { source: "planned", record: { nope: true } },
+    ])
     expect(restored.timer).toBeNull()
     expect(restored.finishedSessionId).toBeNull()
     expect(restored.settings.homeListSize).toBe(3)

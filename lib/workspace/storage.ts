@@ -1,3 +1,4 @@
+import { migrateCalendar, restoreEvents } from "@/lib/calendar/migrate"
 import { clearSession, loadSession } from "@/lib/session"
 import type { Session } from "@/lib/session"
 import { inferEventKind, withEvent } from "@/lib/workspace/reducer"
@@ -5,7 +6,6 @@ import {
   DEFAULT_SETTINGS,
   EMPTY_WORKSPACE,
   FocusSessionSchema,
-  PlannedSessionSchema,
   SettingsSchema,
   TaskSchema,
   TimerSchema,
@@ -17,13 +17,13 @@ import {
   ParkedThoughtSchema,
   ProgressEventSchema,
   RecoverySchema,
-  RoutinePlacementSchema,
-  RoutineSchema,
 } from "@/lib/workspace/schemas"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
 
 const STORAGE_KEY = "backontrack.workspace.v1"
 const BACKUP_KEY = "backontrack.workspace.backup"
+/** The data as it was before calendar events replaced routines and blocks. */
+export const PRE_EVENTS_BACKUP_KEY = "backontrack.workspace.pre-events-backup"
 
 function validItems<T>(
   items: unknown,
@@ -40,7 +40,7 @@ function validItems<T>(
 export function restoreWorkspace(raw: unknown): Workspace {
   if (!raw || typeof raw !== "object") return EMPTY_WORKSPACE
   const saved = raw as Record<string, unknown>
-  if (saved.version !== 1 && saved.version !== WORKSPACE_VERSION) {
+  if (![1, 2, WORKSPACE_VERSION].includes(saved.version as number)) {
     return EMPTY_WORKSPACE
   }
 
@@ -61,6 +61,18 @@ export function restoreWorkspace(raw: unknown): Workspace {
     TaskSchema.safeParse(item)
   )
 
+  const calendar =
+    saved.version === WORKSPACE_VERSION
+      ? restoreEvents(saved.events)
+      : migrateCalendar(
+          {
+            planned: saved.planned,
+            routines: saved.routines,
+            routinePlacements: saved.routinePlacements,
+          },
+          tasks
+        )
+
   return {
     version: WORKSPACE_VERSION,
     // Version 1 events had no kind, so it's worked out from what they recorded.
@@ -75,9 +87,13 @@ export function restoreWorkspace(raw: unknown): Workspace {
           }))
         : tasks,
     focusSessions,
-    planned: validItems(saved.planned, (item) =>
-      PlannedSessionSchema.safeParse(item)
-    ),
+    events: calendar.events,
+    unmigrated: [
+      ...(Array.isArray(saved.unmigrated)
+        ? (saved.unmigrated as Workspace["unmigrated"])
+        : []),
+      ...calendar.unmigrated,
+    ],
     timer: timer.success ? timer.data : null,
     finishedSessionId: finished ? (saved.finishedSessionId as string) : null,
     settings: settings.success ? settings.data : DEFAULT_SETTINGS,
@@ -93,12 +109,6 @@ export function restoreWorkspace(raw: unknown): Workspace {
     learning: learning.success ? learning.data : DEFAULT_LEARNING,
     dailyPlan: dailyPlan.success ? dailyPlan.data : null,
     intakeDraft: typeof saved.intakeDraft === "string" ? saved.intakeDraft : "",
-    routines: validItems(saved.routines, (item) =>
-      RoutineSchema.safeParse(item)
-    ),
-    routinePlacements: validItems(saved.routinePlacements, (item) =>
-      RoutinePlacementSchema.safeParse(item)
-    ),
     parkingLot: validItems(saved.parkingLot, (item) =>
       ParkedThoughtSchema.safeParse(item)
     ),
@@ -193,11 +203,20 @@ function needsBackup(raw: string) {
   return version !== WORKSPACE_VERSION
 }
 
-function backUp(raw: string) {
+function backUp(raw: string, key = BACKUP_KEY) {
   try {
-    window.localStorage.setItem(BACKUP_KEY, raw)
+    window.localStorage.setItem(key, raw)
   } catch {
     // Storage is full, so the original data is left in place until a save.
+  }
+}
+
+/** Keeps the first copy, which is the one from before anything was migrated. */
+function backUpBeforeEvents(raw: string) {
+  const version = (JSON.parse(raw) as { version?: unknown }).version
+  if (version === WORKSPACE_VERSION) return
+  if (window.localStorage.getItem(PRE_EVENTS_BACKUP_KEY) === null) {
+    backUp(raw, PRE_EVENTS_BACKUP_KEY)
   }
 }
 
@@ -206,9 +225,10 @@ export function loadWorkspace(): Workspace {
   let raw: string | null = null
   try {
     raw = window.localStorage.getItem(STORAGE_KEY)
-    if (raw) workspace = restoreWorkspace(JSON.parse(raw))
     // Keeps a copy before migrating, or if the data can't be understood.
     if (raw && needsBackup(raw)) backUp(raw)
+    if (raw) backUpBeforeEvents(raw)
+    if (raw) workspace = restoreWorkspace(JSON.parse(raw))
   } catch {
     if (raw) backUp(raw)
     workspace = EMPTY_WORKSPACE
@@ -272,6 +292,7 @@ export function clearAllData() {
   try {
     window.localStorage.removeItem(STORAGE_KEY)
     window.localStorage.removeItem(BACKUP_KEY)
+    window.localStorage.removeItem(PRE_EVENTS_BACKUP_KEY)
   } catch {
     // Nothing to clear.
   }

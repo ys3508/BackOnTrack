@@ -1,5 +1,6 @@
 "use client"
 
+import { plannedSessions } from "@/lib/calendar/model"
 import { useEffect, useRef, useState } from "react"
 import {
   ArrowLeft,
@@ -501,7 +502,7 @@ function FocusCard({ task }: { task: Task }) {
 function ScheduleCard({ task }: { task: Task }) {
   const { state, today } = useStore()
   const [replanning, setReplanning] = useState(false)
-  const planned = state.planned.filter((item) => item.taskId === task.id)
+  const planned = plannedSessions(state).filter((item) => item.taskId === task.id)
   return (
     <Card className="space-y-3">
       <SectionTitle>Planned work</SectionTitle>

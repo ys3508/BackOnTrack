@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
+import { Dialog } from "@base-ui/react/dialog"
 import { Plus } from "lucide-react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
@@ -27,37 +28,41 @@ import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { AuraStar } from "@/components/workspace/aura"
 import { CalendarDashboard } from "@/components/workspace/calendar-dashboard"
-import {
-  BlockPopover,
-  CreateSession,
-  CreateTask,
-} from "@/components/workspace/calendar-overlays"
+import { BlockPopover } from "@/components/workspace/calendar-overlays"
 import type { BlockRef } from "@/components/workspace/calendar-overlays"
 import {
   MyRoutines,
   NotStartedTray,
 } from "@/components/workspace/calendar-sidebar"
+import { EventEditor, ScopeChoice } from "@/components/workspace/event-editor"
+import type {
+  EditorPreview,
+  EventDraft,
+} from "@/components/workspace/event-editor"
 import { ConfirmDialog } from "@/components/workspace/parts"
 import { useCalendarEvents } from "@/components/workspace/use-calendar-events"
 import { ReplanDialog } from "@/components/workspace/schedule"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
 import {
-  PALETTE,
   defaultSessionMinutes,
   focusMinutesByDay,
   formatClockTime,
   formatDuration,
   heatLevel,
   hourRange,
-  occurrenceOutcome,
-  routineTime,
 } from "@/lib/calendar/derived"
 import { droppedSlot } from "@/lib/calendar/events"
+import {
+  addClock,
+  minutesBetween,
+  nextFreeQuarter,
+  occurrenceAt,
+} from "@/lib/calendar/model"
+import type { EventPatch } from "@/lib/calendar/model"
 import { downloadIcs } from "@/lib/calendar/ics"
 import { withGap } from "@/lib/today/buffer"
 import type { CalendarItemKind } from "@/lib/calendar/events"
 import { addDays, localToday, shortDate } from "@/lib/workspace/dates"
-import { isActive } from "@/lib/workspace/schemas"
 import type { Task } from "@/lib/workspace/schemas"
 
 const DAY_VIEW = "timeGridDay"
@@ -67,19 +72,26 @@ const YEAR_VIEW = "multiMonthYear"
 
 type DeadlineMove = { task: Task; date: string }
 
-type Creating = {
-  date: string
-  time: string | null
-  minutes: number
-  /** Which way it was opened, since only "Add to" takes a remembered length. */
-  source: "click" | "drag" | "add"
-  /** True once a length was chosen on purpose, so it's remembered. */
-  chosen: boolean
+type AskingScope = {
+  id: string
+  key: string
+  title: string
+  patch: EventPatch
 }
 type Open = { block: BlockRef; element: Element }
 type Shown = { type: string; from: string; until: string }
 
 const pad = (value: number) => String(value).padStart(2, "0")
+
+/** How a block looks says how it went, so this doesn't use anyone's colour. */
+const LEGEND = [
+  { label: "Planned", style: "bot-planned" },
+  { label: "Done", style: "bot-done" },
+  { label: "Minimum", style: "bot-minimum" },
+  { label: "Skipped", style: "bot-skipped" },
+  { label: "Buffer", style: "bot-buffer-block" },
+  { label: "Deadline", style: "bot-deadline" },
+]
 
 /** About an hour before now, so the current time is on screen and has context. */
 function scrollPosition() {
@@ -93,7 +105,9 @@ export function CalendarView() {
   const [selected, setSelected] = useState(today)
   const [deadlineMove, setDeadlineMove] = useState<DeadlineMove | null>(null)
   const [replanning, setReplanning] = useState<Task | null>(null)
-  const [creating, setCreating] = useState<Creating | null>(null)
+  const [creating, setCreating] = useState<EventDraft | null>(null)
+  const [preview, setPreview] = useState<EditorPreview | null>(null)
+  const [askingScope, setAskingScope] = useState<AskingScope | null>(null)
   const [opened, setOpened] = useState<Open | null>(null)
   const [editingRoutine, setEditingRoutine] = useState<string | null>(null)
   const [shown, setShown] = useState<Shown>({
@@ -106,7 +120,10 @@ export function CalendarView() {
   const isYear = shown.type === YEAR_VIEW
   const isMonth = shown.type === MONTH_VIEW
   const isTimed = shown.type === DAY_VIEW || shown.type === WEEK_VIEW
-  const closeCreating = useCallback(() => setCreating(null), [])
+  const closeCreating = useCallback(() => {
+    setCreating(null)
+    setPreview(null)
+  }, [])
   const closeOpened = useCallback(() => setOpened(null), [])
 
   const heat = useMemo(() => focusMinutesByDay(state), [state])
@@ -115,116 +132,80 @@ export function CalendarView() {
     [state, shown.from, shown.until]
   )
 
-  const { events, eventClasses, eventContent, eventDidMount } =
-    useCalendarEvents(isYear)
+  const range = useMemo(
+    () => ({ from: shown.from, until: shown.until }),
+    [shown.from, shown.until]
+  )
+  const { events, eventContent, eventDidMount } = useCalendarEvents(
+    range,
+    isYear
+  )
 
-  /** Shows where a new session will land, while it's being named. */
+  /** Shows where a new event will land, while it's being filled in. */
   const withPending = useMemo<EventInput[]>(() => {
-    if (!creating?.time || !isTimed) return events
-    const start = new Date(`${creating.date}T${creating.time}:00`)
+    const place = preview ?? (creating && { ...creating, flexible: false })
+    if (!creating || !place || place.flexible || !isTimed) return events
+    const start = new Date(`${place.date}T${place.start}:00`)
     return [
       ...events,
       {
         id: "pending",
         title: "New · not saved yet",
         start,
-        end: new Date(start.getTime() + creating.minutes * 60_000),
+        end: new Date(start.getTime() + place.minutes * 60_000),
         editable: false,
-        classNames: ["bot-planned", "bot-pending"],
+        classNames: ["bot-pending"],
         extendedProps: { kind: "pending", refId: "pending", taskId: null },
       },
     ]
-  }, [events, creating, isTimed])
+  }, [events, creating, preview, isTimed])
 
   const selectedDay = useCallback(
     (date: Date) => (localToday(date) === selected ? ["bot-selected-day"] : []),
     [selected]
   )
 
+  function openEditor(draft: EventDraft) {
+    setSelected(draft.date)
+    setOpened(null)
+    setPreview(null)
+    setCreating(draft)
+  }
+
   function handleDateClick(info: DateClickArg) {
     const date = info.dateStr.slice(0, 10)
-    setSelected(date)
-    setOpened(null)
     if (shown.type === YEAR_VIEW) {
+      setSelected(date)
+      setOpened(null)
       calendar.current?.getApi().changeView(DAY_VIEW, date)
       return
     }
-    setCreating({
+    const minutes = defaultSessionMinutes(settings)
+    const allDay = info.allDay
+    openEditor({
       date,
-      time: info.allDay
-        ? null
-        : withGap(
-            state,
-            date,
-            info.dateStr.slice(11, 16),
-            defaultSessionMinutes(settings)
-          ),
-      // The length last used, or else the usual 25.
-      minutes: defaultSessionMinutes(settings),
-      source: "click",
-      chosen: false,
+      // A click in Month has no hour of its own, so it finds the next free one.
+      start:
+        isMonth
+          ? nextFreeQuarter(state, date, "09:00", minutes)
+          : allDay
+            ? "00:00"
+            : withGap(state, date, info.dateStr.slice(11, 16), minutes),
+      minutes,
+      flexible: allDay && !isMonth,
     })
   }
 
   /** Dragging across slots sets the length directly. */
   function handleSelect(info: DateSelectArg) {
-    const date = localToday(info.start)
-    setSelected(date)
-    setOpened(null)
-    setCreating({
-      date,
-      time: `${pad(info.start.getHours())}:${pad(info.start.getMinutes())}`,
+    openEditor({
+      date: localToday(info.start),
+      start: `${pad(info.start.getHours())}:${pad(info.start.getMinutes())}`,
       minutes: (info.end.getTime() - info.start.getTime()) / 60_000,
-      source: "drag",
       chosen: true,
     })
     // The pending block takes over from the selection's mirror.
     calendar.current?.getApi().unselect()
-  }
-
-  function createTask(title: string) {
-    if (!creating) return
-    dispatch({
-      type: "create-task",
-      id: newId(),
-      at: nowIso(),
-      title,
-      deadline: creating.date,
-    })
-    setCreating(null)
-  }
-
-  function createSession(title: string, firstStep: string) {
-    if (!creating) return
-    const at = nowIso()
-    const { date, time, minutes, chosen } = creating
-    // A title matching an open task sets aside time for it, not a duplicate.
-    const existing = state.tasks.find(
-      (task) =>
-        isActive(task) && task.title.toLowerCase() === title.toLowerCase()
-    )
-    const taskId = existing?.id ?? newId()
-    if (!existing) dispatch({ type: "create-task", id: taskId, at, title })
-    if (firstStep) {
-      dispatch({ type: "edit-task", id: taskId, at, patch: { firstStep } })
-    }
-    dispatch({
-      type: "add-planned",
-      at,
-      session: {
-        id: newId(),
-        taskId,
-        date,
-        time,
-        minutes,
-        label: "",
-        done: false,
-      },
-    })
-    if (chosen) {
-      dispatch({ type: "settings", patch: { lastSessionMinutes: minutes } })
-    }
-    setCreating(null)
   }
 
   function handleEventClick(info: EventClickArg) {
@@ -232,20 +213,22 @@ export function CalendarView() {
     if ((info.jsEvent.target as Element).closest?.("[data-block-action]")) {
       return
     }
-    const { kind, refId, taskId } = info.event.extendedProps as {
+    const { kind, refId, taskId, key } = info.event.extendedProps as {
       kind: CalendarItemKind
       refId: string
       taskId: string | null
+      key?: string
     }
-    if (kind === "pending" || kind === "buffer") return
+    if (kind === "pending" || refId === "buffer") return
     const { start, end } = info.event
     info.jsEvent.preventDefault()
-    setCreating(null)
+    closeCreating()
     setOpened({
       element: info.el,
       block: {
         kind,
         refId,
+        occurrence: key,
         taskId,
         title: info.event.title,
         date: start ? localToday(start) : selected,
@@ -255,9 +238,34 @@ export function CalendarView() {
     })
   }
 
+  /** A repeating event asks how far this reaches; anything else just changes. */
+  function changeOccurrence(
+    id: string,
+    key: string,
+    title: string,
+    patch: EventPatch
+  ) {
+    const event = state.events.find((item) => item.id === id)
+    if (event?.repeat) {
+      setAskingScope({ id, key, title, patch })
+    } else if (event) {
+      dispatch({
+        type: "edit-event",
+        id,
+        key,
+        scope: "all",
+        patch,
+        newId: newId(),
+      })
+    }
+  }
+
   function handleEventDrop(info: EventDropArg) {
-    const kind = info.event.extendedProps.kind as CalendarItemKind
-    const refId = info.event.extendedProps.refId as string
+    const { kind, refId, key } = info.event.extendedProps as {
+      kind: CalendarItemKind
+      refId: string
+      key?: string
+    }
     const start = info.event.start
     if (!start) return info.revert()
     const slot = droppedSlot(start, info.event.allDay)
@@ -273,40 +281,17 @@ export function CalendarView() {
       })
       return
     }
-    // The calendar would move the whole series, so it snaps back first.
+    // The change is made by the state below, so the drag itself snaps back.
     info.revert()
-    if (kind === "routine") {
-      const routine = state.routines.find((item) => item.id === refId)
-      const from = info.oldEvent.start
-      const oldEnd = info.oldEvent.end
-      if (!routine || !from) return
-      dispatch({
-        type: "move-routine-occurrence",
-        routineId: refId,
-        fromDate: localToday(from),
-        placement: {
-          id: newId(),
-          routineId: refId,
-          date: slot.date,
-          time:
-            slot.time ??
-            (routine.kind === "flexible" ? "" : routineTime(routine)),
-          minutes: oldEnd ? (oldEnd.getTime() - from.getTime()) / 60_000 : null,
-          adjusted: true,
-          done: routine.doneDates.includes(localToday(from)),
-          result: occurrenceOutcome(routine, localToday(from)),
-        },
-      })
-      return
-    }
-    if (kind === "routine-placement") {
-      const placement = state.routinePlacements.find((i) => i.id === refId)
-      if (!placement) return
-      dispatch({
-        type: "move-placement",
-        id: refId,
+    if (kind === "routine" || kind === "buffer") {
+      const event = state.events.find((item) => item.id === refId)
+      const before = event && occurrenceAt(event, key ?? slot.date)
+      if (!event || !before) return
+      changeOccurrence(refId, before.key, info.event.title, {
         date: slot.date,
-        time: slot.time ?? placement.time,
+        ...(slot.time && !event.flexible
+          ? { start: slot.time, end: addClock(slot.time, before.minutes) }
+          : {}),
       })
       return
     }
@@ -319,9 +304,10 @@ export function CalendarView() {
 
   function handleEventResize(info: EventResizeDoneArg) {
     const { start, end } = info.event
-    const { kind, refId } = info.event.extendedProps as {
+    const { kind, refId, key } = info.event.extendedProps as {
       kind: CalendarItemKind
       refId: string
+      key?: string
     }
     if (!start || !end) return info.revert()
     const minutes = (end.getTime() - start.getTime()) / 60_000
@@ -329,37 +315,14 @@ export function CalendarView() {
     if (kind === "planned") {
       dispatch({ type: "resize-planned", at: nowIso(), id: refId, minutes })
       dispatch({ type: "settings", patch: { lastSessionMinutes: minutes } })
-    } else if (kind === "routine") {
-      // Resizing changes this one only, and the popover offers "All future".
-      info.revert()
-      const routine = state.routines.find((item) => item.id === refId)
-      if (!routine) return
-      const date = localToday(start)
-      dispatch({
-        type: "move-routine-occurrence",
-        routineId: refId,
-        fromDate: date,
-        placement: {
-          id: newId(),
-          routineId: refId,
-          date,
-          time: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
-          minutes,
-          adjusted: true,
-          done: routine.doneDates.includes(date),
-          result: occurrenceOutcome(routine, date),
-        },
-      })
-    } else if (kind === "routine-placement") {
-      info.revert()
-      dispatch({
-        type: "update-placement",
-        id: refId,
-        date: localToday(start),
-        time: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
-        minutes,
-      })
-    } else return info.revert()
+      return
+    }
+    info.revert()
+    if (kind !== "routine" && kind !== "buffer") return
+    const clock = `${pad(start.getHours())}:${pad(start.getMinutes())}`
+    changeOccurrence(refId, key ?? localToday(start), info.event.title, {
+      end: addClock(clock, minutes),
+    })
   }
 
   /** Something dragged in from the tray or from My routines. */
@@ -386,18 +349,24 @@ export function CalendarView() {
       })
     }
     if (kind === "routine") {
-      const routine = state.routines.find((item) => item.id === id)
+      const routine = state.events.find((item) => item.id === id)
       if (!routine) return
+      // An extra one, on a day of its own, that still counts for this routine.
+      const start = slot.time ?? routine.start
       dispatch({
-        type: "place-routine",
-        placement: {
+        type: "add-event",
+        event: {
+          ...routine,
           id: newId(),
-          routineId: id,
+          seriesId: routine.seriesId ?? routine.id,
           date: slot.date,
-          time:
-            slot.time ??
-            (routine.kind === "flexible" ? "" : routineTime(routine)),
-          done: false,
+          start,
+          end: addClock(start, minutesBetween(routine.start, routine.end)),
+          flexible: routine.flexible || !slot.time,
+          repeat: null,
+          overrides: {},
+          outcomes: {},
+          createdAt: nowIso(),
         },
       })
     }
@@ -413,7 +382,6 @@ export function CalendarView() {
     })
     // In Day view, the day on screen is the chosen day.
     if (info.view.type === DAY_VIEW) setSelected(from)
-    setCreating(null)
     setOpened(null)
     if (info.view.type !== lastView.current) {
       lastView.current = info.view.type
@@ -457,20 +425,21 @@ export function CalendarView() {
     [heat, shown.type]
   )
 
-  /** The same quick add as clicking the grid, for anyone not using a mouse. */
+  /** The same editor as clicking the grid, at the next quarter hour that's free. */
   function addToSelected() {
-    setOpened(null)
     const nowDate = new Date()
-    setCreating({
+    const minutes = defaultSessionMinutes(settings)
+    openEditor({
       date: selected,
-      time: isMonth
-        ? null
-        : selected === today
-          ? `${pad(nowDate.getHours())}:${pad(Math.floor(nowDate.getMinutes() / 15) * 15)}`
+      start: nextFreeQuarter(
+        state,
+        selected,
+        selected === today
+          ? `${pad(nowDate.getHours())}:${pad(nowDate.getMinutes())}`
           : "09:00",
-      minutes: defaultSessionMinutes(settings),
-      source: "add",
-      chosen: false,
+        minutes
+      ),
+      minutes,
     })
   }
 
@@ -498,22 +467,11 @@ export function CalendarView() {
     )
   }, [openedElement, openedId, openedDate])
 
-  const pendingVisible = Boolean(creating?.time && isTimed)
-  useEffect(() => {
-    if (pendingVisible && creating?.source === "add") {
-      document
-        .querySelector(".bot-pending")
-        ?.scrollIntoView({ block: "nearest" })
-    }
-    // Only when it first appears, so typing never moves the grid.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingVisible])
-
   return (
     <div className="space-y-4">
       <ScreenHeading>Calendar</ScreenHeading>
 
-      {!state.planned.length && !state.routines.length && (
+      {!state.events.length && (
         <p className="bot-rise flex items-center gap-3 rounded-[1.5rem] bg-white/70 px-4 py-3 text-sm">
           <AuraStar className="size-9 shrink-0" />
           <span>
@@ -556,7 +514,6 @@ export function CalendarView() {
             <MyRoutines
               editingId={editingRoutine}
               setEditingId={setEditingRoutine}
-              selected={selected}
             />
           </aside>
         )}
@@ -586,46 +543,15 @@ export function CalendarView() {
                 aria-label="Calendar key"
                 className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground"
               >
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="inline-block h-3.5 w-5 rounded-full border border-caution bg-caution-soft"
-                  />
-                  Deadline
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="inline-block h-3.5 w-5 rounded-sm border border-dashed border-brand bg-brand-soft"
-                  />
-                  Planned
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="inline-block h-3.5 w-5 rounded-sm bg-primary"
-                  />
-                  Focus done
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="bot-routine-swatch inline-block h-3.5 w-5 rounded-sm"
-                    style={
-                      {
-                        "--routine": state.routines[0]?.color ?? PALETTE[1],
-                      } as React.CSSProperties
-                    }
-                  />
-                  Routine
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="bot-buffer-swatch inline-block h-3.5 w-5 rounded-sm border border-border"
-                  />
-                  Buffer
-                </li>
+                {LEGEND.map((item) => (
+                  <li key={item.label} className="flex items-center gap-1.5">
+                    <span
+                      aria-hidden
+                      className={`bot-legend-swatch ${item.style}`}
+                    />
+                    {item.label}
+                  </li>
+                ))}
               </ul>
               <div className="flex flex-wrap items-center gap-1">
                 <Button
@@ -678,6 +604,8 @@ export function CalendarView() {
               slotMaxTime={`${pad(hours.last)}:00:00`}
               scrollTime={scrollPosition()}
               snapDuration="00:15:00"
+              // Side by side, so a clash can be seen and both can still be read.
+              slotEventOverlap={false}
               slotLabelContent={(arg) => formatClockTime(arg.date)}
               nowIndicator
               allDayText=""
@@ -700,7 +628,6 @@ export function CalendarView() {
               select={handleSelect}
               events={withPending}
               eventContent={eventContent}
-              eventClassNames={eventClasses}
               eventDidMount={eventDidMount}
               dayCellClassNames={dayClasses}
               dayCellContent={dayContent}
@@ -715,43 +642,19 @@ export function CalendarView() {
               datesSet={handleDatesSet}
             />
           </Card>
-          {creating &&
-            (isMonth ? (
-              <CreateTask
-                key={creating.date}
-                anchor={dayAnchor}
-                date={creating.date}
-                onCreate={createTask}
-                onClose={closeCreating}
-              />
-            ) : (
-              <CreateSession
-                key={`${creating.date}-${creating.time}`}
-                anchor={creating.time ? pendingAnchor : dayAnchor}
-                date={creating.date}
-                time={creating.time}
-                minutes={creating.minutes}
-                onMinutes={(minutes) =>
-                  setCreating({ ...creating, minutes, chosen: true })
-                }
-                onPickTask={(task) => {
-                  // A remembered length wins, and then the task's own estimate.
-                  if (
-                    task?.estimateMinutes &&
-                    creating.source === "add" &&
-                    !creating.chosen &&
-                    !settings.lastSessionMinutes
-                  ) {
-                    setCreating({
-                      ...creating,
-                      minutes: task.estimateMinutes,
-                    })
-                  }
-                }}
-                onCreate={createSession}
-                onClose={closeCreating}
-              />
-            ))}
+          {creating && (
+            <EventEditor
+              key={`${creating.date}-${creating.start}-${creating.minutes}`}
+              draft={creating}
+              anchor={
+                !isTimed || preview?.flexible || creating.flexible
+                  ? dayAnchor
+                  : pendingAnchor
+              }
+              onPreview={setPreview}
+              onClose={closeCreating}
+            />
+          )}
           {opened && (
             <BlockPopover
               key={`${opened.block.refId}-${opened.block.date}`}
@@ -822,6 +725,40 @@ export function CalendarView() {
       </ConfirmDialog>
 
       <ReplanDialog task={replanning} onClose={() => setReplanning(null)} />
+
+      <Dialog.Root
+        open={Boolean(askingScope)}
+        onOpenChange={(next) => !next && setAskingScope(null)}
+      >
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-ink/25" />
+          <Dialog.Popup
+            style={{ background: "var(--card)" }}
+            className="fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 bot-card p-5 outline-none"
+          >
+            <Dialog.Title className="sr-only">
+              Change which occurrences
+            </Dialog.Title>
+            {askingScope && (
+              <ScopeChoice
+                question={`Change which “${askingScope.title}”?`}
+                onCancel={() => setAskingScope(null)}
+                onChoose={(scope) => {
+                  dispatch({
+                    type: "edit-event",
+                    id: askingScope.id,
+                    key: askingScope.key,
+                    scope,
+                    patch: askingScope.patch,
+                    newId: newId(),
+                  })
+                  setAskingScope(null)
+                }}
+              />
+            )}
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   )
 }

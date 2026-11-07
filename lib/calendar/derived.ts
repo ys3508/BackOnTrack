@@ -1,7 +1,15 @@
+import {
+  allOccurrences,
+  isPlannedEvent,
+  occurrenceAt,
+  plannedSessions,
+  seriesParts,
+} from "@/lib/calendar/model"
 import { addDays, daysBetween, localToday } from "@/lib/workspace/dates"
 import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type {
-  Routine,
+  CalendarEvent,
+  EventOutcome,
   Settings,
   Task,
   Workspace,
@@ -30,7 +38,7 @@ export type CalendarSession = {
 export function sessionsFrom(state: Workspace): CalendarSession[] {
   const titleOf = (id: string) =>
     state.tasks.find((task) => task.id === id)?.title
-  const planned = state.planned.flatMap((item): CalendarSession[] => {
+  const planned = plannedSessions(state).flatMap((item): CalendarSession[] => {
     const title = titleOf(item.taskId)
     if (!title) return []
     const start = new Date(`${item.date}T${item.time ?? "00:00"}:00`)
@@ -131,7 +139,7 @@ export function endOf(date: string, time: string, minutes: number) {
 
 /** The length to start from, when nothing more specific was chosen. */
 export function defaultSessionMinutes(settings: Settings, task?: Task | null) {
-  return settings.lastSessionMinutes ?? task?.estimateMinutes ?? 25
+  return settings.lastSessionMinutes ?? task?.estimateMinutes ?? 30
 }
 
 /* ---------- Hours on screen ---------- */
@@ -159,24 +167,11 @@ export function hourRange(
       add(item.start, item.end)
     }
   }
-  for (const routine of state.routines) {
-    // A flexible routine has no hour to make room for.
-    if (routine.kind === "flexible") continue
-    for (const rule of [routine, ...routine.priorRules]) {
-      const start = new Date(
-        `2000-01-15T${parseRoutineRule(rule.rrule).time}:00`
-      )
-      add(start, new Date(start.getTime() + rule.duration * 60_000))
-    }
-  }
-  for (const item of state.routinePlacements) {
-    const routine = state.routines.find((r) => r.id === item.routineId)
-    if (routine && item.time && item.date >= from && item.date < until) {
-      add(
-        new Date(`${item.date}T${item.time}:00`),
-        endOf(item.date, item.time, item.minutes ?? routine.duration)
-      )
-    }
+  for (const item of allOccurrences(state, from, until)) {
+    // A flexible one has no hour to make room for, and a block is counted above.
+    if (item.event.flexible || isPlannedEvent(item.event)) continue
+    const start = new Date(`${item.date}T${item.start}:00`)
+    add(start, new Date(start.getTime() + item.minutes * 60_000))
   }
   const today = localToday(now)
   if (today >= from && today < until) add(now, now)
@@ -217,18 +212,6 @@ export function placePopover(
   }
 }
 
-/* ---------- Colors ---------- */
-
-/** All dark enough to carry white text when a routine is filled in. */
-export const PALETTE = [
-  "#0b4fb3",
-  "#4a7d1e",
-  "#d9501f",
-  "#5e65dc",
-  "#2f7fb8",
-  "#c23a86",
-]
-
 /* ---------- Year heatmap ---------- */
 
 export function focusMinutesByDay(state: Workspace) {
@@ -261,7 +244,9 @@ export function trayItems(state: Workspace, today: string): TrayItem[] {
   return state.tasks
     .filter((task) => isActive(task) && task.status !== "paused")
     .flatMap((task): TrayItem[] => {
-      const planned = state.planned.filter((item) => item.taskId === task.id)
+      const planned = plannedSessions(state).filter(
+        (item) => item.taskId === task.id
+      )
       // "Didn't" sends it here straight away, even if it was planned for today.
       const passed = (item: (typeof planned)[number]) =>
         !item.done && (item.date < today || item.outcome === "didnt")
@@ -288,52 +273,6 @@ export const WEEKDAYS = [
   { code: "SA", label: "Sat" },
 ] as const
 
-/** Local time with no zone, so 7am stays 7am wherever the user is. */
-export function buildRoutineRule(days: string[], time: string, start: string) {
-  const ordered = WEEKDAYS.map((day) => day.code).filter((code) =>
-    days.includes(code)
-  )
-  return `DTSTART:${start.replaceAll("-", "")}T${time.replace(":", "")}00\nRRULE:FREQ=WEEKLY;BYDAY=${ordered.join(",")}`
-}
-
-export function parseRoutineRule(rule: string) {
-  const start = rule.match(/DTSTART:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/)
-  const days = rule.match(/BYDAY=([A-Z,]+)/)?.[1].split(",") ?? []
-  return {
-    days,
-    time: start ? `${start[4]}:${start[5]}` : "07:00",
-    startDate: start ? `${start[1]}-${start[2]}-${start[3]}` : "",
-  }
-}
-
-/** Closes a rule just before a date, for "All future" to take over from. */
-export function endRoutineRule(rule: string, fromDate: string) {
-  const until = addDays(fromDate, -1).replaceAll("-", "")
-  return `${rule.replace(/;UNTIL=[^;\n]*/, "")};UNTIL=${until}T235959`
-}
-
-/** The rule with the same weekdays, at a new time and starting from a date. */
-export function ruleFrom(rule: string, fromDate: string, time: string) {
-  return buildRoutineRule(parseRoutineRule(rule).days, time, fromDate)
-}
-
-export function routineTime(routine: Routine) {
-  return parseRoutineRule(routine.rrule).time
-}
-
-/** Whether a routine's regular occurrence falls on this date. */
-export function routineOccursOn(routine: Routine, date: string) {
-  if (routine.exdates.includes(date)) return false
-  const [year, month, day] = date.split("-").map(Number)
-  const code = WEEKDAYS[new Date(year, month - 1, day).getDay()].code
-  return [routine, ...routine.priorRules].some((rule) => {
-    const { days, startDate } = parseRoutineRule(rule.rrule)
-    const until = rule.rrule.match(/UNTIL=(\d{4})(\d{2})(\d{2})/)
-    const last = until ? `${until[1]}-${until[2]}-${until[3]}` : null
-    return days.includes(code) && startDate <= date && (!last || date <= last)
-  })
-}
-
 /** The Sunday that starts the calendar's week. */
 export function weekStart(date: string) {
   const [year, month, day] = date.split("-").map(Number)
@@ -342,51 +281,50 @@ export function weekStart(date: string) {
 
 export type RoutineOutcome = "full" | "minimum" | "skipped" | null
 
-/** What came of a routine's regular occurrence on a date. */
+/** What came of an occurrence, in the words routines use. */
 export function occurrenceOutcome(
-  routine: Routine,
-  date: string
+  event: CalendarEvent,
+  key: string
 ): RoutineOutcome {
-  if (routine.doneDates.includes(date)) return "full"
-  if (routine.minimumDates.includes(date)) return "minimum"
-  if (routine.skippedDates.includes(date)) return "skipped"
-  return null
-}
-
-/** The outcome of whichever routine block this is. */
-export function blockOutcome(
-  state: Workspace,
-  kind: string,
-  refId: string,
-  date: string
-): RoutineOutcome {
-  if (kind === "routine") {
-    const routine = state.routines.find((item) => item.id === refId)
-    return routine ? occurrenceOutcome(routine, date) : null
-  }
-  if (kind === "routine-placement") {
-    const item = state.routinePlacements.find((entry) => entry.id === refId)
-    return item ? (item.result ?? (item.done ? "full" : null)) : null
-  }
+  const outcome: EventOutcome | undefined = event.outcomes[key]
+  if (outcome === "full" || outcome === "did") return "full"
+  if (outcome === "minimum") return "minimum"
+  if (outcome === "skipped") return "skipped"
   return null
 }
 
 /** Full and minimum this week, counted apart. Deliberately not a streak. */
-export function routineWeek(state: Workspace, routine: Routine, today: string) {
+export function routineWeek(
+  state: Workspace,
+  event: CalendarEvent,
+  today: string
+) {
   const from = weekStart(today)
   const until = addDays(from, 7)
-  const within = (date: string) => date >= from && date < until
-  const placed = state.routinePlacements.filter(
-    (item) => item.routineId === routine.id && within(item.date)
+  const results = seriesParts(state, event).flatMap((part) =>
+    Object.keys(part.outcomes).flatMap((key) => {
+      const date = occurrenceAt(part, key)?.date ?? key
+      return date >= from && date < until
+        ? [occurrenceOutcome(part, key)]
+        : []
+    })
   )
   return {
-    full:
-      routine.doneDates.filter(within).length +
-      placed.filter((item) => item.result === "full" || item.done).length,
-    minimum:
-      routine.minimumDates.filter(within).length +
-      placed.filter((item) => item.result === "minimum").length,
+    full: results.filter((result) => result === "full").length,
+    minimum: results.filter((result) => result === "minimum").length,
   }
+}
+
+/** Plain words for how an event repeats. */
+export function repeatLabel(days: number[]) {
+  const sorted = [...days].sort().join()
+  if (sorted === "0,1,2,3,4,5,6") return "Every day"
+  if (sorted === "1,2,3,4,5") return "Weekdays"
+  if (sorted === "0,6") return "Weekends"
+  return [...days]
+    .sort()
+    .map((day) => WEEKDAYS[day].label)
+    .join(", ")
 }
 
 const EMOJI_RULES: [RegExp, string][] = [

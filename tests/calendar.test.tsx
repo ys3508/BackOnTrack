@@ -6,21 +6,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import { buildCalendarItems, droppedSlot } from "@/lib/calendar/events"
 import {
-  PALETTE,
-  buildRoutineRule,
   focusMinutesByDay,
   heatLevel,
   formatTimeRange,
   hourRange,
-  parseRoutineRule,
   placePopover,
   rangeStats,
-  ruleFrom,
   routineWeek,
   trayItems,
   weekStart,
 } from "@/lib/calendar/derived"
+import { occurrencesBetween, plannedSessions } from "@/lib/calendar/model"
 import { restoreWorkspace } from "@/lib/workspace/storage"
+import { eventOf } from "./event-fixtures"
 import type { Workspace } from "@/lib/workspace/schemas"
 import { addDays, localToday } from "@/lib/workspace/dates"
 import { workspaceReducer } from "@/lib/workspace/reducer"
@@ -43,7 +41,6 @@ type CalendarProps = {
   datesSet: (info: unknown) => void
   drop: (info: unknown) => void
   eventResize: (info: unknown) => void
-  eventClassNames: (info: unknown) => string[]
   eventContent?: (info: unknown) => React.ReactNode
   select: (info: unknown) => void
   selectable: boolean
@@ -474,11 +471,11 @@ describe("the Not started yet tray", () => {
     act(() =>
       props().drop({ draggedEl, date: local(TODAY, 16), allDay: false })
     )
-    expect(saved().planned[0]).toMatchObject({
+    expect(plannedSessions(saved())[0]).toMatchObject({
       taskId: "late",
       date: TODAY,
       time: "16:00",
-      minutes: 25,
+      minutes: 30,
     })
     expect(saved().tasks[0].deadline).toBe(past)
     await waitFor(() => expect(screen.queryByText("put off 2 days")).toBeNull())
@@ -499,179 +496,181 @@ describe("the Not started yet tray", () => {
 })
 
 describe("routines", () => {
-  const routine = {
+  // Monday, Wednesday, and Friday from a known Monday.
+  const routine = eventOf({
     id: "r",
-    name: "Gym",
+    title: "Gym",
     emoji: "🏋",
-    color: PALETTE[1],
-    duration: 60,
-    rrule: buildRoutineRule(["FR", "MO", "WE"], "07:00", "2026-11-02"),
-    exdates: [],
-    doneDates: [],
-    createdAt: AT,
+    minutes: 60,
+    date: "2026-11-02",
+    repeat: { days: [1, 3, 5] },
+  })
+  // Every day, so that it falls on whatever day the tests run.
+  const daily = eventOf({ id: "r", title: "Gym", emoji: "🏋", minutes: 60 })
+  const seedRoutine = () => {
+    window.localStorage.clear()
+    window.location.hash = "#/calendar"
+    window.localStorage.setItem(
+      STORAGE,
+      JSON.stringify({
+        ...run([{ type: "add-event", event: daily }]),
+        legacyMigrated: true,
+      })
+    )
   }
 
-  it("builds and reads back a rule in local time", () => {
-    expect(routine.rrule).toBe(
-      "DTSTART:20261102T070000\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
-    )
-    expect(parseRoutineRule(routine.rrule)).toEqual({
-      days: ["MO", "WE", "FR"],
-      time: "07:00",
-      startDate: "2026-11-02",
-    })
+  it("falls only on its days, in local time", () => {
+    const found = occurrencesBetween(routine, "2026-11-01", "2026-11-09")
+    expect(found.map((item) => [item.date, item.start, item.end])).toEqual([
+      ["2026-11-02", "07:00", "08:00"],
+      ["2026-11-04", "07:00", "08:00"],
+      ["2026-11-06", "07:00", "08:00"],
+    ])
   })
 
   it("counts this week only, and survives saving and reloading", () => {
-    const monday = weekStart(TODAY)
+    const sunday = weekStart(TODAY)
     const state = run([
-      { type: "add-routine", routine },
-      { type: "toggle-routine-done", routineId: "r", date: addDays(monday, 1) },
+      { type: "add-event", event: daily },
       {
-        type: "toggle-routine-done",
-        routineId: "r",
-        date: addDays(monday, -6),
+        type: "occurrence-outcome",
+        id: "r",
+        key: addDays(sunday, 1),
+        outcome: "full",
       },
       {
-        type: "place-routine",
-        placement: {
+        type: "occurrence-outcome",
+        id: "r",
+        key: addDays(sunday, -6),
+        outcome: "full",
+      },
+      {
+        type: "add-event",
+        event: eventOf({
           id: "x",
-          routineId: "r",
-          date: addDays(monday, 2),
-          time: "07:00",
-          done: true,
-        },
+          title: "Gym",
+          seriesId: "r",
+          date: addDays(sunday, 2),
+          repeat: null,
+          outcomes: { [addDays(sunday, 2)]: "full" },
+        }),
       },
     ])
     const restored = restoreWorkspace(JSON.parse(JSON.stringify(state)))
-    expect(restored.routines).toHaveLength(1)
-    expect(restored.routinePlacements).toHaveLength(1)
-    expect(routineWeek(restored, restored.routines[0], TODAY).full).toBe(2)
+    expect(restored.events).toHaveLength(2)
+    expect(routineWeek(restored, restored.events[0], TODAY).full).toBe(2)
   })
 
-  it("applies All future from one date, and leaves earlier weeks alone", () => {
+  it("applies This and following from one date, and leaves earlier weeks alone", () => {
     const state = run([
-      { type: "add-routine", routine },
-      { type: "toggle-routine-done", routineId: "r", date: "2026-11-04" },
+      { type: "add-event", event: routine },
       {
-        type: "update-routine-future",
+        type: "occurrence-outcome",
         id: "r",
-        fromDate: "2026-11-09",
-        rrule: ruleFrom(routine.rrule, "2026-11-09", "18:00"),
-        duration: 45,
+        key: "2026-11-04",
+        outcome: "full",
       },
-    ])
-    const [updated] = state.routines
-    expect(parseRoutineRule(updated.rrule)).toMatchObject({
-      time: "18:00",
-      startDate: "2026-11-09",
-      days: ["MO", "WE", "FR"],
-    })
-    expect(updated.duration).toBe(45)
-    expect(updated.priorRules).toEqual([
       {
-        rrule: `${routine.rrule};UNTIL=20261108T235959`,
-        duration: 60,
+        type: "edit-event",
+        id: "r",
+        key: "2026-11-09",
+        scope: "following",
+        patch: { start: "18:00", end: "18:45" },
+        newId: "r2",
       },
     ])
-    expect(updated.doneDates).toEqual(["2026-11-04"])
+    const [earlier, later] = state.events
+    expect(later).toMatchObject({
+      id: "r2",
+      seriesId: "r",
+      date: "2026-11-09",
+      start: "18:00",
+      end: "18:45",
+      repeat: { days: [1, 3, 5] },
+    })
+    expect(earlier).toMatchObject({
+      id: "r",
+      seriesId: "r",
+      start: "07:00",
+      end: "08:00",
+      repeat: { days: [1, 3, 5], until: "2026-11-08" },
+      outcomes: { "2026-11-04": "full" },
+    })
     const raw = JSON.parse(JSON.stringify(state))
-    expect(restoreWorkspace(raw).routines[0].priorRules).toHaveLength(1)
+    expect(restoreWorkspace(raw).events).toHaveLength(2)
   })
 
   it("saves This one only as an adjusted occurrence, from the popover", async () => {
-    window.localStorage.clear()
-    window.location.hash = "#/calendar"
-    window.localStorage.setItem(
-      STORAGE,
-      JSON.stringify({
-        ...run([{ type: "add-routine", routine }]),
-        legacyMigrated: true,
-      })
-    )
+    seedRoutine()
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
-    clickBlock({ kind: "routine", refId: "r", taskId: null }, "Gym")
-    await user.click(
-      await screen.findByRole("button", { name: "Change time or length" })
-    )
-    expect(
-      screen.getByRole("button", { name: "This one only" })
-    ).toHaveAttribute("aria-pressed", "true")
-    await user.click(screen.getByRole("button", { name: "45" }))
+    clickBlock({ kind: "routine", refId: "r", taskId: null, key: TODAY }, "Gym")
+    await user.click(await screen.findByRole("button", { name: "Edit" }))
+    await user.click(await screen.findByRole("button", { name: "45" }))
     await user.click(screen.getByRole("button", { name: "Save" }))
-    expect(saved().routines[0].exdates).toEqual([TODAY])
-    expect(saved().routines[0].duration).toBe(60)
-    expect(saved().routinePlacements[0]).toMatchObject({
-      minutes: 45,
-      adjusted: true,
-    })
-    const placed = await screen.findByTestId(
-      `event-placement:${saved().routinePlacements[0].id}`
+    await user.click(
+      await screen.findByRole("button", { name: "This one only" })
     )
-    expect(placed).toHaveTextContent("adjusted")
+    expect(saved().events[0].end).toBe("08:00")
+    expect(saved().events[0].overrides[TODAY]).toEqual({ end: "07:45" })
+    expect(
+      await screen.findByTestId(`event-routine:r:${TODAY}`)
+    ).toHaveTextContent("adjusted")
   })
 
-  it("saves All future from the popover, without an adjusted marker", async () => {
-    window.localStorage.clear()
-    window.location.hash = "#/calendar"
-    window.localStorage.setItem(
-      STORAGE,
-      JSON.stringify({
-        ...run([{ type: "add-routine", routine }]),
-        legacyMigrated: true,
-      })
-    )
+  it("saves All from the popover, without an adjusted marker", async () => {
+    seedRoutine()
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
-    clickBlock({ kind: "routine", refId: "r", taskId: null }, "Gym")
-    await user.click(
-      await screen.findByRole("button", { name: "Change time or length" })
-    )
-    await user.click(screen.getByRole("button", { name: "All future" }))
-    expect(screen.queryByLabelText("Day")).toBeNull()
-    await user.click(screen.getByRole("button", { name: "90" }))
+    clickBlock({ kind: "routine", refId: "r", taskId: null, key: TODAY }, "Gym")
+    await user.click(await screen.findByRole("button", { name: "Edit" }))
+    await user.click(await screen.findByRole("button", { name: "90" }))
     await user.click(screen.getByRole("button", { name: "Save" }))
-    expect(saved().routines[0].duration).toBe(90)
-    expect(saved().routinePlacements).toEqual([])
-    expect(parseRoutineRule(saved().routines[0].rrule).startDate).toBe(TODAY)
+    await user.click(await screen.findByRole("button", { name: "All" }))
+    expect(saved().events).toHaveLength(1)
+    expect(saved().events[0]).toMatchObject({ end: "08:30", overrides: {} })
+    expect(
+      await screen.findByTestId(`event-routine:r:${TODAY}`)
+    ).not.toHaveTextContent("adjusted")
   })
 
   it("moves one occurrence and leaves the rest", () => {
     const state = run([
-      { type: "add-routine", routine },
-      { type: "toggle-routine-done", routineId: "r", date: "2026-11-09" },
+      { type: "add-event", event: routine },
       {
-        type: "move-routine-occurrence",
-        routineId: "r",
-        fromDate: "2026-11-09",
-        placement: {
-          id: "x",
-          routineId: "r",
-          date: "2026-11-10",
-          time: "18:00",
-          done: true,
-        },
+        type: "occurrence-outcome",
+        id: "r",
+        key: "2026-11-09",
+        outcome: "full",
+      },
+      {
+        type: "edit-event",
+        id: "r",
+        key: "2026-11-09",
+        scope: "one",
+        patch: { date: "2026-11-10", start: "18:00", end: "19:00" },
+        newId: "unused",
       },
     ])
-    expect(state.routines[0].exdates).toEqual(["2026-11-09"])
-    expect(state.routines[0].doneDates).toEqual([])
-    expect(state.routines[0].rrule).toBe(routine.rrule)
-    expect(state.routinePlacements[0]).toMatchObject({
-      date: "2026-11-10",
-      done: true,
-    })
+    const [event] = state.events
+    expect(event.repeat).toEqual(routine.repeat)
+    expect(event.start).toBe("07:00")
+    const found = occurrencesBetween(event, "2026-11-09", "2026-11-12")
+    expect(
+      found.map((item) => [item.date, item.start, item.outcome, item.adjusted])
+    ).toEqual([
+      ["2026-11-10", "18:00", "full", true],
+      ["2026-11-11", "07:00", null, false],
+    ])
   })
 
   it("loads older data, which has no routines", () => {
     const raw = JSON.parse(JSON.stringify(EMPTY_WORKSPACE))
-    delete raw.routines
-    delete raw.routinePlacements
+    delete raw.events
     const restored = restoreWorkspace({ ...raw, version: 2 })
-    expect(restored.routines).toEqual([])
-    expect(restored.routinePlacements).toEqual([])
+    expect(restored.events).toEqual([])
   })
 
   it("creates one from the sidebar, and it reaches the calendar", async () => {
@@ -680,7 +679,8 @@ describe("routines", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await screen.findByRole("button", { name: "New routine" }))
-    await user.type(screen.getByLabelText("Name"), "Gym")
+    await user.type(screen.getByLabelText("Title"), "Gym")
+    await user.selectOptions(screen.getByLabelText("Repeat"), "custom")
     // Today's weekday starts selected, so this sets exactly the three.
     for (const day of ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) {
       const chip = screen.getByRole("button", { name: day })
@@ -689,66 +689,59 @@ describe("routines", () => {
         await user.click(chip)
       }
     }
-    await user.click(screen.getByRole("button", { name: /^More options/ }))
     await user.click(screen.getByRole("button", { name: "60" }))
-    await user.click(screen.getByRole("button", { name: "Add routine" }))
-    const [saved0] = saved().routines
-    expect(saved0.name).toBe("Gym")
-    expect(saved0.rrule).toMatch(/BYDAY=MO,WE,FR/)
-    expect(saved0.duration).toBe(60)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    const [saved0] = saved().events
+    expect(saved0.title).toBe("Gym")
+    expect([...saved0.repeat.days].sort()).toEqual([1, 3, 5])
+    expect(saved0).toMatchObject({ start: "07:00", end: "08:00" })
+    const nextWeek = addDays(weekStart(TODAY), 7)
+    showView("timeGridWeek", nextWeek, addDays(nextWeek, 7))
     await waitFor(() =>
       expect(
-        props().events.some((event) => event.id === `routine:${saved0.id}:0`)
-      ).toBe(true)
+        props().events.filter((event) =>
+          event.id.startsWith(`routine:${saved0.id}:`)
+        )
+      ).toHaveLength(3)
     )
     expect(document.body.textContent).not.toMatch(/streak/i)
   })
 
   it("fills in when done from the popover, and shows at most a weekly count", async () => {
-    window.localStorage.clear()
-    window.location.hash = "#/calendar"
-    window.localStorage.setItem(
-      STORAGE,
-      JSON.stringify({
-        ...run([{ type: "add-routine", routine }]),
-        legacyMigrated: true,
-      })
-    )
+    seedRoutine()
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
-    clickBlock({ kind: "routine", refId: "r", taskId: null }, "Gym")
+    clickBlock({ kind: "routine", refId: "r", taskId: null, key: TODAY }, "Gym")
     await user.click(await screen.findByRole("button", { name: "● Full" }))
-    expect(saved().routines[0].doneDates).toEqual([TODAY])
+    expect(saved().events[0].outcomes).toEqual({ [TODAY]: "full" })
     expect(await screen.findByText("this week: ● 1 time")).toBeTruthy()
     expect(
-      props().eventClassNames({
-        event: {
-          start: local(TODAY, 7),
-          end: local(TODAY, 8),
-          extendedProps: { kind: "routine", refId: "r" },
-        },
-      })
-    ).toEqual(["bot-routine-done"])
+      props().events.find((event) => event.id === `routine:r:${TODAY}`)!
+        .classNames
+    ).toEqual(["bot-done"])
   })
 
-  it("adds one to the chosen day without dragging", async () => {
-    window.localStorage.clear()
-    window.location.hash = "#/calendar"
-    window.localStorage.setItem(
-      STORAGE,
-      JSON.stringify({
-        ...run([{ type: "add-routine", routine }]),
-        legacyMigrated: true,
+  it("has no Add link on a card, and dragging one in adds an extra that still counts", async () => {
+    seedRoutine()
+    render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Calendar" })
+    expect(screen.queryByRole("button", { name: /^Add Gym to/ })).toBeNull()
+    const tomorrow = addDays(TODAY, 1)
+    act(() =>
+      props().drop({
+        draggedEl: document.querySelector('[data-kind="routine"]'),
+        date: local(tomorrow, 16),
+        allDay: false,
       })
     )
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await screen.findByRole("button", { name: /^Add Gym to/ }))
-    expect(saved().routinePlacements[0]).toMatchObject({
-      routineId: "r",
-      date: TODAY,
-      time: "07:00",
+    expect(saved().events[1]).toMatchObject({
+      title: "Gym",
+      seriesId: "r",
+      date: tomorrow,
+      start: "16:00",
+      end: "17:00",
+      repeat: null,
     })
   })
 })
@@ -821,10 +814,11 @@ describe("mini dashboard", () => {
     )
   })
 
-  it("adds Routine to the legend", async () => {
+  it("names statuses in the legend, not kinds of thing", async () => {
     render(<WorkspaceApp />)
     const key = await screen.findByRole("list", { name: "Calendar key" })
-    expect(within(key).getByText("Routine")).toBeTruthy()
+    expect(within(key).getByText("Minimum")).toBeTruthy()
+    expect(within(key).queryByText("Routine")).toBeNull()
   })
 
   it("shows seven bars in the week view, and no dashboard in month", async () => {
@@ -880,7 +874,7 @@ describe("calendar screen", () => {
     await screen.findByRole("heading", { name: "Calendar" })
     clickBlock({ kind: "planned", refId: "p", taskId: "a" }, "Essay")
     const popover = await screen.findByRole("dialog", { name: "Essay" })
-    for (const name of ["Start focus", "Done", "Change time", "Open"]) {
+    for (const name of ["Start focus", "Done", "Edit", "Open"]) {
       expect(within(popover).getByRole("button", { name })).toBeTruthy()
     }
     await user.click(within(popover).getByRole("button", { name: "Open" }))
@@ -893,7 +887,7 @@ describe("calendar screen", () => {
     await screen.findByRole("heading", { name: "Calendar" })
     clickBlock({ kind: "planned", refId: "p", taskId: "a" }, "Essay")
     await user.click(await screen.findByRole("button", { name: "Done" }))
-    expect(saved().planned[0].done).toBe(true)
+    expect(plannedSessions(saved())[0].done).toBe(true)
     expect(saved().tasks[0].status).toBe("not-started")
   })
 
@@ -902,7 +896,7 @@ describe("calendar screen", () => {
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
     clickBlock({ kind: "planned", refId: "p", taskId: "a" }, "Essay")
-    await user.click(await screen.findByRole("button", { name: "Change time" }))
+    await user.click(await screen.findByRole("button", { name: "Edit" }))
     const time = screen.getByLabelText("Start")
     await user.clear(time)
     await user.type(time, "14:15")
@@ -911,7 +905,7 @@ describe("calendar screen", () => {
     await user.clear(minutes)
     await user.type(minutes, "50")
     await user.click(screen.getByRole("button", { name: "Save" }))
-    expect(saved().planned[0]).toMatchObject({ time: "14:15", minutes: 50 })
+    expect(plannedSessions(saved())[0]).toMatchObject({ time: "14:15", minutes: 50 })
   })
 
   it("starts focus for the session's own length", async () => {
@@ -937,8 +931,8 @@ describe("calendar screen", () => {
         },
       })
     )
-    expect(saved().planned[0].minutes).toBe(60)
-    expect(saved().planned[0].time).toBe("09:30")
+    expect(plannedSessions(saved())[0].minutes).toBe(60)
+    expect(plannedSessions(saved())[0].time).toBe("09:30")
   })
 
   it("moves planned work without touching the deadline", async () => {
@@ -947,7 +941,7 @@ describe("calendar screen", () => {
     const date = addDays(TODAY, 5)
     const revert = drop("planned", "p", date)
     expect(revert).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(saved().planned[0].date).toBe(date))
+    await vi.waitFor(() => expect(plannedSessions(saved())[0].date).toBe(date))
     expect(saved().tasks[0].deadline).toBe(addDays(TODAY, 3))
   })
 
@@ -992,11 +986,11 @@ describe("calendar screen", () => {
         name: /instead/,
       })
     )
-    expect(saved().planned).toHaveLength(2)
+    expect(plannedSessions(saved())).toHaveLength(2)
     expect(saved().tasks[0].deadline).toBe(addDays(TODAY, 3))
   })
 
-  it("creates a task due on a clicked month day, typing inline", async () => {
+  it("opens the same editor from a clicked month day, at a free hour", async () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
@@ -1004,34 +998,37 @@ describe("calendar screen", () => {
     const date = addDays(TODAY, 4)
     clickSlot(date, true)
     await user.type(
-      await screen.findByRole("textbox", { name: /^New task due/ }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "Dentist form{Enter}"
     )
-    expect(saved().tasks.at(-1)).toMatchObject({
-      title: "Dentist form",
-      deadline: date,
+    const task = saved().tasks.at(-1)
+    expect(task).toMatchObject({ title: "Dentist form", deadline: null })
+    expect(plannedSessions(saved()).at(-1)).toMatchObject({
+      taskId: task.id,
+      date,
+      time: "09:00",
+      minutes: 30,
     })
-    expect(saved().planned).toHaveLength(1)
-    expect(screen.queryByRole("dialog")).toBeNull()
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   })
 
-  it("creates a 25-minute session on a clicked slot", async () => {
+  it("creates a 30-minute session on a clicked slot", async () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:30:00`)
     await user.type(
-      await screen.findByRole("combobox", { name: "Task for this time" }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "Call the bank{Enter}"
     )
     const task = saved().tasks.at(-1)
     expect(task.title).toBe("Call the bank")
     expect(task.deadline).toBeNull()
-    expect(saved().planned.at(-1)).toMatchObject({
+    expect(plannedSessions(saved()).at(-1)).toMatchObject({
       taskId: task.id,
       date: TODAY,
       time: "14:30",
-      minutes: 25,
+      minutes: 30,
     })
   })
 
@@ -1041,11 +1038,11 @@ describe("calendar screen", () => {
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:30:00`)
     await user.type(
-      await screen.findByRole("combobox", { name: "Task for this time" }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "essay{Enter}"
     )
     expect(saved().tasks).toHaveLength(1)
-    expect(saved().planned.at(-1).taskId).toBe("a")
+    expect(plannedSessions(saved()).at(-1)!.taskId).toBe("a")
   })
 
   it("cancels inline creation with Escape", async () => {
@@ -1054,7 +1051,7 @@ describe("calendar screen", () => {
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:30:00`)
     await user.type(
-      await screen.findByRole("combobox", { name: "Task for this time" }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "Nope{Escape}"
     )
     expect(screen.queryByRole("dialog")).toBeNull()
@@ -1081,18 +1078,18 @@ describe("calendar screen", () => {
     act(() =>
       props().select({ start: local(TODAY, 14), end: local(TODAY, 15, 15) })
     )
-    expect(await screen.findByTestId("session-range")).toHaveTextContent(
-      "2:00 – 3:15 PM"
+    expect(await screen.findByTestId("event-end")).toHaveTextContent(
+      "Ends 3:15 PM"
     )
     await user.type(
-      await screen.findByRole("combobox", { name: "Task for this time" }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "Long one{Enter}"
     )
-    expect(saved().planned.at(-1)).toMatchObject({ time: "14:00", minutes: 75 })
+    expect(plannedSessions(saved()).at(-1)).toMatchObject({ time: "14:00", minutes: 75 })
     expect(saved().settings.lastSessionMinutes).toBe(75)
   })
 
-  it("uses the last length on a single click, or 25 before there is one", async () => {
+  it("uses the last length on a single click", async () => {
     const user = userEvent.setup()
     window.localStorage.setItem(
       STORAGE,
@@ -1105,14 +1102,14 @@ describe("calendar screen", () => {
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:30:00`)
-    expect(await screen.findByTestId("session-range")).toHaveTextContent(
-      "2:30 – 3:30 PM"
+    expect(await screen.findByTestId("event-end")).toHaveTextContent(
+      "Ends 3:30 PM"
     )
     await user.type(
-      await screen.findByRole("combobox", { name: "Task for this time" }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "Quick{Enter}"
     )
-    expect(saved().planned.at(-1).minutes).toBe(60)
+    expect(plannedSessions(saved()).at(-1)!.minutes).toBe(60)
   })
 
   it("shows the end time as a duration chip is chosen, and previews the block", async () => {
@@ -1120,16 +1117,11 @@ describe("calendar screen", () => {
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:00:00`)
-    await user.click(
-      await screen.findByRole("button", { name: /^Length and first step/ })
-    )
     await user.click(await screen.findByRole("button", { name: "90" }))
-    expect(screen.getByTestId("session-range")).toHaveTextContent(
-      "2:00 – 3:30 PM"
-    )
+    expect(screen.getByTestId("event-end")).toHaveTextContent("Ends 3:30 PM")
     expect(screen.getByTestId("event-pending")).toBeTruthy()
     await user.type(
-      await screen.findByRole("combobox", { name: "Task for this time" }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "Chosen{Enter}"
     )
     expect(saved().settings.lastSessionMinutes).toBe(90)
@@ -1157,13 +1149,10 @@ describe("calendar screen", () => {
     render(<WorkspaceApp />)
     await user.click(await screen.findByRole("button", { name: /^Add to/ }))
     const box = await screen.findByRole("combobox", {
-      name: "Task for this time",
+      name: "Title",
     })
     await user.type(box, "estim")
     await user.click(screen.getByRole("option", { name: "Estimated" }))
-    await user.click(
-      screen.getByRole("button", { name: /^Length and first step/ })
-    )
     expect(screen.getByRole("button", { name: "60" })).toHaveAttribute(
       "aria-pressed",
       "true"
@@ -1176,38 +1165,36 @@ describe("calendar screen", () => {
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:00:00`)
     const box = await screen.findByRole("combobox", {
-      name: "Task for this time",
+      name: "Title",
     })
-    // Length and first step are there when wanted, not in the way.
-    expect(screen.queryByLabelText(/What will you do first/)).toBeNull()
+    // Link and notes are there when wanted, not in the way.
+    expect(screen.queryByLabelText("Notes")).toBeNull()
     await user.type(box, "Report{Enter}")
     expect(saved().tasks.at(-1).title).toBe("Report")
-    expect(saved().planned.at(-1)).toMatchObject({
+    expect(plannedSessions(saved()).at(-1)).toMatchObject({
       date: TODAY,
       time: "14:00",
     })
-    expect(screen.queryByRole("dialog", { name: "New session" })).toBeNull()
+    expect(screen.queryByRole("dialog", { name: "New event" })).toBeNull()
   })
 
-  it("takes an optional first step when creating a session", async () => {
+  it("keeps a link and notes under More", async () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:00:00`)
     await user.type(
-      await screen.findByRole("combobox", { name: "Task for this time" }),
+      await screen.findByRole("combobox", { name: "Title" }),
       "Report"
     )
-    await user.click(
-      screen.getByRole("button", { name: /^Length and first step/ })
-    )
-    await user.type(
-      screen.getByLabelText("What will you do first? (optional)"),
-      "Open the template{Enter}"
-    )
-    expect(saved().tasks.at(-1)).toMatchObject({
+    await user.click(screen.getByRole("button", { name: "More" }))
+    await user.type(screen.getByLabelText("Link"), "example.com")
+    await user.type(screen.getByLabelText("Notes"), "Open the template")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    expect(saved().events.at(-1)).toMatchObject({
       title: "Report",
-      firstStep: "Open the template",
+      link: "example.com",
+      notes: "Open the template",
     })
   })
 
@@ -1216,7 +1203,7 @@ describe("calendar screen", () => {
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:00:00`)
     const box = await screen.findByRole("combobox", {
-      name: "Task for this time",
+      name: "Title",
     })
     await waitFor(() => expect(box).toHaveFocus())
   })
@@ -1227,7 +1214,7 @@ describe("calendar screen", () => {
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:00:00`)
     const box = await screen.findByRole("combobox", {
-      name: "Task for this time",
+      name: "Title",
     })
     await user.type(box, "ess")
     expect(screen.getByRole("option", { name: "Essay" })).toBeTruthy()
@@ -1237,7 +1224,7 @@ describe("calendar screen", () => {
     expect(screen.queryByRole("listbox")).toBeNull()
     await user.keyboard("{Enter}")
     expect(saved().tasks).toHaveLength(1)
-    expect(saved().planned.at(-1)).toMatchObject({ taskId: "a", time: "14:00" })
+    expect(plannedSessions(saved()).at(-1)).toMatchObject({ taskId: "a", time: "14:00" })
   })
 
   it("uses one time format, matching the blocks", async () => {
@@ -1321,7 +1308,7 @@ describe("calendar screen", () => {
         actualSeconds: 1800,
         outcome: "completed",
       })
-      expect(saved().planned[0]).toMatchObject({ outcome: "did", done: true })
+      expect(plannedSessions(saved())[0]).toMatchObject({ outcome: "did", done: true })
       expect(screen.queryByTestId("event-planned:e")).toBeNull()
       expect(screen.getByTestId(`event-focused:${record.id}`)).toBeTruthy()
       expect(trayItems(saved(), TODAY)).toEqual([])
@@ -1342,7 +1329,7 @@ describe("calendar screen", () => {
         await screen.findByRole("button", { name: "I didn’t actually do this" })
       )
       expect(saved().focusSessions).toEqual([])
-      expect(saved().planned[0]).toMatchObject({ outcome: null, done: false })
+      expect(plannedSessions(saved())[0]).toMatchObject({ outcome: null, done: false })
     })
 
     it("sends the task to Not started yet on Didn't, with no focus time", async () => {
@@ -1353,7 +1340,7 @@ describe("calendar screen", () => {
         await screen.findByRole("button", { name: "Didn’t: Bank call" })
       )
       expect(saved().focusSessions).toEqual([])
-      expect(saved().planned[0].outcome).toBe("didnt")
+      expect(plannedSessions(saved())[0].outcome).toBe("didnt")
       expect(await screen.findByText("put off 1 day")).toBeTruthy()
       expect(
         screen.queryByRole("button", { name: "Did it: Bank call" })
@@ -1410,7 +1397,7 @@ describe("calendar screen", () => {
         ],
         ended
       )
-      expect(state.planned[0]).toMatchObject({ outcome: "did", done: true })
+      expect(plannedSessions(state)[0]).toMatchObject({ outcome: "did", done: true })
       expect(state.focusSessions[0].reported).toBe(false)
       expect(
         buildCalendarItems(state, TODAY).some((i) => i.id === "planned:e")
@@ -1440,7 +1427,7 @@ describe("calendar screen", () => {
         ],
         ended
       )
-      expect(state.planned[0].outcome).toBeNull()
+      expect(plannedSessions(state)[0].outcome).toBeNull()
     })
   })
 
@@ -1524,7 +1511,7 @@ describe("calendar screen", () => {
     const dialog = await screen.findByRole("dialog")
     await user.click(within(dialog).getByRole("button", { name: "Tomorrow" }))
     await user.click(within(dialog).getByRole("button", { name: "Plan it" }))
-    expect(saved().planned[0].date).toBe(addDays(TODAY, 1))
+    expect(plannedSessions(saved())[0].date).toBe(addDays(TODAY, 1))
     expect(saved().tasks[0].deadline).toBe(past)
   })
 
@@ -1565,7 +1552,7 @@ describe("calendar screen", () => {
     const input = await screen.findByLabelText(/Move this work session/)
     const { fireEvent } = await import("@testing-library/react")
     fireEvent.change(input, { target: { value: addDays(TODAY, 6) } })
-    expect(saved().planned[0].date).toBe(addDays(TODAY, 6))
+    expect(plannedSessions(saved())[0].date).toBe(addDays(TODAY, 6))
     expect(saved().tasks[0].deadline).toBe(addDays(TODAY, 3))
   })
 })

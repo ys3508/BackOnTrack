@@ -1,3 +1,4 @@
+import { plannedSessions } from "@/lib/calendar/model"
 import { addDays, daysBetween } from "@/lib/workspace/dates"
 import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type { Task, TaskEvent, Workspace } from "@/lib/workspace/schemas"
@@ -90,7 +91,7 @@ export function priorityScore(task: Task, state: Workspace, today: string) {
     else if (days <= 2) value += 30
     else if (days <= 7) value += 15
   }
-  const plannedToday = state.planned.some(
+  const plannedToday = plannedSessions(state).some(
     (item) => item.taskId === task.id && item.date === today && !item.done
   )
   if (plannedToday) value += 40

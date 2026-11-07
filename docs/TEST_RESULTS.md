@@ -445,3 +445,20 @@ Run in the development server in Demo Mode, using saved data built by the real r
 Not tested: a person dragging by hand, reduced motion with the setting actually on (the rules are in place, but the browser here can't turn it on), touch dragging, screen readers, GPU smoothness on a real display, Live AI, and real users. Color contrast was calculated for the task palette, not measured on screen, and text over the orbs was only judged by eye.
 
 The earlier freeze report was not reproduced. The main thread ran at about 60 frames per second with no long tasks, in an earlier version.
+
+## Calendar v2, Phase A
+
+Automated: 758 tests pass. Run in the development server in the built-in browser with real clicks and drags, on data saved in the old format, at 1024 x 768 and 375 x 812.
+
+| Check | Result |
+| --- | --- |
+| Click 10:00, save "Read ch.3", 45 min, blue | Editor beside the slot, title focused. Blue dashed block, 10:00 to 10:45 |
+| "Gym", weekdays, 7:00, 30 min, green, minimum "shoes on" | Monday to Friday in Week, on Routines, and in the sidebar, green in each |
+| Drag Wednesday's Gym to 8:00, "This one only" | Only Wednesday moves, marked "adjusted", with no split |
+| Change a routine's colour | Calendar, Today, and the card all update with no reload |
+| Load old-format data, then reload | All records appear, a backup key exists, a damaged record is kept in `unmigrated` |
+| Resize a repeating block by its grip, drag-select, Month click, Esc | Each works. Phone width opens a bottom sheet |
+
+The calendar sidebar being empty with a routine on the Routines page was not reproduced on the code before this change. Both now read `routinesOf`, and a test covers it.
+
+Not tested: touch dragging, a person dragging by hand, screen readers, real data from a long-used browser.

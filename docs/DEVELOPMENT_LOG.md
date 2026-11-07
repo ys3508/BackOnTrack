@@ -356,6 +356,21 @@ The app's look follows reference images supplied by the student: grainy, soft gr
 | The countdown is light drawing inward, with a fine line running out around it | Time left can be felt at a glance |
 | Today's timeline is drawn by the app, and Calendar keeps FullCalendar | Both read the same `buildCalendarItems` facts, and no scheduling logic changed |
 
+## Calendar v2, Phase A: one event model
+
+Routines, routine placements, and planned blocks are now one stored record, `CalendarEvent`, in `state.events`. Everything else reads it through `lib/calendar/model.ts`, and `plannedSessions()` gives the rest of the app the block shape it already reasoned about.
+
+| Decision | Reason |
+| --- | --- |
+| Occurrences are expanded per visible range, not by FullCalendar's rrule plugin | Each one can be moved, marked, and coloured by itself, and a colour change redraws in place |
+| The spec's Event gained `outcomes`, `seriesId`, `emoji`, `label`, `window`, `createdAt`, and override `date`, `title`, `color` | Needed to keep existing behaviour: per-day results, "This and following" splits, and moving an occurrence to another day |
+| A new title makes a task unless the event repeats | Today, Focus, and Recovery all work from tasks, but a routine isn't something to finish |
+| Migration runs in `restoreWorkspace`, keeps ids, writes `backontrack.workspace.pre-events-backup` once, and sets unreadable records aside in `unmigrated` | Timers, focus sessions, and reminders keep pointing at the right thing, and nothing is dropped |
+
+The "no editor opens" bug was CSS: `.bot-card` sets `position: relative` outside any layer, which beat Tailwind's `fixed`, so every floating panel and dialog rendered in normal flow, below the page. `.bot-card.fixed` now restores it.
+
+Removed from the calendar flow on purpose: the first-step field and the Morning, Afternoon, and Evening choice when editing a block (`RescheduleForm` still offers parts of the day from recovery), and creating a task due that day by clicking in Month.
+
 ## Known limitations
 
 - **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.

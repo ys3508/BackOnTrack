@@ -1,5 +1,6 @@
 "use client"
 
+import { plannedSessions } from "@/lib/calendar/model"
 import { useMemo, useState } from "react"
 import { CalendarPlus } from "lucide-react"
 
@@ -32,6 +33,7 @@ export function PlanRemaining({ taskId }: { taskId?: string }) {
       task?.subtasks.filter((sub) => !sub.done).map((sub) => sub.title) ?? [],
     [task]
   )
+  const { events } = state
   const plan = useMemo(
     () =>
       planRemaining({
@@ -40,9 +42,11 @@ export function PlanRemaining({ taskId }: { taskId?: string }) {
         deadline: task?.deadline ?? null,
         minutesPerDay,
         skipWeekends,
-        existing: state.planned.filter((item) => item.taskId === task?.id),
+        existing: plannedSessions({ events }).filter(
+          (item) => item.taskId === task?.id
+        ),
       }),
-    [openSteps, today, task, minutesPerDay, skipWeekends, state.planned]
+    [openSteps, today, task, minutesPerDay, skipWeekends, events]
   )
 
   if (!task || !openSteps.length) {

@@ -255,6 +255,11 @@ summary:focus-visible {
   box-shadow: var(--shadow-md);
 }
 
+/* Not in a layer, so without this it would beat the utility on a panel or dialog. */
+.bot-card.fixed {
+  position: fixed;
+}
+
 .bot-tile {
   display: flex;
   min-height: 3.5rem;
@@ -601,12 +606,12 @@ button.bot-tile:hover .bot-tile-glyph {
 }
 
 .bot-outcome[data-outcome="full"][aria-pressed="true"] {
-  background: var(--routine, var(--primary));
+  background: var(--event-color, var(--primary));
   color: white;
 }
 
 .bot-outcome[data-outcome="minimum"][aria-pressed="true"] {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--routine, var(--primary)) 38%, white) 50%, white 50%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--event-color, var(--primary)) 38%, white) 50%, white 50%);
 }
 
 .bot-outcome[data-outcome="skipped"][aria-pressed="true"] {
@@ -642,7 +647,7 @@ button.bot-tile:hover .bot-tile-glyph {
   left: 3.75rem;
   right: 0;
   border-radius: 1.25rem;
-  background: linear-gradient(90deg, rgb(155 190 235 / 0.28), rgb(155 190 235 / 0.06));
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 4px, #f6f5f2 4px 8px);
   color: var(--muted-foreground);
 }
 
@@ -650,7 +655,6 @@ button.bot-tile:hover .bot-tile-glyph {
   position: absolute;
   overflow: hidden;
   border-radius: 1.125rem;
-  background: linear-gradient(115deg, var(--task-soft, var(--brand-soft)), var(--task-wash, var(--card)));
   padding: 0.3125rem 0.75rem;
   color: var(--ink);
   transition:
@@ -698,46 +702,6 @@ button.bot-tile:hover .bot-tile-glyph {
   min-height: 1.75rem;
   min-width: 1.75rem;
   border-radius: 999px;
-}
-
-.bot-tl-block[data-state="focused"] {
-  background: var(--task-strong, var(--primary));
-}
-
-.bot-tl-block[data-state="focused"] .bot-block {
-  color: white;
-}
-
-.bot-tl-block[data-state="routine"] {
-  background: linear-gradient(115deg, color-mix(in srgb, var(--routine) 26%, white), color-mix(in srgb, var(--routine) 7%, white));
-}
-
-.bot-tl-block[data-state="routine-full"] {
-  background: var(--routine);
-}
-
-.bot-tl-block[data-state="routine-full"] .bot-block {
-  color: white;
-}
-
-.bot-tl-block[data-state="routine-minimum"] {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--routine) 42%, white) 50%, color-mix(in srgb, var(--routine) 8%, white) 50%);
-}
-
-.bot-tl-block[data-state="missed"],
-.bot-tl-block[data-state="skipped"] {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--input);
-}
-
-.bot-tl-block[data-state="missed"] .bot-block,
-.bot-tl-block[data-state="skipped"] .bot-block {
-  color: var(--muted-foreground);
-}
-
-.bot-tl-block[data-state="done"] {
-  background: var(--state-done);
-  text-decoration: line-through;
 }
 
 .bot-tl-now {
@@ -790,7 +754,7 @@ button.bot-tile:hover .bot-tile-glyph {
 
 .bot-any-chip[data-kind="routine"],
 .bot-any-chip[data-kind="routine-placement"] {
-  background: color-mix(in srgb, var(--routine) 22%, white);
+  background: color-mix(in srgb, var(--event-color) 22%, white);
 }
 
 /* ---------- Focus: nothing in the room but the light and the time ---------- */
@@ -948,7 +912,10 @@ html[data-focusing] [data-app-shell] {
   align-items: center;
   border: 1px solid rgb(255 255 255 / 0.8);
   border-radius: 999px;
-  background: rgb(255 253 249 / 0.95);
+  /* Translucent, so anything passing under it stays readable through the blur. */
+  background: rgb(255 253 249 / 0.62);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
   box-shadow: var(--shadow-md);
   padding: 0.25rem;
 }
@@ -1110,7 +1077,7 @@ html[data-focusing] [data-app-shell] {
 
 .fc .bot-deadline {
   background: var(--butter);
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
   border-radius: 999px;
   padding: 1px 10px;
   font-size: 0.75rem;
@@ -1127,48 +1094,130 @@ html[data-focusing] [data-app-shell] {
   text-decoration: line-through;
 }
 
-/* Planned is a soft wash with a hairline. Focus that really happened glows solid. */
-.fc .bot-planned {
-  background: linear-gradient(115deg, var(--task-soft, var(--brand-soft)), var(--task-wash, var(--card)));
-  border: 1px dashed color-mix(in srgb, var(--task-strong, var(--primary)) 50%, transparent);
+/*
+ * One look per status, wherever a block is drawn. --event-color is the item's
+ * own colour and never changes with status; the style says how it went.
+ */
+.fc .bot-planned,
+.fc .bot-missed,
+.bot-tl-block[data-state="planned"],
+.bot-tl-block[data-state="missed"],
+.bot-any-chip[data-state="planned"],
+.bot-legend-swatch.bot-planned {
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 9%, white);
+  border: 1.5px dashed var(--event-color, var(--primary));
 }
 
-.fc .bot-planned-done {
-  background: var(--state-done);
-  border: 1px dashed var(--input);
-  text-decoration: line-through;
+.fc .bot-missed,
+.bot-tl-block[data-state="missed"] {
+  border-color: color-mix(in srgb, var(--event-color, var(--primary)) 45%, white);
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 4%, white);
 }
 
-.fc .bot-focused {
-  background: var(--task-strong, var(--primary));
-  border: none;
+.fc .bot-done,
+.fc .bot-focused,
+.bot-tl-block[data-state="done"],
+.bot-tl-block[data-state="focused"],
+.bot-any-chip[data-state="done"],
+.bot-legend-swatch.bot-done {
+  background: var(--event-color, var(--primary));
+  border: 1.5px solid var(--event-color, var(--primary));
 }
 
-.fc .bot-focused .bot-block {
+.fc .bot-done .bot-block,
+.fc .bot-focused .bot-block,
+.fc .bot-done .bot-block-title,
+.fc .bot-focused .bot-block-title,
+.fc .bot-done .bot-block-time,
+.fc .bot-focused .bot-block-time,
+.bot-tl-block[data-state="done"] .bot-block,
+.bot-tl-block[data-state="focused"] .bot-block,
+.bot-any-chip[data-state="done"] .bot-block {
   color: white;
 }
 
-.fc .bot-routine,
-.bot-routine-swatch {
-  background: color-mix(in srgb, var(--routine) 20%, white);
-  border: none;
+.fc .bot-minimum,
+.bot-tl-block[data-state="minimum"],
+.bot-any-chip[data-state="minimum"],
+.bot-legend-swatch.bot-minimum {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--event-color, var(--primary)) 45%, white) 50%,
+    color-mix(in srgb, var(--event-color, var(--primary)) 7%, white) 50%
+  );
+  border: 1.5px solid var(--event-color, var(--primary));
 }
 
-.fc .bot-routine-done {
-  background: var(--routine);
+.fc .bot-skipped,
+.bot-tl-block[data-state="skipped"],
+.bot-any-chip[data-state="skipped"],
+.bot-legend-swatch.bot-skipped {
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 5%, white);
+  border: 1.5px solid color-mix(in srgb, var(--event-color, var(--primary)) 18%, white);
+  opacity: 0.55;
 }
 
-.fc .bot-routine-done .bot-block {
-  color: white;
-}
-
-.fc .bot-missed {
-  background: transparent;
-  border: 1px dashed var(--input);
-}
-
+.fc .bot-skipped .bot-block-title,
 .fc .bot-missed .bot-block-title,
-.fc .bot-missed .bot-block-time {
+.fc .bot-missed .bot-block-time,
+.bot-tl-block[data-state="missed"] .bot-block,
+.bot-tl-block[data-state="skipped"] .bot-block {
+  color: var(--muted-foreground);
+}
+
+/* The bottom grip for changing a block's length. */
+.fc .fc-timegrid-event .fc-event-resizer-end {
+  display: block;
+  bottom: 0;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.fc .fc-timegrid-event .fc-event-resizer-end::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 1.25rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--event-color, var(--primary));
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 160ms ease;
+}
+
+.fc .fc-timegrid-event:hover .fc-event-resizer-end::after {
+  opacity: 0.7;
+}
+
+.bot-legend-swatch {
+  --event-color: #8b8780;
+  display: inline-block;
+  width: 1.25rem;
+  height: 0.875rem;
+  border-radius: 0.25rem;
+}
+
+.bot-legend-swatch.bot-buffer-block {
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 3px, #f6f5f2 3px 6px);
+  border: 1px solid #dad7d1;
+}
+
+.bot-legend-swatch.bot-deadline {
+  background: #eeece8;
+  border: 1px solid #8b8780;
+  border-radius: 999px;
+}
+
+.fc .bot-buffer-block,
+.bot-tl-block[data-state="buffer"] {
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 4px, #f6f5f2 4px 8px);
+  border: 1px solid #dad7d1;
+}
+
+.fc .bot-buffer-block .bot-block-title,
+.bot-tl-block[data-state="buffer"] .bot-block {
   color: var(--muted-foreground);
 }
 
@@ -1295,6 +1344,7 @@ html[data-focusing] [data-app-shell] {
 }
 
 .fc .fc-timegrid-event .fc-event-resizer-end {
+  display: block;
   bottom: 0;
   height: 9px;
   cursor: ns-resize;
@@ -1313,9 +1363,8 @@ html[data-focusing] [data-app-shell] {
   opacity: 0.35;
 }
 
-.fc .bot-buffer,
-.bot-buffer-swatch {
-  background: linear-gradient(90deg, rgb(155 190 235 / 0.34), rgb(155 190 235 / 0.08));
+.fc .bot-buffer {
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 4px, #f6f5f2 4px 8px);
   opacity: 1;
 }
 
@@ -1324,21 +1373,6 @@ html[data-focusing] [data-app-shell] {
   padding: 1px 4px;
   font-size: 0.6875rem;
   color: var(--muted-foreground);
-}
-
-.fc .bot-routine-minimum {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--routine) 42%, white) 50%, color-mix(in srgb, var(--routine) 8%, white) 50%);
-  border: none;
-}
-
-.fc .bot-routine-skipped {
-  background: transparent;
-  border: 1px dotted var(--input);
-}
-
-.fc .bot-routine-skipped .bot-block-title {
-  color: var(--muted-foreground);
-  font-weight: 400;
 }
 
 .fc .fc-timegrid .fc-daygrid-body .fc-daygrid-day-events {

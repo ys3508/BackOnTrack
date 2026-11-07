@@ -1,8 +1,8 @@
 "use client"
 
 import type { EventApi } from "@fullcalendar/core"
-import { useCallback, useRef, useState } from "react"
-import { Play } from "lucide-react"
+import { useCallback, useLayoutEffect, useRef, useState } from "react"
+import { Flag, Play } from "lucide-react"
 
 import {
   Floating,
@@ -10,22 +10,18 @@ import {
 } from "@/components/workspace/calendar-overlays"
 import { useStartFocus } from "@/components/workspace/focus-view"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
-import {
-  blockOutcome,
-  formatClockTime,
-  formatTimeRange,
-} from "@/lib/calendar/derived"
-import { localToday } from "@/lib/workspace/dates"
+import { formatClockTime, formatTimeRange } from "@/lib/calendar/derived"
+import { plannedSession } from "@/lib/calendar/model"
+import type { BlockStatus } from "@/lib/calendar/model"
 import type { CalendarItemKind } from "@/lib/calendar/events"
 
 const KIND_WORD: Partial<Record<CalendarItemKind, string>> = {
   planned: "Planned",
   focused: "Focus done",
   routine: "Routine",
-  "routine-placement": "Routine",
 }
 
-/** Title first, then the time. The colour and border already say which kind. */
+/** Title first, then the time. The colour says what it is, the style how it went. */
 export function BlockContent({
   event,
   viewType,
@@ -38,6 +34,7 @@ export function BlockContent({
   const startFocus = useStartFocus({ stay: true })
   const [reporting, setReporting] = useState(false)
   const didItRef = useRef<HTMLButtonElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const anchor = useCallback(() => didItRef.current, [])
   const stopReporting = useCallback(() => setReporting(false), [])
   const {
@@ -47,6 +44,8 @@ export function BlockContent({
     awaitingAnswer,
     timed,
     adjusted,
+    color,
+    status,
     window: part,
   } = event.extendedProps as {
     window?: string | null
@@ -56,21 +55,23 @@ export function BlockContent({
     awaitingAnswer?: boolean
     timed?: boolean
     adjusted?: boolean
+    color?: string
+    status?: BlockStatus
   }
   const { start, end, title } = event
-  if (kind === "buffer") {
+  // The calendar keeps a block's element when it's redrawn, so a new colour has
+  // to be handed to it here rather than only when it first appears.
+  useLayoutEffect(() => {
+    const block = rootRef.current?.closest<HTMLElement>(".fc-event")
+    if (block && color) block.style.setProperty("--event-color", color)
+  }, [color])
+  if (kind === "buffer" && refId === "buffer") {
     return <span className="bot-buffer-label">Buffer</span>
   }
-  const outcome = blockOutcome(
-    state,
-    kind,
-    refId,
-    start ? localToday(start) : ""
-  )
   const windowName = part ? part[0].toUpperCase() + part.slice(1) : null
   const minutes =
     start && end ? (end.getTime() - start.getTime()) / 60_000 : null
-  const session = state.planned.find((item) => item.id === refId)
+  const session = plannedSession(state, refId)
   const inMonth = viewType === "dayGridMonth"
   const canPlay =
     !inMonth &&
@@ -92,6 +93,7 @@ export function BlockContent({
 
   return (
     <div
+      ref={rootRef}
       className={
         inMonth
           ? "bot-block flex items-baseline gap-1"
@@ -107,11 +109,14 @@ export function BlockContent({
         </span>
       )}
       <span className="bot-block-title">
-        {outcome === "full" && <span aria-label="Done in full">● </span>}
-        {outcome === "minimum" && (
-          <span aria-label="Done in the minimum version">◐ </span>
+        {kind === "deadline" && (
+          <Flag className="mr-1 inline size-3 align-[-1px]" aria-hidden />
         )}
-        {outcome === "skipped" && <span className="sr-only">Skipped: </span>}
+        {status === "done" && <span className="sr-only">Done: </span>}
+        {status === "minimum" && (
+          <span className="sr-only">Done in the minimum version: </span>
+        )}
+        {status === "skipped" && <span className="sr-only">Skipped: </span>}
         {title}
       </span>
       {!inMonth && start && end && !event.allDay && (

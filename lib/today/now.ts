@@ -1,3 +1,4 @@
+import { plannedSessions } from "@/lib/calendar/model"
 import { rankTasks } from "@/lib/planning/priority"
 import { addDays, daysBetween, localToday } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
@@ -31,7 +32,7 @@ const startOf = (session: PlannedSession) =>
 
 /** Planned for today, with a time, and not yet answered in any way. */
 function openBlocksToday(state: Workspace, today: string, now: number) {
-  return state.planned.flatMap((session) => {
+  return plannedSessions(state).flatMap((session) => {
     if (session.date !== today || !session.time) return []
     if (session.done || session.outcome) return []
     // An attempt means it was started, so it's never called missed. A block
@@ -211,7 +212,7 @@ export type TodayOccurrence = {
 export const HEAVY_DAY_MINUTES = 8 * 60
 
 export function plannedMinutesOn(state: Workspace, date: string) {
-  return state.planned
+  return plannedSessions(state)
     .filter((item) => item.date === date && !item.done)
     .reduce((sum, item) => sum + item.minutes, 0)
 }
@@ -225,7 +226,7 @@ export function splitTasks(state: Workspace, today: string) {
     task.status === "in-progress" ||
     task.quick ||
     localToday(new Date(task.createdAt)) === today ||
-    state.planned.some(
+    plannedSessions(state).some(
       (item) => item.taskId === task.id && item.date === today && !item.done
     )
   return {

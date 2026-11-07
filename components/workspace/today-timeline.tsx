@@ -36,6 +36,8 @@ function eventOf(item: AgendaItem, untimed: boolean) {
       awaitingAnswer: item.awaitingAnswer,
       timed: !untimed,
       adjusted: item.adjusted,
+      color: item.color,
+      status: item.state === "focused" ? undefined : item.state,
       window: item.window,
     },
   }
@@ -116,6 +118,7 @@ export function TodayTimeline() {
       block: {
         kind: item.kind,
         refId: item.refId,
+        occurrence: item.occurrence,
         taskId: item.taskId,
         title: item.title,
         date: today,
@@ -130,7 +133,7 @@ export function TodayTimeline() {
         item.taskId,
         state.tasks.find((task) => task.id === item.taskId)?.focusTheme
       ),
-      ...(item.color ? { "--routine": item.color } : {}),
+      ...(item.color ? { "--event-color": item.color } : {}),
     }) as React.CSSProperties
 
   return (
@@ -158,6 +161,7 @@ export function TodayTimeline() {
             <li
               key={item.key}
               data-kind={item.kind}
+              data-state={item.state}
               data-block-id={item.refId}
               style={itemStyle(item)}
               className="bot-any-chip"

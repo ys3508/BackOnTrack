@@ -11,6 +11,8 @@ import {
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { plannedSessions } from "@/lib/calendar/model"
+import { eventOf } from "./event-fixtures"
 import {
   agendaColumns,
   agendaHours,
@@ -549,7 +551,7 @@ describe("working from the card", () => {
     await user.clear(day)
     await user.type(day, addDays(TODAY, 1))
     await user.click(within(nowCard()).getByRole("button", { name: "Save" }))
-    expect(saved().planned[0].date).toBe(addDays(TODAY, 1))
+    expect(plannedSessions(saved())[0].date).toBe(addDays(TODAY, 1))
     expect(saved().tasks[0].deadline).toBe(deadline)
     expect(saved().tasks[0].originalDeadline).toBe(deadline)
   })
@@ -560,8 +562,8 @@ describe("working from the card", () => {
     render(<WorkspaceApp />)
     await user.click(await button("Change time"))
     await user.click(within(nowCard()).getByRole("button", { name: "Save" }))
-    expect(saved().planned).toHaveLength(1)
-    expect(saved().planned[0].taskId).toBe("a")
+    expect(plannedSessions(saved())).toHaveLength(1)
+    expect(plannedSessions(saved())[0].taskId).toBe("a")
   })
 
   it("makes a step smaller, labels it as built-in, and starts it for 5 minutes", async () => {
@@ -860,35 +862,27 @@ describe("around the card", () => {
     expect(await screen.findByText(/9 h planned today/)).toBeTruthy()
     await user.click(await button("It’s fine"))
     expect(screen.queryByText(/planned today/)).toBeNull()
-    expect(saved().planned).toHaveLength(1)
+    expect(plannedSessions(saved())).toHaveLength(1)
   })
 
   it("lists a routine that falls today, and marks it done", async () => {
-    const weekdays = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
-    const code = weekdays[new Date().getDay()]
     seed(
       run([
         task("a", "Essay"),
         {
-          type: "add-routine",
-          routine: {
-            id: "r",
-            name: "Gym",
-            emoji: "",
-            color: "#3f6b52",
-            duration: 60,
-            rrule: `DTSTART:20200101T070000\nRRULE:FREQ=WEEKLY;BYDAY=${code}`,
-            exdates: [],
-            doneDates: [],
-            createdAt: AT,
-          },
+          type: "add-event",
+          event: eventOf({
+            title: "Gym",
+            minutes: 60,
+            repeat: { days: [new Date().getDay()] },
+          }),
         },
       ])
     )
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.click(await button("Done in full: Gym"))
-    expect(saved().routines[0].doneDates).toEqual([TODAY])
+    expect(saved().events[0].outcomes).toEqual({ [TODAY]: "full" })
   })
 
   it("still offers one way back after time away", async () => {

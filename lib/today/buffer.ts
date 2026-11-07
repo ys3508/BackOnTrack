@@ -1,9 +1,9 @@
+import { endOf } from "@/lib/calendar/derived"
 import {
-  endOf,
-  parseRoutineRule,
-  routineOccursOn,
-  routineTime,
-} from "@/lib/calendar/derived"
+  allOccurrences,
+  isPlannedEvent,
+  plannedSessions,
+} from "@/lib/calendar/model"
 import { addDays } from "@/lib/workspace/dates"
 import type {
   PlannedSession,
@@ -36,7 +36,7 @@ export function withGap(
   const gap = state.settings.bufferGapMinutes
   if (!gap) return time
   let start = new Date(`${date}T${time}:00`).getTime()
-  const others = state.planned
+  const others = plannedSessions(state)
     .filter(
       (item) =>
         item.id !== ignoreId && item.date === date && item.time && !item.done
@@ -69,25 +69,15 @@ function busyOn(state: Workspace, date: string, ignoreId: string) {
     const start = new Date(`${date}T${time}:00`).getTime()
     busy.push([start, start + minutes * 60_000])
   }
-  for (const item of state.planned) {
+  for (const item of plannedSessions(state)) {
     if (item.id !== ignoreId && item.date === date && item.time && !item.done) {
       add(item.time, item.minutes)
     }
   }
-  for (const routine of state.routines) {
-    if (routine.kind !== "flexible" && routineOccursOn(routine, date)) {
-      const rule = [routine, ...routine.priorRules].find((entry) => {
-        const { startDate } = parseRoutineRule(entry.rrule)
-        return startDate <= date
-      })
-      add(routineTime(routine), rule?.duration ?? routine.duration)
-    }
-  }
-  for (const item of state.routinePlacements) {
-    const routine = state.routines.find((r) => r.id === item.routineId)
-    if (routine && item.date === date && item.time) {
-      add(item.time, item.minutes ?? routine.duration)
-    }
+  for (const item of allOccurrences(state, date, addDays(date, 1))) {
+    if (isPlannedEvent(item.event) || item.event.flexible) continue
+    if (item.event.kind === "buffer" || item.date !== date) continue
+    add(item.start, item.minutes)
   }
   for (const item of state.focusSessions) {
     const start = new Date(item.startedAt)

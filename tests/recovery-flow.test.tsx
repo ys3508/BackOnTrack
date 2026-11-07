@@ -10,6 +10,8 @@ import userEvent from "@testing-library/user-event"
 import axe from "axe-core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { plannedSessions } from "@/lib/calendar/model"
+import { eventOf } from "./event-fixtures"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import { draftRealityGap } from "@/lib/recovery/case-engine"
 import { chooseBuffer, freeBuffersOn } from "@/lib/today/buffer"
@@ -116,7 +118,7 @@ describe("Test 2: avoiding something, with nothing scheduled", () => {
       name: "What’s making this difficult right now?",
     })
     expect(window.location.hash).toBe("#/")
-    expect(saved().planned).toEqual([])
+    expect(plannedSessions(saved())).toEqual([])
     expect(saved().tasks[0].title).toBe("I haven't finished my homework")
     expect(events("restarted")).toEqual([])
 
@@ -151,7 +153,7 @@ describe("Test 2: avoiding something, with nothing scheduled", () => {
     await user.click(await button("Schedule it"))
     await user.click(await button("Evening"))
     await user.click(await button("Save"))
-    expect(saved().planned[0]).toMatchObject({
+    expect(plannedSessions(saved())[0]).toMatchObject({
       time: null,
       window: "evening",
       date: TODAY,
@@ -444,8 +446,8 @@ describe("the four reasons", () => {
     await user.click(await button("Schedule it"))
     await user.click(await button("Afternoon"))
     await user.click(await button("Save"))
-    expect(saved().planned).toHaveLength(1)
-    expect(saved().planned[0]).toMatchObject({
+    expect(plannedSessions(saved())).toHaveLength(1)
+    expect(plannedSessions(saved())[0]).toMatchObject({
       id: "m",
       time: null,
       window: "afternoon",
@@ -531,7 +533,7 @@ describe("Test 4: a missed block, all the way through", () => {
     expect(screen.getByText("Send the second paragraph")).toBeTruthy()
     expect(events("restarted")).toHaveLength(1)
     expect(saved().focusSessions).toHaveLength(1)
-    expect(saved().planned[0].outcome).toBeNull()
+    expect(plannedSessions(saved())[0].outcome).toBeNull()
     expect(await screen.findByText(/Restarted 1 time/)).toBeTruthy()
   })
 
@@ -634,21 +636,14 @@ describe("Test 5: moving to a buffer", () => {
   })
 
   it("counts routines as taken, too", () => {
-    const code = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][new Date().getDay()]
     const state = run([
       {
-        type: "add-routine",
-        routine: {
-          id: "r",
-          name: "Walk",
-          emoji: "",
-          color: "#3f6b52",
-          duration: 30,
-          rrule: `DTSTART:20200101T150000\nRRULE:FREQ=WEEKLY;BYDAY=${code}`,
-          exdates: [],
-          doneDates: [],
-          createdAt: AT,
-        },
+        type: "add-event",
+        event: eventOf({
+          date: "2020-01-01",
+          start: "15:00",
+          repeat: { days: [new Date().getDay()] },
+        }),
       },
     ])
     expect(freeBuffersOn(state, TODAY, ending)).toEqual([])
@@ -665,7 +660,7 @@ describe("Test 5: moving to a buffer", () => {
 
   it("moves it if it fits", () => {
     const state = run([task("a"), block("m", "a", "09:00", 25)])
-    expect(chooseBuffer(state, state.planned[0], TODAY, ending)).toEqual({
+    expect(chooseBuffer(state, plannedSessions(state)[0], TODAY, ending)).toEqual({
       kind: "fits",
       slot: { date: TODAY, time: "15:00", minutes: 30 },
     })
@@ -673,7 +668,7 @@ describe("Test 5: moving to a buffer", () => {
 
   it("never moves something too long by itself", () => {
     const state = run([task("a"), block("m", "a", "09:00", 60)])
-    const choice = chooseBuffer(state, state.planned[0], TODAY, ending)
+    const choice = chooseBuffer(state, plannedSessions(state)[0], TODAY, ending)
     expect(choice.kind).toBe("choose")
     if (choice.kind === "choose") {
       expect(choice.needed).toBe(60)
@@ -693,7 +688,7 @@ describe("Test 5: moving to a buffer", () => {
     render(<WorkspaceApp />)
     await user.click(await button("Move to buffer"))
     await waitFor(() => {
-      const [moved] = saved().planned
+      const [moved] = plannedSessions(saved())
       const stillHere = moved.time !== earlierToday()
       const offered = screen.queryByRole("button", {
         name: /Reschedule manually/,
@@ -714,7 +709,7 @@ describe("Test 5: moving to a buffer", () => {
     render(<WorkspaceApp />)
     await user.click(await button("Move to buffer"))
     expect(await screen.findByText(/Nothing has moved/)).toBeTruthy()
-    expect(saved().planned[0]).toMatchObject({
+    expect(plannedSessions(saved())[0]).toMatchObject({
       time,
       minutes: 120,
       date: TODAY,
@@ -742,7 +737,7 @@ describe("Test 6: deadlines never change", () => {
     await user.clear(day)
     await user.type(day, addDays(TODAY, 4))
     await user.click(await button("Save"))
-    expect(saved().planned[0].date).toBe(addDays(TODAY, 4))
+    expect(plannedSessions(saved())[0].date).toBe(addDays(TODAY, 4))
     check()
   })
 
@@ -837,7 +832,7 @@ describe("Did you work on this?", () => {
         plannedMinutes: 5,
         reported: true,
       })
-      expect(saved().planned[0].outcome).toBe("did")
+      expect(plannedSessions(saved())[0].outcome).toBe("did")
       expect(events("restarted")).toEqual([])
     }
   )

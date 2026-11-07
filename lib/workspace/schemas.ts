@@ -347,6 +347,11 @@ export const FocusSessionSchema = z.object({
 })
 export type FocusSession = z.infer<typeof FocusSessionSchema>
 
+/**
+ * A block as the rest of the app reads it: one-off work on a task. It's a view
+ * of a CalendarEvent, and this schema is only used to read data saved before
+ * events existed.
+ */
 export const PlannedSessionSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -438,7 +443,7 @@ export const DailyPlanItemSchema = z.object({
 })
 export type DailyPlanItem = z.infer<typeof DailyPlanItemSchema>
 
-/** Recurs by an iCal rule. Routines never count streaks. */
+/** Saved data from before events existed. Only migration reads this now. */
 export const RoutineSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -469,7 +474,7 @@ export const RoutineSchema = z.object({
 })
 export type Routine = z.infer<typeof RoutineSchema>
 
-/** A one-off occurrence: dragged from the sidebar, or moved from its usual time. */
+/** Saved data from before events existed. Only migration reads this now. */
 export const RoutinePlacementSchema = z.object({
   id: z.string(),
   routineId: z.string(),
@@ -488,6 +493,78 @@ export const RoutinePlacementSchema = z.object({
     .default(null),
 })
 export type RoutinePlacement = z.infer<typeof RoutinePlacementSchema>
+
+export const EVENT_OUTCOMES = [
+  "full",
+  "minimum",
+  "skipped",
+  "did",
+  "didnt",
+] as const
+export type EventOutcome = (typeof EVENT_OUTCOMES)[number]
+
+/** A change to one occurrence, keyed by the date it would normally fall on. */
+export const EventOverrideSchema = z.object({
+  /** Where it moved to, when that's another day. */
+  date: DateString.optional(),
+  start: z.string().optional(),
+  end: z.string().optional(),
+  cancelled: z.boolean().optional(),
+  title: z.string().optional(),
+  color: z.string().optional(),
+})
+export type EventOverride = z.infer<typeof EventOverrideSchema>
+
+export const EventRepeatSchema = z.object({
+  /** Weekdays, 0 is Sunday. */
+  days: z.array(z.number().int().min(0).max(6)).min(1),
+  until: DateString.optional(),
+  count: z.number().int().positive().optional(),
+})
+export type EventRepeat = z.infer<typeof EventRepeatSchema>
+
+/**
+ * The one thing on the calendar. A routine is an event that repeats, and a
+ * planned block is one with a task and no repeat.
+ */
+export const CalendarEventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  taskId: z.string().nullable().catch(null).default(null),
+  kind: z.enum(["event", "buffer"]).catch("event").default("event"),
+  /** The day it happens, or the first day it can if it repeats. */
+  date: DateString,
+  /** Local HH:MM. An end before the start runs past midnight. */
+  start: z.string(),
+  end: z.string(),
+  /** Any time that day. Start and end then only say how long it is. */
+  flexible: z.boolean().catch(false).default(false),
+  /** Null follows the task's colour. */
+  color: z.string().nullable().catch(null).default(null),
+  repeat: EventRepeatSchema.nullable().catch(null).default(null),
+  overrides: z.record(z.string(), EventOverrideSchema).catch({}).default({}),
+  /** What came of each occurrence, by the same date as overrides. */
+  outcomes: z.record(z.string(), z.enum(EVENT_OUTCOMES)).catch({}).default({}),
+  minimum: z.string().catch("").default(""),
+  link: z.string().catch("").default(""),
+  notes: z.string().catch("").default(""),
+  emoji: z.string().catch("").default(""),
+  /** The step of a task this time is for. */
+  label: z.string().catch("").default(""),
+  /** A part of the day instead of an exact time. Only when flexible. */
+  window: z
+    .enum(["morning", "afternoon", "evening"])
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** Shared by the parts of a series that "This and following" split apart. */
+  seriesId: z.string().nullable().catch(null).default(null),
+  createdAt: z.string().catch("").default(""),
+})
+export type CalendarEvent = z.infer<typeof CalendarEventSchema>
+
+/** A saved record that couldn't be read, kept rather than thrown away. */
+export type UnmigratedRecord = { source: string; record: unknown }
 
 export const PROGRESS_EVENT_TYPES = [
   "started",
@@ -629,13 +706,16 @@ export function isFocusTime(session: FocusSession) {
   return !isInterrupted(session)
 }
 
-export const WORKSPACE_VERSION = 2
+export const WORKSPACE_VERSION = 3
 
 export type Workspace = {
-  version: 2
+  version: 3
   tasks: Task[]
   focusSessions: FocusSession[]
-  planned: PlannedSession[]
+  /** Everything on the calendar except deadlines and past focus time. */
+  events: CalendarEvent[]
+  /** Saved records that couldn't be read, kept so nothing is ever lost. */
+  unmigrated: UnmigratedRecord[]
   timer: TimerState | null
   /** A focus session that just ended and hasn't been acknowledged yet. */
   finishedSessionId: string | null
@@ -650,8 +730,6 @@ export type Workspace = {
   dailyPlan: DailyPlan | null
   /** What's typed on the home page, kept until it's submitted. */
   intakeDraft: string
-  routines: Routine[]
-  routinePlacements: RoutinePlacement[]
   parkingLot: ParkedThought[]
   progressEvents: ProgressEvent[]
   recovery: Recovery | null
@@ -661,16 +739,15 @@ export type Workspace = {
 
 export const EMPTY_WORKSPACE: Workspace = {
   intakeDraft: "",
-  routines: [],
-  routinePlacements: [],
   parkingLot: [],
   progressEvents: [],
   recovery: null,
   remindedBlocks: [],
-  version: 2,
+  version: 3,
   tasks: [],
   focusSessions: [],
-  planned: [],
+  events: [],
+  unmigrated: [],
   timer: null,
   finishedSessionId: null,
   settings: DEFAULT_SETTINGS,

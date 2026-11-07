@@ -37,8 +37,6 @@ import {
   formatDuration,
   occurrenceOutcome,
   rangeStats,
-  routineOccursOn,
-  routineTime,
   trayItems,
 } from "@/lib/calendar/derived"
 import { taskColorVars } from "@/lib/calendar/task-colors"
@@ -52,6 +50,12 @@ import {
   sessionMinutes,
   splitTasks,
 } from "@/lib/today/now"
+import {
+  allOccurrences,
+  colorOf,
+  eventTitle,
+  isPlannedEvent,
+} from "@/lib/calendar/model"
 import { addDays, formatDateTime } from "@/lib/workspace/dates"
 import { returnSummary } from "@/lib/workspace/returning"
 import { isActive } from "@/lib/workspace/schemas"
@@ -228,38 +232,22 @@ function TaskLine({
 
 function RoutinesToday() {
   const { state, dispatch, today } = useStore()
-  const regular = state.routines
-    .filter((routine) => routineOccursOn(routine, today))
-    .map((routine) => ({
-      id: routine.id,
-      routineId: routine.id,
-      placementId: null as string | null,
-      title: `${routine.emoji} ${routine.name}`.trim(),
-      color: routine.color,
-      time: routine.kind === "flexible" ? "" : routineTime(routine),
-      minimum: routine.minimumVersion,
-      outcome: occurrenceOutcome(routine, today),
+  const items = allOccurrences(state, today, addDays(today, 1))
+    .filter((item) => !isPlannedEvent(item.event) && item.event.kind === "event")
+    .map((item) => ({
+      id: `${item.event.id}:${item.key}`,
+      eventId: item.event.id,
+      occurrence: item.key,
+      title: eventTitle(item, state.tasks),
+      color: colorOf(
+        { color: item.color, taskId: item.event.taskId },
+        state.tasks
+      ),
+      time: item.event.flexible ? "" : item.start,
+      minimum: item.event.minimum,
+      outcome: occurrenceOutcome(item.event, item.key),
     }))
-  const placed = state.routinePlacements.flatMap((item) => {
-    const routine = state.routines.find((r) => r.id === item.routineId)
-    return routine && item.date === today
-      ? [
-          {
-            id: item.id,
-            routineId: routine.id,
-            placementId: item.id as string | null,
-            title: `${routine.emoji} ${routine.name}`.trim(),
-            color: routine.color,
-            time: item.time,
-            minimum: routine.minimumVersion,
-            outcome: item.result ?? (item.done ? "full" : null),
-          },
-        ]
-      : []
-  })
-  const items = [...regular, ...placed].sort((a, b) =>
-    a.time.localeCompare(b.time)
-  )
+    .sort((a, b) => a.time.localeCompare(b.time))
   if (!items.length) return null
   return (
     <section
@@ -273,17 +261,16 @@ function RoutinesToday() {
         {items.map((item) => {
           const set = (outcome: "full" | "minimum" | "skipped") =>
             dispatch({
-              type: "routine-outcome",
-              routineId: item.routineId,
-              date: today,
-              placementId: item.placementId,
+              type: "occurrence-outcome",
+              id: item.eventId,
+              key: item.occurrence,
               outcome: item.outcome === outcome ? null : outcome,
             })
           return (
             <li
               key={item.id}
               className="text-sm"
-              style={{ "--routine": item.color } as React.CSSProperties}
+              style={{ "--event-color": item.color } as React.CSSProperties}
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="min-w-0 font-medium break-words">
@@ -737,8 +724,7 @@ export function TodayView() {
     })
   const hasDay =
     state.tasks.some(isActive) ||
-    state.planned.length > 0 ||
-    state.routines.length > 0
+    state.events.length > 0
   const longDate = new Date(`${today}T12:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",

@@ -1,3 +1,4 @@
+import { plannedSessions } from "@/lib/calendar/model"
 import { addDays } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
 import type { Workspace } from "@/lib/workspace/schemas"
@@ -50,7 +51,7 @@ export function buildIcs(state: Workspace, today: string, now = new Date()) {
   const stamp = utc(now)
   const events: string[][] = []
 
-  for (const session of state.planned) {
+  for (const session of plannedSessions(state)) {
     if (session.done || session.outcome || session.date < today) continue
     const task = state.tasks.find((item) => item.id === session.taskId)
     if (!task || !isActive(task)) continue

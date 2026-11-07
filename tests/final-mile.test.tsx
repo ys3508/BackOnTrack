@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { plannedSessions } from "@/lib/calendar/model"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import { buildIcs } from "@/lib/calendar/ics"
 import { dueReminders, reminderKey } from "@/lib/today/reminders"
@@ -114,7 +115,7 @@ describe("which blocks are due a reminder", () => {
 
   it("reminds once, and again if the block moves", () => {
     const state = withTask([on, block("10:04")])
-    const key = reminderKey(state.planned[0])
+    const key = reminderKey(plannedSessions(state)[0])
     const reminded = run([{ type: "mark-reminded", key }], state)
     expect(dueReminders(reminded, now)).toEqual([])
     const moved = run(

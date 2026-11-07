@@ -5,6 +5,7 @@ import type { Editor } from "@tiptap/react"
 import { MockLanguageModelV4 } from "ai/test"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { plannedSessions } from "@/lib/calendar/model"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import { generateStepHelp, generateWorkspaceSetup } from "@/lib/ai/task-assist"
 import { buildCalendarItems } from "@/lib/calendar/events"
@@ -688,7 +689,7 @@ describe("planning remaining work", () => {
     const list = await screen.findByRole("list", {
       name: "Suggested work sessions",
     })
-    expect(saved().planned).toEqual([])
+    expect(plannedSessions(saved())).toEqual([])
     expect(
       screen.getByText(/Calculated from your open steps/)
     ).toBeInTheDocument()
@@ -699,7 +700,7 @@ describe("planning remaining work", () => {
     await user.click(
       await button(new RegExp(`^Add ${boxes.length - 1} to my calendar`))
     )
-    expect(saved().planned).toHaveLength(boxes.length - 1)
+    expect(plannedSessions(saved())).toHaveLength(boxes.length - 1)
     expect(saved().tasks[0].deadline).toBe(deadline)
     expect(await screen.findByText(/to your calendar/)).toBeInTheDocument()
   })

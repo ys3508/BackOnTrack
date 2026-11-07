@@ -12,7 +12,7 @@ import {
 import { TaskBreakdownRequestSchema } from "@/lib/schemas"
 import { workspaceReducer } from "@/lib/workspace/reducer"
 import type { WorkspaceAction } from "@/lib/workspace/reducer"
-import { EMPTY_WORKSPACE } from "@/lib/workspace/schemas"
+import { EMPTY_WORKSPACE, WORKSPACE_VERSION } from "@/lib/workspace/schemas"
 import type { Workspace } from "@/lib/workspace/schemas"
 import { currentSubtask, nextActionFor } from "@/lib/workspace/selectors"
 import { restoreWorkspace } from "@/lib/workspace/storage"
@@ -378,7 +378,7 @@ describe("data migration", () => {
       ],
     })
     const [task] = restored.tasks
-    expect(restored.version).toBe(2)
+    expect(restored.version).toBe(WORKSPACE_VERSION)
     expect(task.subtasks[0]).toMatchObject({
       title: "Old step",
       done: true,

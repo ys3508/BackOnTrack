@@ -1,3 +1,4 @@
+import { plannedSessions } from "@/lib/calendar/model"
 import { daysBetween, shortDate } from "@/lib/workspace/dates"
 import type { Task, Workspace } from "@/lib/workspace/schemas"
 import { isActive } from "@/lib/workspace/schemas"
@@ -26,7 +27,7 @@ export function remainingMinutes(task: Task): Remaining {
 export function reasonsFor(task: Task, state: Workspace, today: string) {
   const reasons: string[] = []
   if (
-    state.planned.some(
+    plannedSessions(state).some(
       (item) => item.taskId === task.id && item.date === today && !item.done
     )
   ) {
