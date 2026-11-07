@@ -34,7 +34,7 @@ SOFTWARE.
 
 | Project | Use | License |
 | --- | --- | --- |
-| [FullCalendar](https://github.com/fullcalendar/fullcalendar) standard packages (`@fullcalendar/core`, `react`, `daygrid`, `timegrid`, `interaction`) | Calendar, as an npm dependency. No premium packages. | MIT, Copyright (c) 2021 Adam Shaw |
+| [FullCalendar](https://github.com/fullcalendar/fullcalendar) standard packages (`@fullcalendar/core`, `react`, `daygrid`, `timegrid`, `multimonth`, `interaction`) | Calendar, as an npm dependency. No premium packages. | MIT, Copyright (c) 2021 Adam Shaw |
 | [dnd-kit](https://github.com/clauderic/dnd-kit) (`@dnd-kit/core`) | Kanban drag and drop, as an npm dependency | MIT, Copyright (c) 2021, Claudéric Demers |
 | [axe-core](https://github.com/dequelabs/axe-core) | Accessibility tests only. Not shipped in the app. | MPL-2.0 |
 

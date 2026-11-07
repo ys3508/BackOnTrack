@@ -356,3 +356,138 @@ npm run test:live
 ```
 
 The last command needs an API key in `.env.local`.
+
+## Phase 1: Adaptive Recovery Workspace
+
+`tests/recovery-case.test.tsx` covers acceptance scenarios A to H, the definition of done, safety, the Live AI guards against a mocked model, and the audited bugs.
+
+Also run by hand in the built app, in Demo Mode, in a real browser: intake, all four blockers, Plan B, a 2-minute timer including pause and running out during a reload, Finish/Reduce/Release, notes through an immediate reload, changing the blocker, the crisis interruption, the resume prompt, the calendar's selected day, and phone width (375 px, no sideways scrolling).
+
+Not tested: the recovery stage against a real AI model, since no key is configured locally, and any use by real people.
+
+## Calendar upgrade
+
+`tests/calendar.test.tsx` calls FullCalendar's callbacks against a mock, because FullCalendar needs real layout.
+
+Also run with a real mouse in the built app, in Demo Mode: creating from a slot and a month day, moving a block, resizing a block, the popover, dragging from the tray and from My routines, moving one routine occurrence, marking a routine done, Week and Year views, a reload, and phone width.
+
+Not tested: dragging on a touch screen, and time zones other than the one the browser was in (US Central). Daylight saving changes haven't been checked for routines.
+
+## Calendar duration, routines, and block prompts
+
+Run with a real mouse in the built app, in Demo Mode: drag-select, the task combobox, resizing by the grip, Did it, Didn't, ▶, the popover following a scrolled grid, This one only, All future, a routine's Done, a reload compared field by field, Week view, phone width, and opening a block with Enter.
+
+Not tested: touch screens, other time zones, and daylight saving changes. The planned block's prompt appearing on its own as time passes is covered with past dates rather than by waiting in a browser.
+
+## Final MVP acceptance tests
+
+Run in the built app, in Demo Mode, in a real browser, on the final build. Clicks and typing were a mix of real mouse and keyboard input and scripted page events, with results read from what's on screen and what's stored.
+
+| Test | Result |
+| --- | --- |
+| 1. Simple task | Passed. "Buy lunch" could be started and completed, with no recovery workflow. |
+| 2. Unscheduled avoidance | Passed. A sentence led to a reason, an edited next action, and a running session, with no block. |
+| 3. Reality Gap | Passed. Four editable sections, with worries worded as possibilities and no invented facts. |
+| 4. Missed scheduled block | Passed, with a real one-minute wait. One restart recorded, through a pause, a resume, and reloads. |
+| 5. Buffer recovery | Passed. Moved to the free 3:00 PM buffer, with the deadline and task unchanged. |
+| 6. Deadline integrity | Passed. Stored deadline unchanged through reschedule, reduce, and release. |
+| 7. Minimum version | Passed. Recorded as minimum, and the task stayed open. |
+| 8. Routine | Passed. ◐ shown, and counted apart from full. |
+| 9. Persistence | Passed for an active session, a paused session, a recovery workflow, and a resume cue. |
+| 10. No clutter | Passed for no tasks, upcoming, missed, active, and paused, each with one main button. |
+
+Not tested: Live AI against a real model (no key is configured locally), a real browser notification (the browser used had them blocked, so it was checked with a stand-in), importing the `.ics` into a real calendar app, touch screens, other time zones, and use by real people.
+
+## One recovery system, phone-width walk
+
+Run in the production build at 375 x 812, in Demo Mode, with real clicks and typing for the main choices and scripted page clicks for some buttons.
+
+| Step | Result |
+| --- | --- |
+| "Did it" on a real calendar block | Asked for minutes, starting at the planned 30. It stayed open for 8 seconds, saved nothing until answered, and then saved 30 minutes as reported. |
+| "I'm stuck" on the Upcoming card | Opened the four reasons, linked to that block. |
+| Worried path | Reality Gap and Plan B showed, with the message draft below Possible Actions. No sideways scroll. |
+| Plan B, pause, end session | Timer ran for the 5 minutes chosen in Plan B, and one restart was recorded. |
+| Minimum version with none written | Asked "What did you do?", saved the answer, and left the task open. It survived a reload. |
+
+On the first pass, the message draft looked closed in a screenshot just after opening by script. Three more attempts stayed open. A later check showed the screenshot tool can capture a stale frame mid-transition, which is the likely explanation.
+
+## Usability pass: Recovery audit
+
+Run in the production build, in Demo Mode, comparing saved data after each step. The main choices used real clicks and typing.
+
+| Step | Saved result |
+| --- | --- |
+| Choose an obstacle | Recovery reason and blocker saved. The step is labelled "Built-in suggestion, not AI", and history says "Demo Mode template". |
+| Edit Plan B | Step and next action updated, and the label changed to "Your own step". Survived a reload. |
+| Start focus | Timer saved, linked to the task and block. One restart recorded. |
+| Pause, reload, resume | Clock held at 04:58 through the reload, then continued. |
+| Save next-step cue | Resume note saved, timer cleared, task stays in progress, and the session is recorded. |
+
+Bug found and fixed: a short attempt on a block still ahead closed that block, so the Now card moved to another task and the saved note wasn't shown. A block still ahead now stays on the card, showing "Pick up here".
+
+Also checked in the browser: title and Enter creates a planned block, the unsaved block looks different from saved ones, task colors on blocks, the Now card and Focus, no sideways scroll at 375 px on six screens, and the Now card ending at 606 of 812 px with a cue showing.
+
+Not tested: Live AI, touch dragging, and real users. Color contrast was calculated for the palette, not measured on screen.
+
+## Usability pass: Aura redesign
+
+Run in the development server in Demo Mode, using saved data built by the real reducer, at 1280 x 800 and 375 x 812.
+
+| Check | Result |
+| --- | --- |
+| Empty Today, scheduled, missed, active, paused, recovery, Reality Gap | Each seen in the browser, and each looks distinct |
+| Today, Calendar (Day and Week), Routines, Settings, Tasks | Seen in the browser, in one visual language |
+| Start | Opens the Focus room in place, with the address unchanged. Escape returns to that screen with the timer still running (checked before the visual swap, whose logic didn't change, and by automated tests) |
+| Moving a calendar block by stepped mouse events | Moved 20:28 to 19:28, and the new time was saved |
+| Sideways scroll at 375 px | None on Today, Calendar, Routines, Settings, or Tasks |
+
+Not tested: a person dragging by hand, reduced motion with the setting actually on (the rules are in place, but the browser here can't turn it on), touch dragging, screen readers, GPU smoothness on a real display, Live AI, and real users. Color contrast was calculated for the task palette, not measured on screen, and text over the orbs was only judged by eye.
+
+The earlier freeze report was not reproduced. The main thread ran at about 60 frames per second with no long tasks, in an earlier version.
+
+## Calendar v2, Phase A
+
+Automated: 758 tests pass. Run in the development server in the built-in browser with real clicks and drags, on data saved in the old format, at 1024 x 768 and 375 x 812.
+
+| Check | Result |
+| --- | --- |
+| Click 10:00, save "Read ch.3", 45 min, blue | Editor beside the slot, title focused. Blue dashed block, 10:00 to 10:45 |
+| "Gym", weekdays, 7:00, 30 min, green, minimum "shoes on" | Monday to Friday in Week, on Routines, and in the sidebar, green in each |
+| Drag Wednesday's Gym to 8:00, "This one only" | Only Wednesday moves, marked "adjusted", with no split |
+| Change a routine's colour | Calendar, Today, and the card all update with no reload |
+| Load old-format data, then reload | All records appear, a backup key exists, a damaged record is kept in `unmigrated` |
+| Resize a repeating block by its grip, drag-select, Month click, Esc | Each works. Phone width opens a bottom sheet |
+
+The calendar sidebar being empty with a routine on the Routines page was not reproduced on the code before this change. Both now read `routinesOf`, and a test covers it.
+
+Not tested: touch dragging, a person dragging by hand, screen readers, real data from a long-used browser.
+
+## Calendar v2, Phase B
+
+Automated: 771 tests pass. Run in the development server in the built-in browser with real drags and clicks. Saved data was edited to make a block that had just been missed.
+
+| Check | Result |
+| --- | --- |
+| Fresh day | No buffers |
+| Drag the Buffer chip to 4:00, then its grip | Hatched grey, 30 minutes, then 45 |
+| Missed block, Move to buffer | Moved to 4:00, inside the buffer on Today and Calendar, with the rest of the buffer still visible |
+| Missed block with no buffer | Nothing moves. Offers Today, 10:15 AM, with Move it there and Make this a buffer |
+| Make this a buffer | Creates the buffer and puts the block in it |
+| Click the empty part of an occupied buffer | Opens Edit and Delete, and Delete works |
+
+Not tested: touch dragging the chip, which has no fallback other than the editor's toggle on a phone.
+
+## Calendar v2, Phase C
+
+Automated: 790 tests pass. Run in the development server in the built-in browser with real clicks. The timer was wound forward in saved data rather than waited out, and blocks were placed in the past the same way.
+
+| Check | Result |
+| --- | --- |
+| 25-minute focus started 12 minutes after the planned start | Day shows 25 min focus and 12 min start delay. Week's bar for that day reads 25 min planned, 25 min focus |
+| Recovery shown for two blocks, one restarted | Comebacks 1, Recovery-to-Action 50% |
+| A range with no data (September 2026) | A dash and a reason on each figure, no errors |
+| Month with under 3 points | A dash and a reason in place of each chart |
+| Year and Month charts with enough data | Seen in the browser with five days of focus. Levels show in the heatmaps and best hours. This caught a CSS order bug that tests can't see, since jsdom loads no CSS |
+
+Not tested: months of real use, or how the log grows in browser storage.

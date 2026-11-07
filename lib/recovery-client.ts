@@ -1,10 +1,13 @@
 import { demoAnalysis, demoNextStep } from "@/lib/demo/engine"
+import { demoCasePlan } from "@/lib/recovery/case-engine"
+import type { CasePlan } from "@/lib/recovery/case-engine"
 import { demoWritingAssist } from "@/lib/recovery/demo-assist"
 import { demoBreakdown } from "@/lib/recovery/demo-breakdown"
 import { demoTaskRecovery } from "@/lib/recovery/demo-plan"
 import { demoStepHelp, demoWorkspaceSetup } from "@/lib/recovery/demo-setup"
 import type {
   Analysis,
+  CaseRequest,
   Intake,
   NextStepRequest,
   NextStepResult,
@@ -105,6 +108,19 @@ export async function requestWorkspaceSetup(
 ): Promise<WorkspaceSetupResult> {
   if (mode === "demo") return demoWorkspaceSetup(request)
   return postRecovery<WorkspaceSetupResult>(request)
+}
+
+/** Falls back to labeled templates when Live AI can't answer, and says so. */
+export async function requestCasePlan(
+  mode: Source,
+  request: CaseRequest
+): Promise<CasePlan> {
+  if (mode === "demo") return demoCasePlan(request)
+  try {
+    return await postRecovery<CasePlan>(request)
+  } catch {
+    return { ...demoCasePlan(request), usedFallback: true }
+  }
 }
 
 export async function fetchLiveStatus(): Promise<{

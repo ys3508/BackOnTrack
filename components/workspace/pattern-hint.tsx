@@ -18,12 +18,12 @@ export function PatternHint({
   return (
     <section
       aria-label="Something BackOnTrack noticed"
-      className="space-y-2 rounded-2xl border border-border bg-indigo-soft p-4"
+      className="space-y-2 rounded-2xl border border-border bg-link-soft p-4"
     >
       <div className="flex gap-2.5">
         <Lightbulb className="mt-0.5 size-4 shrink-0" aria-hidden />
         <div className="min-w-0">
-          <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+          <h2 className="font-heading text-lg">
             {hint.title}
           </h2>
           <p className="mt-0.5 text-sm">{hint.evidence}</p>

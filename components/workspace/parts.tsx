@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Dialog } from "@base-ui/react/dialog"
-import { CalendarClock, Flag } from "lucide-react"
+import { ExternalLink, CalendarClock, Flag } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/components/workspace/store"
@@ -14,10 +14,10 @@ import { cn } from "@/lib/utils"
 
 const STATUS_STYLE: Record<TaskStatus, string> = {
   "not-started": "bg-secondary text-foreground",
-  "in-progress": "bg-sage-soft text-sage",
+  "in-progress": "bg-brand-soft text-brand",
   paused: "bg-secondary text-muted-foreground",
-  "needs-recovery": "bg-indigo-soft text-indigo",
-  completed: "bg-sage-soft text-sage",
+  "needs-recovery": "bg-link-soft text-link",
+  completed: "bg-brand-soft text-brand",
   released: "bg-secondary text-muted-foreground",
 }
 
@@ -34,6 +34,47 @@ export function StatusBadge({ status }: { status: TaskStatus }) {
   )
 }
 
+/** Only web addresses, so a pasted script can never run from a link. */
+export function safeLink(link: string) {
+  const text = link.trim()
+  if (!text) return null
+  try {
+    const url = new URL(
+      /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`
+    )
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.href
+      : null
+  } catch {
+    return null
+  }
+}
+
+export function TaskLink({
+  task,
+  className,
+}: {
+  task: Task
+  className?: string
+}) {
+  const href = safeLink(task.link)
+  if (!href) return null
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-link underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30",
+        className
+      )}
+    >
+      <ExternalLink className="size-4" aria-hidden />
+      Open link
+    </a>
+  )
+}
+
 export function DeadlineChip({ task }: { task: Task }) {
   const { today } = useStore()
   if (!task.deadline) return null
@@ -42,7 +83,7 @@ export function DeadlineChip({ task }: { task: Task }) {
     <span
       className={cn(
         "inline-flex items-center gap-1 text-xs",
-        passed ? "font-medium text-sand" : "text-muted-foreground"
+        passed ? "font-medium text-caution" : "text-muted-foreground"
       )}
     >
       <CalendarClock className="size-3.5" aria-hidden />
@@ -78,7 +119,7 @@ export function ProgressBar({
       aria-valuemin={0}
       aria-valuemax={100}
       className={cn(
-        "h-1.5 overflow-hidden rounded-full bg-secondary",
+        "h-2.5 overflow-hidden rounded-full border border-line bg-card",
         className
       )}
     >
@@ -119,11 +160,9 @@ export function ExpandableList<T>({
           type="button"
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
-          className="mt-2 min-h-11 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="mt-2 min-h-11 rounded-md text-sm font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         >
-          {expanded
-            ? "Show fewer"
-            : `Show ${items.length - limit} more ${label}`}
+          {expanded ? "Show fewer" : `Show all ${items.length} ${label}`}
         </button>
       )}
     </>
@@ -152,8 +191,8 @@ export function ConfirmDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onCancel()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-40 bg-foreground/20" />
-        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[85svh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-border bg-card p-6 shadow-lg outline-none">
+        <Dialog.Backdrop className="fixed inset-0 z-40 bg-ink/25" />
+        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[85svh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-auto bot-card p-6 outline-none">
           <Dialog.Title className="font-heading text-2xl">{title}</Dialog.Title>
           {children && (
             <Dialog.Description
@@ -183,4 +222,4 @@ export function ConfirmDialog({
 }
 
 export const fieldClass =
-  "h-11 w-full rounded-xl border border-input bg-card px-3 text-base outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
+  "h-11 w-full rounded-2xl border border-input bg-card px-3 text-base font-medium outline-none transition-[color,box-shadow,border-color] focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/30 md:text-sm"

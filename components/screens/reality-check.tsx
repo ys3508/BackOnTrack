@@ -37,7 +37,7 @@ function Section({
         >
           <Icon className="size-4" />
         </span>
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+        <h2 className="font-heading text-lg">
           {title}
         </h2>
       </div>
@@ -69,7 +69,7 @@ export function RealityCheckContent({ analysis }: { analysis: Analysis }) {
       {analysis.supportConcern && (
         <div
           role="note"
-          className="mt-5 rounded-xl border border-indigo/30 bg-indigo-soft p-4 text-sm leading-relaxed text-indigo"
+          className="mt-5 rounded-xl border border-link/30 bg-link-soft p-4 text-sm leading-relaxed text-link"
         >
           <strong className="font-semibold">
             Something you wrote sounds like more than a task.
@@ -86,7 +86,7 @@ export function RealityCheckContent({ analysis }: { analysis: Analysis }) {
           icon={Check}
           title="Known facts"
           hint="What you actually told me."
-          tone="bg-sage-soft text-sage"
+          tone="bg-brand-soft text-brand"
         >
           <Items items={knownFacts} empty="Nothing definite yet." />
         </Section>
@@ -94,7 +94,7 @@ export function RealityCheckContent({ analysis }: { analysis: Analysis }) {
           icon={Cloud}
           title="Assumptions"
           hint="Interpretations that haven't been verified."
-          tone="bg-sand-soft text-sand"
+          tone="bg-caution-soft text-caution"
         >
           <Items items={assumptions} empty="None identified." />
         </Section>
@@ -102,7 +102,7 @@ export function RealityCheckContent({ analysis }: { analysis: Analysis }) {
           icon={CircleHelp}
           title="Unknowns"
           hint="What's needed to decide with confidence."
-          tone="bg-indigo-soft text-indigo"
+          tone="bg-link-soft text-link"
         >
           <Items items={unknowns} empty="None identified." />
         </Section>
@@ -120,8 +120,8 @@ export function RealityCheckContent({ analysis }: { analysis: Analysis }) {
                     className={cn(
                       "mb-1 block w-fit rounded-full px-2 py-0.5 text-xs font-medium",
                       item.status === "confirmed"
-                        ? "bg-sage-soft text-sage"
-                        : "bg-sand-soft text-sand"
+                        ? "bg-brand-soft text-brand"
+                        : "bg-caution-soft text-caution"
                     )}
                   >
                     {item.status === "confirmed" ? "Confirmed" : "Uncertain"}

@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
+import { render, screen, within } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
@@ -16,15 +15,19 @@ import { progressSummary, recentActions } from "@/lib/workspace/selectors"
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
 vi.mock("@fullcalendar/timegrid", () => ({ default: {} }))
-vi.mock("@fullcalendar/interaction", () => ({ default: {} }))
+vi.mock("@fullcalendar/interaction", () => ({
+  default: {},
+  Draggable: class {
+    destroy() {}
+  },
+}))
+vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 const AT = "2026-11-05T12:00:00.000Z"
 const TODAY = "2026-11-05"
 const run = (actions: WorkspaceAction[], start: Workspace = EMPTY_WORKSPACE) =>
   actions.reduce(workspaceReducer, start)
-const saved = () => JSON.parse(window.localStorage.getItem(STORAGE)!)
-const button = (name: RegExp | string) => screen.findByRole("button", { name })
 
 const INSTRUCTIONS =
   "Machine learning project.\n- Train a classifier\n- Report the accuracy\nYou must submit a PDF."
@@ -334,33 +337,6 @@ describe("in the app", () => {
     )
   })
 
-  it("inserts a chosen opening into the document, marked as suggested", async () => {
-    window.location.hash = `#/recover/a`
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Get a recovery plan"))
-    const heading = await screen.findByRole("heading", {
-      name: "Pick one to put in your document",
-    })
-    const choice = within(heading.parentElement!).getAllByRole("button")[0]
-    const text = choice.textContent!
-    await user.click(choice)
-    await waitFor(() =>
-      expect(saved().tasks[0].workDoc?.content).toContain("data-suggested")
-    )
-    const task = saved().tasks[0]
-    expect(task.workDoc.content).toContain(text.slice(0, 30))
-    expect(task.recovery).toBeNull()
-    expect(task.recoveryAttempts[0].outcome).toBe("accepted")
-    expect(JSON.stringify(task.history)).toContain("Reported being stuck")
-    await waitFor(() =>
-      expect(document.querySelector(".ProseMirror")?.textContent).toContain(
-        text.slice(0, 30)
-      )
-    )
-    expect(document.querySelector(".ProseMirror [data-suggested]")).toBeTruthy()
-  })
-
   it("labels each history entry by what really happened", async () => {
     window.location.hash = "#/tasks/a"
     render(<WorkspaceApp />)
@@ -370,21 +346,5 @@ describe("in the app", () => {
     expect(
       within(history).getByText("Completed: Read the requirements")
     ).toBeInTheDocument()
-  })
-
-  it("resumes without repeating a Reality Check", async () => {
-    window.location.hash = "#/"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: "Continue where you left off" })
-    expect(
-      screen.getByText(
-        /You completed 1 of 2 steps for Machine learning assignment/
-      )
-    ).toBeInTheDocument()
-    expect(screen.getByText("Write the introduction")).toBeInTheDocument()
-    expect(screen.queryByText("Known facts")).not.toBeInTheDocument()
-    await user.click(await button("Open my document"))
-    await waitFor(() => expect(window.location.hash).toBe("#/tasks/a/doc"))
   })
 })

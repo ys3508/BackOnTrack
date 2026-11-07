@@ -57,7 +57,7 @@ export function StrategyCards({
                   {STRATEGY_LABEL[strategy]}
                 </span>
                 {strategy === decision.recommended && (
-                  <span className="rounded-full bg-sage-soft px-2 py-0.5 text-xs font-medium text-sage">
+                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand">
                     Suggested
                   </span>
                 )}
@@ -115,7 +115,7 @@ export function ReleaseCaution({
       {decision.highStakes && decision.caution && (
         <div
           role="note"
-          className="mt-4 flex gap-3 rounded-xl bg-sand-soft p-4 text-sm leading-relaxed text-sand"
+          className="mt-4 flex gap-3 rounded-xl bg-caution-soft p-4 text-sm leading-relaxed text-caution"
         >
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
           <div>

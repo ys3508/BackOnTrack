@@ -56,7 +56,7 @@ export function LearningCard() {
 
   return (
     <Card className="space-y-3">
-      <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+      <h2 className="font-heading text-lg">
         What BackOnTrack has noticed
       </h2>
       <p className="text-sm text-muted-foreground">

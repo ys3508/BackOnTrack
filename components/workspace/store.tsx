@@ -28,14 +28,15 @@ import {
 /** Where a task opens: its document, or straight into getting help. */
 export type TaskSection = "doc" | "help" | "setup"
 
+/** A choice made before opening a case, such as from the resume prompt. */
+
 export type Route =
   | { view: "workspace" }
+  | { view: "routines" }
   | { view: "tasks" }
   | { view: "task"; id: string; section?: TaskSection }
   | { view: "calendar" }
-  | { view: "recover"; taskId?: string }
   | { view: "focus"; taskId?: string }
-  | { view: "guided" }
   | { view: "settings" }
 
 export function parseHash(hash: string): Route {
@@ -46,11 +47,10 @@ export function parseHash(hash: string): Route {
       : { view: "task", id }
   }
   if (view === "focus") return { view: "focus", taskId: id }
-  if (view === "recover") return { view: "recover", taskId: id }
   if (
     view === "tasks" ||
     view === "calendar" ||
-    view === "guided" ||
+    view === "routines" ||
     view === "settings"
   ) {
     return { view }
@@ -63,9 +63,6 @@ export function routeHash(route: Route) {
     return `#/tasks/${route.id}${route.section ? `/${route.section}` : ""}`
   }
   if (route.view === "workspace") return "#/"
-  if (route.view === "recover") {
-    return route.taskId ? `#/recover/${route.taskId}` : "#/recover"
-  }
   if (route.view === "focus") {
     return route.taskId ? `#/focus/${route.taskId}` : "#/focus"
   }
@@ -90,6 +87,9 @@ type Store = {
   /** True after time away, until the user has chosen a way back in. */
   returning: boolean
   finishReturn: () => void
+  /** Whether the running timer is showing as the whole-screen Focus room. */
+  focusRoomOpen: boolean
+  setFocusRoomOpen: (open: boolean) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -98,6 +98,24 @@ export function useStore() {
   const store = useContext(StoreContext)
   if (!store) throw new Error("useStore must be used inside WorkspaceProvider")
   return store
+}
+
+/** Goes back to the Now card, where recovery happens, for this task. */
+export function useEnterRecovery() {
+  const { dispatch, navigate } = useStore()
+  return useCallback(
+    (taskId: string, plannedId: string | null = null) => {
+      dispatch({
+        type: "enter-recovery",
+        at: nowIso(),
+        taskId,
+        plannedId,
+        source: plannedId ? "scheduled" : "avoidance",
+      })
+      navigate({ view: "workspace" })
+    },
+    [dispatch, navigate]
+  )
 }
 
 export function newId() {
@@ -130,6 +148,19 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     isAway(state.lastOpenedAt, Date.now())
   )
   const finishReturn = useCallback(() => setReturning(false), [])
+  // Which timer was stepped out of. Every new timer has a new id, so wherever it
+  // was started from, it opens in the room. A reload on another screen doesn't.
+  const [leftRoomOf, setLeftRoomOf] = useState<string | null>(() =>
+    state.timer && parseHash(window.location.hash).view !== "workspace"
+      ? state.timer.id
+      : null
+  )
+  const timerId = state.timer?.id ?? null
+  const focusRoomOpen = timerId !== null && leftRoomOf !== timerId
+  const setFocusRoomOpen = useCallback(
+    (open: boolean) => setLeftRoomOf(open ? null : timerId),
+    [timerId]
+  )
 
   useEffect(() => {
     latest.current = state
@@ -241,6 +272,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       storageFailed,
       returning,
       finishReturn,
+      focusRoomOpen,
+      setFocusRoomOpen,
     }),
     [
       state,
@@ -254,6 +287,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       storageFailed,
       returning,
       finishReturn,
+      focusRoomOpen,
+      setFocusRoomOpen,
     ]
   )
 

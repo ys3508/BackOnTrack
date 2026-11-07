@@ -1,9 +1,36 @@
+import { observeActivity } from "@/lib/calendar/activity"
+import {
+  applyEventDelete,
+  applyEventEdit,
+  eventFromPlanned,
+  mapPlanned,
+  plannedSession,
+} from "@/lib/calendar/model"
+import type { EventPatch, EventScope } from "@/lib/calendar/model"
 import { elapsedMs, finishTime, formatMinutes } from "@/lib/focus/timer"
+import type { CasePlan } from "@/lib/recovery/case-engine"
 import { shortDate } from "@/lib/workspace/dates"
 import { observeFriction } from "@/lib/workspace/friction"
-import type { DailyPlan, HelpKind, Learning } from "@/lib/workspace/schemas"
+import type {
+  Blocker,
+  CaseFeedback,
+  CaseTool,
+  DailyPlan,
+  HelpKind,
+  Learning,
+  ProgressEvent,
+  Recovery,
+  RecoveryReason,
+  RealityCheckAnswers,
+  RealityGap,
+  RecoveryCase,
+  RecoveryPath,
+  CalendarEvent,
+} from "@/lib/workspace/schemas"
 import {
+  BLOCKER_LABEL,
   STATUS_LABEL,
+  STUCK_LABEL,
   PRIORITY_LABEL,
   isInterrupted,
 } from "@/lib/workspace/schemas"
@@ -50,6 +77,11 @@ export type WorkspaceAction =
           | "priority"
           | "nextAction"
           | "estimateMinutes"
+          | "firstStep"
+          | "resumeNote"
+          | "link"
+          | "minimumVersion"
+          | "focusTheme"
         >
       >
     }
@@ -142,15 +174,74 @@ export type WorkspaceAction =
     }
   | { type: "set-ai-consent"; id: string; at: string }
   | { type: "log-obstacle"; id: string; at: string; text: string }
-  | { type: "add-planned"; at: string; session: PlannedSession }
+  | {
+      type: "add-planned"
+      at: string
+      session: Omit<PlannedSession, "outcome" | "window"> &
+        Partial<Pick<PlannedSession, "outcome" | "window">>
+    }
+  | {
+      type: "enter-recovery"
+      at: string
+      taskId: string | null
+      plannedId?: string | null
+      source: Recovery["source"]
+    }
+  | { type: "recovery-reason"; reason: RecoveryReason | null }
+  | { type: "exit-recovery" }
+  | {
+      type: "recovery-shown"
+      at: string
+      taskId: string
+      plannedId: string
+    }
+  | { type: "recovery-action"; at: string; taskId: string }
+  | {
+      type: "release-task"
+      at: string
+      id: string
+      /** "defer" sets it aside for now. "release" lets it go on purpose. */
+      mode: "defer" | "release"
+    }
+  | {
+      type: "planned-outcome"
+      at: string
+      id: string
+      outcome: "did" | "didnt"
+      /** The focus record to create when it happened. */
+      sessionId: string
+      /** The time they say they spent, when it differs from the plan. */
+      minutes?: number
+    }
+  | { type: "undo-reported-session"; at: string; sessionId: string }
   | {
       type: "move-planned"
       at: string
       id: string
       date: string
       time: string | null
+      window?: PlannedSession["window"]
     }
   | { type: "remove-planned"; at: string; id: string }
+  | { type: "resize-planned"; at: string; id: string; minutes: number }
+  | { type: "add-event"; event: CalendarEvent }
+  | {
+      type: "edit-event"
+      id: string
+      /** The occurrence being edited, by the date it's stored under. */
+      key: string
+      scope: EventScope
+      patch: EventPatch
+      /** For the later part, when "This and following" splits a series. */
+      newId: string
+    }
+  | { type: "delete-event"; id: string; key: string; scope: EventScope }
+  | {
+      type: "occurrence-outcome"
+      id: string
+      key: string
+      outcome: "full" | "minimum" | "skipped" | null
+    }
   | { type: "toggle-planned"; id: string }
   | {
       type: "set-recovery"
@@ -182,6 +273,9 @@ export type WorkspaceAction =
       kind: TimerState["kind"]
       taskId: string | null
       subtaskId?: string | null
+      plannedId?: string | null
+      /** Starting from a recovery card, which counts as restarting. */
+      restart?: boolean
       minutes: number
       now: number
       at: string
@@ -206,6 +300,13 @@ export type WorkspaceAction =
       at: string
     }
   | { type: "report-stuck"; id: string; at: string; text: string }
+  | {
+      type: "session-wrap-up"
+      sessionId: string
+      at: string
+      outcome: "progress" | "minimum" | "completed"
+      resumeNote: string
+    }
   | { type: "settings"; patch: Partial<Settings> }
   | { type: "mark-opened"; at: string }
   | { type: "set-daily-plan"; plan: DailyPlan }
@@ -217,6 +318,59 @@ export type WorkspaceAction =
   | { type: "clear-friction" }
   | { type: "skip-recommendation"; taskId: string; date: string }
   | { type: "replace"; state: Workspace }
+  | { type: "set-intake-draft"; text: string }
+  | { type: "mark-reminded"; key: string }
+  | {
+      type: "park-thought"
+      id: string
+      at: string
+      text: string
+      taskId: string | null
+    }
+  | { type: "remove-thought"; id: string }
+  | {
+      type: "add-quick-task"
+      id: string
+      at: string
+      title: string
+    }
+  | {
+      type: "start-case"
+      /** An existing task becomes the case, so it's never duplicated. */
+      id: string
+      at: string
+      input: string
+      title: string
+      suggestedBlocker: Blocker | null
+    }
+  | { type: "case-set-blocker"; id: string; at: string; blocker: Blocker }
+  | {
+      type: "case-understood"
+      id: string
+      title: string | null
+      suggestedBlocker: Blocker | null
+    }
+  | { type: "case-apply-plan"; id: string; at: string; plan: CasePlan }
+  | { type: "case-start-action"; id: string; at: string }
+  | { type: "case-complete-action"; id: string; at: string }
+  | { type: "case-write-action"; id: string; at: string; text: string }
+  | { type: "case-feedback"; id: string; at: string; feedback: CaseFeedback }
+  | {
+      type: "case-update"
+      id: string
+      at: string
+      patch: {
+        realityGap?: RealityGap
+        realityCheck?: RealityCheckAnswers
+        messageDraft?: string
+        queue?: string[]
+        openTools?: CaseTool[]
+      }
+    }
+  | { type: "case-set-path"; id: string; at: string; path: RecoveryPath }
+  | { type: "case-answer-detail"; id: string; at: string; text: string }
+  | { type: "case-resume"; id: string; at: string }
+  | { type: "case-pause"; id: string; at: string }
 
 function eventId(at: string, task: Task) {
   return `${at}-${task.history.length}`
@@ -293,11 +447,251 @@ function mapTask(
   }
 }
 
+function blankCase(
+  input: string,
+  suggestedBlocker: Blocker | null,
+  at: string
+): RecoveryCase {
+  return {
+    originalInput: input,
+    blocker: null,
+    suggestedBlocker,
+    current: null,
+    queue: [],
+    alternatives: [],
+    completed: [],
+    tried: [],
+    realityGap: null,
+    realityCheck: null,
+    path: null,
+    messageDraft: "",
+    openTools: [],
+    missingDetail: "",
+    adaptationNote: "",
+    lastFeedback: null,
+    lastActivity: { at, text: "Told BackOnTrack about this" },
+    resumedAt: null,
+    pausedOnPurpose: false,
+  }
+}
+
+function caseActionId(at: string, recovery: RecoveryCase) {
+  return `${at}-${recovery.completed.length + recovery.tried.length}`
+}
+
+/** Applies a change to a task's case, keeping its next action in step with Tasks. */
+function updateCase(
+  state: Workspace,
+  id: string,
+  at: string,
+  update: (recovery: RecoveryCase, task: Task) => RecoveryCase,
+  activity?: string
+): Workspace {
+  return mapTask(state, id, (task) => {
+    if (!task.recoveryCase) return task
+    const next = update(task.recoveryCase, task)
+    return {
+      ...task,
+      updatedAt: at,
+      nextAction: next.current?.text ?? "",
+      recoveryCase: activity
+        ? { ...next, lastActivity: { at, text: activity } }
+        : next,
+    }
+  })
+}
+
+function completeCaseAction(task: Task, at: string): Task {
+  const recovery = task.recoveryCase
+  if (!recovery?.current) return task
+  const { current } = recovery
+  const [next, ...queue] = recovery.queue
+  const updated: RecoveryCase = {
+    ...recovery,
+    completed: [
+      ...recovery.completed,
+      { id: current.id, text: current.text, at },
+    ],
+    queue,
+    current: next
+      ? {
+          id: `${at}-${recovery.completed.length + recovery.tried.length + 1}`,
+          text: next,
+          why: "",
+          origin: current.origin,
+          createdAt: at,
+          startedAt: null,
+        }
+      : null,
+    adaptationNote: "",
+    missingDetail: "",
+    lastFeedback: { kind: "did-it", reason: null, detail: "", at },
+    lastActivity: { at, text: `Finished: ${current.text}` },
+  }
+  const done = withEvent(
+    {
+      ...task,
+      recoveryCase: updated,
+      nextAction: updated.current?.text ?? "",
+      lastWorkedAt: at,
+    },
+    at,
+    "action",
+    `Completed: ${current.text}`
+  )
+  return setTaskStatus(
+    done,
+    done.status === "not-started" || done.status === "needs-recovery"
+      ? "in-progress"
+      : done.status,
+    at
+  )
+}
+
+const MAX_PROGRESS_EVENTS = 1000
+
+/** Written from what really changed, so no screen can record a moment twice. */
+function observeProgress(
+  before: Workspace,
+  after: Workspace,
+  action: WorkspaceAction
+): Workspace {
+  if (action.type === "delete-task") {
+    return {
+      ...after,
+      progressEvents: after.progressEvents.filter(
+        (item) => item.taskId !== action.id
+      ),
+    }
+  }
+  const added: Omit<ProgressEvent, "id">[] = []
+  // Only a session that really began is a restart. Looking at a card isn't.
+  if (
+    action.type === "timer-start" &&
+    action.kind === "focus" &&
+    action.taskId &&
+    after.timer?.id === action.id &&
+    (action.restart || before.recovery?.taskId === action.taskId)
+  ) {
+    added.push({
+      taskId: action.taskId,
+      type: "restarted",
+      at: action.at,
+      sessionId: action.id,
+    })
+    added.push({
+      taskId: action.taskId,
+      type: "recovery_action_taken",
+      at: action.at,
+      sessionId: action.id,
+    })
+  }
+  if (action.type === "enter-recovery" && action.taskId) {
+    added.push({
+      taskId: action.taskId,
+      type: "recovery_shown",
+      at: action.at,
+      sessionId: action.plannedId ?? null,
+    })
+  }
+  if (
+    action.type === "recovery-shown" &&
+    !after.progressEvents.some(
+      (item) =>
+        item.type === "recovery_shown" && item.sessionId === action.plannedId
+    )
+  ) {
+    added.push({
+      taskId: action.taskId,
+      type: "recovery_shown",
+      at: action.at,
+      sessionId: action.plannedId,
+    })
+  }
+  if (action.type === "recovery-action") {
+    added.push({
+      taskId: action.taskId,
+      type: "recovery_action_taken",
+      at: action.at,
+      sessionId: null,
+    })
+  }
+  if (action.type === "release-task") {
+    added.push({
+      taskId: action.id,
+      type: "recovery_action_taken",
+      at: action.at,
+      sessionId: null,
+    })
+  }
+  if (
+    action.type === "timer-start" &&
+    action.kind === "focus" &&
+    action.taskId &&
+    after.timer?.id === action.id &&
+    !after.progressEvents.some(
+      (item) => item.taskId === action.taskId && item.type === "started"
+    )
+  ) {
+    added.push({
+      taskId: action.taskId,
+      type: "started",
+      at: action.at,
+      sessionId: action.id,
+    })
+  }
+  const sessionId = action.type === "session-wrap-up" ? action.sessionId : null
+  if (action.type === "session-wrap-up" && action.outcome === "minimum") {
+    const session = after.focusSessions.find((item) => item.id === sessionId)
+    if (session?.taskId) {
+      added.push({
+        taskId: session.taskId,
+        type: "minimum_met",
+        at: action.at,
+        sessionId,
+      })
+    }
+  }
+  if (after.tasks !== before.tasks) {
+    for (const task of after.tasks) {
+      if (task.status !== "completed" || !task.completedAt) continue
+      const old = before.tasks.find((item) => item.id === task.id)
+      if (old && old.status !== "completed") {
+        added.push({
+          taskId: task.id,
+          type: "completed",
+          at: task.completedAt,
+          sessionId,
+        })
+      }
+    }
+  }
+  if (!added.length) return after
+  return {
+    ...after,
+    progressEvents: [
+      ...after.progressEvents,
+      ...added.map((item, index) => ({
+        ...item,
+        id: `${item.at}-${after.progressEvents.length + index}`,
+      })),
+    ].slice(-MAX_PROGRESS_EVENTS),
+  }
+}
+
 export function workspaceReducer(
   state: Workspace,
   action: WorkspaceAction
 ): Workspace {
-  return observeFriction(state, applyAction(state, action), action)
+  return observeActivity(
+    state,
+    observeProgress(
+      state,
+      observeFriction(state, applyAction(state, action), action),
+      action
+    ),
+    action
+  )
 }
 
 function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
@@ -331,6 +725,13 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
           lastWorkedAt: null,
           recoveryAttempts: [],
           estimateMinutes: action.estimateMinutes ?? null,
+          recoveryCase: null,
+          quick: false,
+          firstStep: "",
+          resumeNote: "",
+          link: "",
+          minimumVersion: "",
+          focusTheme: null,
         },
         action.at,
         "created",
@@ -343,6 +744,27 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
       return mapTask(state, action.id, (task) => {
         const { patch, at } = action
         let updated = { ...task, ...patch }
+        // The task's next action and the case's current step are the same thing.
+        if (patch.nextAction !== undefined && task.recoveryCase) {
+          const recovery = task.recoveryCase
+          const text = patch.nextAction.trim()
+          updated = {
+            ...updated,
+            recoveryCase: {
+              ...recovery,
+              current: text
+                ? {
+                    id: recovery.current?.id ?? caseActionId(at, recovery),
+                    why: "",
+                    createdAt: recovery.current?.createdAt ?? at,
+                    startedAt: recovery.current?.startedAt ?? null,
+                    text,
+                    origin: "user",
+                  }
+                : null,
+            },
+          }
+        }
         if (patch.title !== undefined && patch.title !== task.title) {
           updated = withEvent(
             updated,
@@ -381,9 +803,28 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
       })
 
     case "set-status":
-      return mapTask(state, action.id, (task) =>
-        setTaskStatus(task, action.status, action.at, action.note)
-      )
+      return mapTask(state, action.id, (task) => {
+        const changed = setTaskStatus(
+          task,
+          action.status,
+          action.at,
+          action.note
+        )
+        if (!changed.recoveryCase || changed === task) return changed
+        return {
+          ...changed,
+          recoveryCase: {
+            ...changed.recoveryCase,
+            pausedOnPurpose:
+              action.status === "paused" &&
+              changed.recoveryCase.pausedOnPurpose,
+            lastActivity: {
+              at: action.at,
+              text: `Marked ${STATUS_LABEL[action.status].toLowerCase()}`,
+            },
+          },
+        }
+      })
 
     case "set-deadline":
       return mapTask(state, action.id, (task) => {
@@ -419,6 +860,9 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
 
     case "complete-next-action":
       return mapTask(state, action.id, (task) => {
+        if (task.recoveryCase?.current) {
+          return completeCaseAction(task, action.at)
+        }
         if (task.nextAction) {
           return withEvent(
             { ...task, nextAction: "" },
@@ -440,7 +884,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
       return {
         ...state,
         tasks: state.tasks.filter((task) => task.id !== action.id),
-        planned: state.planned.filter((item) => item.taskId !== action.id),
+        events: state.events.filter((item) => item.taskId !== action.id),
         dailyPlan: state.dailyPlan && {
           ...state.dailyPlan,
           items: state.dailyPlan.items.filter(
@@ -763,7 +1207,98 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
         withEvent(task, action.at, "obstacle", action.text)
       )
 
-    case "add-planned":
+    case "planned-outcome": {
+      const session = plannedSession(state, action.id)
+      if (!session || session.outcome) return state
+      const task = state.tasks.find((item) => item.id === session.taskId)
+      if (action.outcome === "didnt") {
+        return {
+          ...mapTask(state, session.taskId, (item) =>
+            withEvent(
+              item,
+              action.at,
+              "schedule",
+              `Didn’t do a planned session (${session.minutes} min)`
+            )
+          ),
+          events: mapPlanned(state.events, (item) =>
+            item.id === action.id
+              ? { ...item, outcome: "didnt" as const }
+              : item
+          ),
+        }
+      }
+      const start = new Date(`${session.date}T${session.time ?? "12:00"}:00`)
+      const minutes =
+        action.minutes && action.minutes > 0 ? action.minutes : session.minutes
+      const record: FocusSession = {
+        id: action.sessionId,
+        taskId: session.taskId,
+        taskTitle: task?.title ?? "no specific task",
+        plannedMinutes: session.minutes,
+        actualSeconds: minutes * 60,
+        startedAt: start.toISOString(),
+        endedAt: new Date(start.getTime() + minutes * 60_000).toISOString(),
+        outcome: "completed",
+        note: "",
+        subtaskId: null,
+        progressReport: null,
+        plannedId: session.id,
+        reported: true,
+        endOutcome: null,
+      }
+      const next: Workspace = {
+        ...mapTask(state, session.taskId, (item) => {
+          const logged = withEvent(
+            { ...item, lastWorkedAt: action.at },
+            action.at,
+            "focus",
+            `Reported doing a planned session (${minutes} min)`
+          )
+          return item.status === "not-started"
+            ? setTaskStatus(logged, "in-progress", action.at)
+            : logged
+        }),
+        events: mapPlanned(state.events, (item) =>
+          item.id === action.id
+            ? { ...item, done: true, outcome: "did" as const }
+            : item
+        ),
+        focusSessions: [...state.focusSessions, record],
+      }
+      return next
+    }
+
+    case "undo-reported-session": {
+      const record = state.focusSessions.find(
+        (item) => item.id === action.sessionId && item.reported
+      )
+      if (!record) return state
+      const undone: Workspace = {
+        ...state,
+        focusSessions: state.focusSessions.filter((item) => item !== record),
+        events: mapPlanned(state.events, (item) =>
+          item.id === record.plannedId
+            ? { ...item, done: false, outcome: null }
+            : item
+        ),
+      }
+      return record.taskId
+        ? mapTask(undone, record.taskId, (item) =>
+            withEvent(
+              item,
+              action.at,
+              "schedule",
+              "Took back a reported session"
+            )
+          )
+        : undone
+    }
+
+    case "add-planned": {
+      const title =
+        state.tasks.find((task) => task.id === action.session.taskId)?.title ??
+        ""
       return {
         ...mapTask(state, action.session.taskId, (task) =>
           withEvent(
@@ -773,11 +1308,15 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             `Work session planned for ${shortDate(action.session.date)} (${action.session.minutes} min)`
           )
         ),
-        planned: [...state.planned, action.session],
+        events: [
+          ...state.events,
+          eventFromPlanned(action.session, title, action.at),
+        ],
       }
+    }
 
     case "move-planned": {
-      const session = state.planned.find((item) => item.id === action.id)
+      const session = plannedSession(state, action.id)
       if (!session) return state
       return {
         ...mapTask(state, session.taskId, (task) =>
@@ -788,16 +1327,23 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             `Work session moved from ${shortDate(session.date)} to ${shortDate(action.date)}`
           )
         ),
-        planned: state.planned.map((item) =>
+        events: mapPlanned(state.events, (item) =>
           item.id === action.id
-            ? { ...item, date: action.date, time: action.time }
+            ? {
+                ...item,
+                date: action.date,
+                time: action.time,
+                window: action.time ? null : (action.window ?? null),
+                // Moving it gives it a new chance, so the old answer is gone.
+                outcome: item.outcome === "didnt" ? null : item.outcome,
+              }
             : item
         ),
       }
     }
 
     case "remove-planned": {
-      const session = state.planned.find((item) => item.id === action.id)
+      const session = plannedSession(state, action.id)
       if (!session) return state
       return {
         ...mapTask(state, session.taskId, (task) =>
@@ -808,14 +1354,73 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
             `Removed work session on ${shortDate(session.date)}`
           )
         ),
-        planned: state.planned.filter((item) => item.id !== action.id),
+        events: state.events.filter((item) => item.id !== action.id),
       }
     }
+
+    case "resize-planned": {
+      const session = plannedSession(state, action.id)
+      const minutes = Math.max(5, Math.round(action.minutes))
+      if (!session || session.minutes === minutes) return state
+      return {
+        ...mapTask(state, session.taskId, (task) =>
+          withEvent(
+            task,
+            action.at,
+            "schedule",
+            `Work session changed to ${minutes} min`
+          )
+        ),
+        events: mapPlanned(state.events, (item) =>
+          item.id === action.id ? { ...item, minutes } : item
+        ),
+      }
+    }
+
+    case "add-event":
+      return { ...state, events: [...state.events, action.event] }
+
+    case "edit-event":
+      return {
+        ...state,
+        events: applyEventEdit(
+          state.events,
+          action.id,
+          action.key,
+          action.scope,
+          action.patch,
+          action.newId
+        ),
+      }
+
+    case "delete-event":
+      return {
+        ...state,
+        events: applyEventDelete(
+          state.events,
+          action.id,
+          action.key,
+          action.scope
+        ),
+      }
+
+    case "occurrence-outcome":
+      return {
+        ...state,
+        events: state.events.map((event) => {
+          if (event.id !== action.id) return event
+          // Each date has one outcome. Minimum is never stored as full.
+          const outcomes = { ...event.outcomes }
+          if (action.outcome) outcomes[action.key] = action.outcome
+          else delete outcomes[action.key]
+          return { ...event, outcomes }
+        }),
+      }
 
     case "toggle-planned":
       return {
         ...state,
-        planned: state.planned.map((item) =>
+        events: mapPlanned(state.events, (item) =>
           item.id === action.id ? { ...item, done: !item.done } : item
         ),
       }
@@ -902,6 +1507,8 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
         minutes: item.minutes,
         label: item.label,
         done: false,
+        outcome: null,
+        window: null,
       }))
       const next = mapTask(state, action.id, (task) => {
         let updated: Task = {
@@ -962,7 +1569,19 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
           action.at
         )
       })
-      return { ...next, planned: [...next.planned, ...planned] }
+      return {
+        ...next,
+        events: [
+          ...next.events,
+          ...planned.map((item) =>
+            eventFromPlanned(
+              item,
+              next.tasks.find((task) => task.id === action.id)?.title ?? "",
+              action.at
+            )
+          ),
+        ],
+      }
     }
 
     case "timer-start": {
@@ -976,8 +1595,18 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
         startedAt: action.at,
         runningSince: action.now,
         accumulatedMs: 0,
+        plannedId: action.plannedId ?? null,
       }
-      const next = { ...state, timer, finishedSessionId: null }
+      const next = {
+        ...state,
+        timer,
+        finishedSessionId: null,
+        // A real start ends the recovery that led to it.
+        recovery:
+          action.kind === "focus" && state.recovery?.taskId === action.taskId
+            ? null
+            : state.recovery,
+      }
       if (action.kind !== "focus" || !action.taskId) return next
       return mapTask(next, action.taskId, (task) => {
         const started = withEvent(
@@ -1103,6 +1732,53 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
       })
     }
 
+    case "session-wrap-up": {
+      const reported = applyAction(state, {
+        type: "report-focus",
+        sessionId: action.sessionId,
+        report: "yes",
+        at: action.at,
+      })
+      const session = state.focusSessions.find(
+        (item) => item.id === action.sessionId
+      )
+      const next: Workspace = {
+        ...reported,
+        focusSessions: reported.focusSessions.map((item) =>
+          item.id === action.sessionId
+            ? { ...item, endOutcome: action.outcome }
+            : item
+        ),
+      }
+      if (!session?.taskId) return next
+      const note = action.resumeNote.trim()
+      return mapTask(next, session.taskId, (task) => {
+        let updated = task
+        if (note) {
+          updated = withEvent(
+            { ...updated, resumeNote: note },
+            action.at,
+            "action",
+            `Left a note for next time: ${note}`
+          )
+        }
+        // The smaller version counts for what it is, not as the whole task.
+        if (action.outcome === "minimum") {
+          updated = withEvent(
+            updated,
+            action.at,
+            "progress",
+            task.minimumVersion
+              ? `Met the minimum version: ${task.minimumVersion}`
+              : "Met the minimum version"
+          )
+        }
+        return action.outcome === "completed"
+          ? setTaskStatus(updated, "completed", action.at)
+          : updated
+      })
+    }
+
     case "report-stuck":
       return mapTask(state, action.id, (task) => {
         const reported = withEvent(
@@ -1187,6 +1863,417 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
 
     case "replace":
       return action.state
+
+    case "enter-recovery": {
+      const recovery: Recovery = {
+        taskId: action.taskId,
+        plannedId: action.plannedId ?? null,
+        source: action.source,
+        reason: null,
+        enteredAt: action.at,
+      }
+      const next = { ...state, recovery }
+      if (!action.taskId) return next
+      return mapTask(next, action.taskId, (task) =>
+        task.recoveryCase
+          ? task
+          : withEvent(
+              {
+                ...task,
+                recoveryCase: blankCase(
+                  `${task.title} ${task.description}`.trim(),
+                  null,
+                  action.at
+                ),
+              },
+              action.at,
+              "recovery",
+              "Started working through what’s in the way"
+            )
+      )
+    }
+
+    case "recovery-reason":
+      return state.recovery
+        ? { ...state, recovery: { ...state.recovery, reason: action.reason } }
+        : state
+
+    case "exit-recovery":
+      return { ...state, recovery: null }
+
+    case "recovery-shown":
+    case "recovery-action":
+      return state
+
+    case "release-task":
+      return mapTask({ ...state, recovery: null }, action.id, (task) => {
+        const kept = task.deadline
+          ? ` The original deadline stays on record: ${shortDate(task.deadline)}.`
+          : ""
+        const logged = withEvent(
+          task,
+          action.at,
+          "recovery",
+          action.mode === "release"
+            ? `Released this in BackOnTrack.${kept}`
+            : `Set this aside for now.${kept}`
+        )
+        return setTaskStatus(
+          logged,
+          action.mode === "release" ? "released" : "paused",
+          action.at
+        )
+      })
+
+    case "park-thought":
+      return {
+        ...state,
+        parkingLot: [
+          ...state.parkingLot,
+          {
+            id: action.id,
+            at: action.at,
+            text: action.text.trim(),
+            taskId: action.taskId,
+          },
+        ],
+      }
+
+    case "remove-thought":
+      return {
+        ...state,
+        parkingLot: state.parkingLot.filter((item) => item.id !== action.id),
+      }
+
+    case "mark-reminded":
+      return {
+        ...state,
+        remindedBlocks: [...state.remindedBlocks, action.key].slice(-200),
+      }
+
+    case "set-intake-draft":
+      return { ...state, intakeDraft: action.text }
+
+    case "add-quick-task": {
+      const added = applyAction(state, {
+        type: "create-task",
+        id: action.id,
+        at: action.at,
+        title: action.title,
+      })
+      return mapTask({ ...added, intakeDraft: "" }, action.id, (task) => ({
+        ...task,
+        quick: true,
+      }))
+    }
+
+    case "start-case": {
+      const existing = state.tasks.find((task) => task.id === action.id)
+      if (existing?.recoveryCase) return state
+      if (existing) {
+        return mapTask({ ...state, intakeDraft: "" }, action.id, (task) =>
+          withEvent(
+            {
+              ...task,
+              quick: false,
+              recoveryCase: blankCase(
+                action.input,
+                action.suggestedBlocker,
+                action.at
+              ),
+            },
+            action.at,
+            "recovery",
+            "Started working on this in Recovery"
+          )
+        )
+      }
+      const created = applyAction(state, {
+        type: "create-task",
+        id: action.id,
+        at: action.at,
+        title: action.title,
+        description: action.input,
+      })
+      return mapTask({ ...created, intakeDraft: "" }, action.id, (task) => ({
+        ...task,
+        recoveryCase: blankCase(
+          action.input,
+          action.suggestedBlocker,
+          action.at
+        ),
+      }))
+    }
+
+    case "case-understood":
+      return mapTask(state, action.id, (task) =>
+        task.recoveryCase && !task.recoveryCase.blocker
+          ? {
+              ...task,
+              title: action.title?.trim() || task.title,
+              recoveryCase: {
+                ...task.recoveryCase,
+                suggestedBlocker:
+                  action.suggestedBlocker ?? task.recoveryCase.suggestedBlocker,
+              },
+            }
+          : task
+      )
+
+    case "case-set-blocker": {
+      const task = state.tasks.find((item) => item.id === action.id)
+      const before = task?.recoveryCase?.blocker
+      if (!task?.recoveryCase || before === action.blocker) return state
+      const next = updateCase(
+        state,
+        action.id,
+        action.at,
+        (recovery) => ({ ...recovery, blocker: action.blocker }),
+        before ? "Changed what’s in the way" : "Said what’s in the way"
+      )
+      return mapTask(next, action.id, (item) =>
+        withEvent(
+          item,
+          action.at,
+          "recovery",
+          `What’s in the way: ${BLOCKER_LABEL[action.blocker]}`
+        )
+      )
+    }
+
+    case "case-apply-plan": {
+      const { plan, at } = action
+      const origin = plan.source
+      const next = updateCase(state, action.id, at, (recovery) => {
+        const old = recovery.current
+        const replacing = Boolean(old) && !plan.keepCurrent
+        const current =
+          plan.action && !plan.keepCurrent
+            ? {
+                id: caseActionId(at, {
+                  ...recovery,
+                  tried: replacing ? [...recovery.tried, ""] : recovery.tried,
+                }),
+                text: plan.action.text,
+                why: plan.action.why,
+                origin,
+                createdAt: at,
+                startedAt: null,
+              }
+            : plan.keepCurrent
+              ? old
+              : null
+        return {
+          ...recovery,
+          current,
+          queue:
+            plan.keepCurrent || plan.keepQueue
+              ? recovery.queue.filter((step) => step !== plan.action?.text)
+              : plan.queue,
+          alternatives: plan.alternatives,
+          // Anything already drafted or edited is the user's, so it stays.
+          realityGap: recovery.realityGap ?? plan.realityGap ?? null,
+          messageDraft: recovery.messageDraft || (plan.messageDraft ?? ""),
+          openTools: [
+            ...new Set([...recovery.openTools, ...(plan.openTools ?? [])]),
+          ],
+          missingDetail: plan.missingDetail,
+          adaptationNote: plan.note,
+          tried:
+            replacing && old
+              ? [...new Set([...recovery.tried, old.text])].slice(-40)
+              : recovery.tried,
+        }
+      })
+      return mapTask(next, action.id, (task) => {
+        const text = task.recoveryCase?.current?.text
+        const changed =
+          text && !plan.keepCurrent && plan.action
+            ? withEvent(
+                task,
+                at,
+                "recovery",
+                `Suggested a next step (${sourceName({ source: origin })}): ${text}`
+              )
+            : task
+        return changed.status === "needs-recovery" && text
+          ? setTaskStatus(changed, "in-progress", at)
+          : changed
+      })
+    }
+
+    case "case-start-action": {
+      const next = updateCase(
+        state,
+        action.id,
+        action.at,
+        (recovery) =>
+          recovery.current
+            ? {
+                ...recovery,
+                current: { ...recovery.current, startedAt: action.at },
+              }
+            : recovery,
+        "Started the next step"
+      )
+      return mapTask(next, action.id, (task) => {
+        const started = { ...task, lastWorkedAt: action.at }
+        return task.status === "not-started" ||
+          task.status === "paused" ||
+          task.status === "needs-recovery"
+          ? setTaskStatus(started, "in-progress", action.at)
+          : started
+      })
+    }
+
+    case "case-complete-action":
+      return mapTask(state, action.id, (task) =>
+        completeCaseAction(task, action.at)
+      )
+
+    case "case-write-action": {
+      const text = action.text.trim()
+      if (!text) return state
+      const next = updateCase(
+        state,
+        action.id,
+        action.at,
+        (recovery) => {
+          const old = recovery.current
+          if (old?.text === text) return recovery
+          return {
+            ...recovery,
+            current: {
+              id: old?.id ?? caseActionId(action.at, recovery),
+              text,
+              why: "",
+              origin: "user" as const,
+              createdAt: action.at,
+              startedAt: old?.startedAt ?? null,
+            },
+            adaptationNote: "",
+            missingDetail: "",
+            tried:
+              old && !recovery.tried.includes(old.text)
+                ? [...recovery.tried, old.text].slice(-40)
+                : recovery.tried,
+          }
+        },
+        "Chose a next step"
+      )
+      return mapTask(next, action.id, (task) =>
+        withEvent(task, action.at, "action", `Next action set: ${text}`)
+      )
+    }
+
+    case "case-feedback": {
+      const { feedback, at } = action
+      const label =
+        feedback.kind === "stuck" && feedback.reason
+          ? `Reported being stuck: ${STUCK_LABEL[feedback.reason]}`
+          : "Asked for another approach"
+      const next = updateCase(
+        state,
+        action.id,
+        at,
+        (recovery) => ({ ...recovery, lastFeedback: feedback }),
+        label
+      )
+      return mapTask(next, action.id, (task) => {
+        const logged = withEvent(
+          task,
+          at,
+          feedback.kind === "stuck" ? "stuck" : "recovery",
+          label
+        )
+        return feedback.detail
+          ? withEvent(logged, at, "obstacle", feedback.detail)
+          : logged
+      })
+    }
+
+    case "case-update":
+      return updateCase(
+        state,
+        action.id,
+        action.at,
+        (recovery) => ({ ...recovery, ...action.patch }),
+        action.patch.realityGap
+          ? "Edited the Reality Gap"
+          : action.patch.realityCheck
+            ? "Filled in what really happened"
+            : action.patch.queue
+              ? "Edited the plan"
+              : action.patch.openTools
+                ? "Reconsidering the plan"
+                : "Edited the message draft"
+      )
+
+    case "case-set-path": {
+      const task = state.tasks.find((item) => item.id === action.id)
+      if (!task?.recoveryCase || task.recoveryCase.path === action.path) {
+        return state
+      }
+      const next = updateCase(
+        state,
+        action.id,
+        action.at,
+        (recovery) => ({ ...recovery, path: action.path }),
+        `Chose to ${action.path} this`
+      )
+      return mapTask(next, action.id, (item) =>
+        withEvent(item, action.at, "recovery", `Chose to ${action.path} this`)
+      )
+    }
+
+    case "case-answer-detail": {
+      const text = action.text.trim()
+      if (!text) return state
+      return mapTask(state, action.id, (task) => {
+        const recovery = task.recoveryCase
+        if (!recovery) return task
+        const input = `${recovery.originalInput} ${text}`
+        return withEvent(
+          {
+            ...task,
+            // A placeholder title gives way to the thing the user named.
+            title: /^Something I/.test(task.title)
+              ? text.length > 80
+                ? `${text.slice(0, 77)}...`
+                : text[0].toUpperCase() + text.slice(1)
+              : task.title,
+            recoveryCase: {
+              ...recovery,
+              originalInput: input,
+              missingDetail: "",
+              lastActivity: { at: action.at, text: "Added a detail" },
+            },
+          },
+          action.at,
+          "edited",
+          `Added a detail: ${text}`
+        )
+      })
+    }
+
+    case "case-resume":
+      return updateCase(state, action.id, action.at, (recovery) => ({
+        ...recovery,
+        resumedAt: action.at,
+      }))
+
+    case "case-pause": {
+      const paused = mapTask(state, action.id, (task) =>
+        setTaskStatus(task, "paused", action.at, "Paused on purpose")
+      )
+      return updateCase(
+        paused,
+        action.id,
+        action.at,
+        (recovery) => ({ ...recovery, pausedOnPurpose: true }),
+        "Paused on purpose"
+      )
+    }
   }
 }
 
@@ -1204,6 +2291,9 @@ function recordSession(
     progressReport: null,
     plannedMinutes: timer.plannedSeconds / 60,
     startedAt: timer.startedAt,
+    plannedId: timer.plannedId,
+    reported: false,
+    endOutcome: null,
     ...result,
   }
   const length = formatMinutes(result.actualSeconds)
@@ -1220,6 +2310,15 @@ function recordSession(
     timer: null,
     focusSessions: [...state.focusSessions, session],
     finishedSessionId: session.id,
+    // Real focus answers the question, so the block won't ask "Did it?" later.
+    events:
+      timer.plannedId && !interrupted
+        ? mapPlanned(state.events, (item) =>
+            item.id === timer.plannedId
+              ? { ...item, done: true, outcome: "did" as const }
+              : item
+          )
+        : state.events,
   }
   if (!task) return next
   return mapTask(next, task.id, (item) => {

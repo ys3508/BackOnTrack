@@ -1,13 +1,27 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { Download, Trash2, Upload } from "lucide-react"
+import {
+  BellRing,
+  CalendarArrowDown as CalendarDown,
+  Coffee,
+  Database,
+  Download,
+  SlidersHorizontal,
+  Sparkles,
+  Trash2,
+  Upload,
+} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
-import { Card, ScreenHeading } from "@/components/shared"
+import { ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { LearningCard } from "@/components/workspace/learning-card"
 import { ConfirmDialog, fieldClass } from "@/components/workspace/parts"
+import { notificationStatus } from "@/components/workspace/reminder-watcher"
 import { useStore } from "@/components/workspace/store"
+import { downloadIcs } from "@/lib/calendar/ics"
+import type { Source } from "@/lib/session"
 import {
   STORAGE_LIMIT_BYTES,
   exportWorkspace,
@@ -16,8 +30,157 @@ import {
 } from "@/lib/workspace/storage"
 import type { Settings, Workspace } from "@/lib/workspace/schemas"
 
+/** One settings group: a coloured tab to find it by, then its controls. */
+function Section({
+  title,
+  Icon,
+  tone,
+  wide,
+  children,
+}: {
+  title: string
+  Icon: LucideIcon
+  tone: string
+  wide?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      className={`bot-card bot-rise overflow-hidden ${wide ? "lg:col-span-2" : ""}`}
+    >
+      <div className="flex items-center gap-2.5 px-5 pt-5 pb-1">
+        <span style={{ background: tone }} className="bot-tile-glyph size-8">
+          <Icon className="size-4" aria-hidden />
+        </span>
+        <h2 className="text-[2rem] leading-none">{title}</h2>
+      </div>
+      <div className="space-y-3 p-5">{children}</div>
+    </section>
+  )
+}
+
+function SuggestionsCard() {
+  const { state, dispatch, mode, liveAvailable, statusChecked } = useStore()
+  const options: { value: Source; label: string }[] = [
+    { value: "demo", label: "Demo" },
+    { value: "live", label: "Live AI" },
+  ]
+  return (
+    <Section title="Where suggestions come from" Icon={Sparkles} tone="var(--lilac)">
+      <div
+        role="group"
+        aria-label="Response source for suggestions"
+        className="inline-flex rounded-full bg-white/70 p-1 text-sm font-medium"
+      >
+        {options.map((option) => {
+          const unavailable = option.value === "live" && !liveAvailable
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={mode === option.value}
+              disabled={unavailable || !statusChecked}
+              onClick={() =>
+                dispatch({
+                  type: "settings",
+                  patch: { modePreference: option.value },
+                })
+              }
+              className={
+                "min-h-10 rounded-full px-4 transition-colors outline-none  " +
+                (mode === option.value
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground") +
+                (unavailable ? " cursor-not-allowed" : "")
+              }
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {mode === "live"
+          ? "Live AI sends what you write about a task to the AI provider, to suggest next steps. It can be wrong, and you confirm any change."
+          : "Demo uses built-in templates and wording rules, not AI, and sends nothing anywhere. Each suggestion says so."}
+        {statusChecked && !liveAvailable && !state.settings.modePreference
+          ? " Live AI needs an API key on the server, and none is set here."
+          : ""}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Tasks, the timer, recovery, and the calendar all work without AI.
+      </p>
+    </Section>
+  )
+}
+
+function RemindersCard() {
+  const { state, dispatch } = useStore()
+  const [permission, setPermission] = useState(notificationStatus)
+  const on = state.settings.remindersEnabled
+
+  async function turnOn() {
+    dispatch({ type: "settings", patch: { remindersEnabled: true } })
+    // Asked here, once they've read why and chosen to turn this on.
+    if (notificationStatus() === "default") {
+      try {
+        setPermission(await Notification.requestPermission())
+      } catch {
+        setPermission(notificationStatus())
+      }
+    }
+  }
+
+  return (
+    <Section title="Reminders" Icon={BellRing} tone="var(--pink)">
+      <p className="text-sm text-muted-foreground">
+        A reminder about five minutes before a scheduled block. Your browser may
+        ask for permission to show notifications, so they can reach you when
+        you’re in another tab.
+      </p>
+      <p className="text-sm text-muted-foreground">
+        These only work while BackOnTrack is open in a browser tab, and browsers
+        can delay them in the background. They aren’t push notifications: a
+        closed tab or a sleeping computer means no reminder, so don’t rely on
+        them for anything critical.
+      </p>
+      <Button
+        type="button"
+        size="xl"
+        variant={on ? "outline" : "default"}
+        onClick={() =>
+          on
+            ? dispatch({ type: "settings", patch: { remindersEnabled: false } })
+            : turnOn()
+        }
+      >
+        <span
+          aria-hidden
+          className={`relative h-5 w-9 rounded-full border-2 border-current transition-colors`}
+        >
+          <span
+            className={`absolute top-0.5 size-3 rounded-full bg-current transition-[left] duration-200 ${on ? "left-[1.125rem]" : "left-0.5"}`}
+          />
+        </span>
+        {on ? "Turn off reminders" : "Turn on reminders"}
+      </Button>
+      {on && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {permission === "granted"
+            ? "On. You’ll get a browser notification and an on-screen reminder."
+            : permission === "denied"
+              ? "On, on screen only. Your browser is blocking notifications, which you can change in its site settings."
+              : permission === "unsupported"
+                ? "On, on screen only. This browser doesn’t support notifications."
+                : "On, on screen only, unless you allow notifications."}
+        </p>
+      )}
+    </Section>
+  )
+}
+
 export function SettingsView() {
-  const { state, dispatch, deleteAll } = useStore()
+  const { state, dispatch, deleteAll, today } = useStore()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pendingImport, setPendingImport] = useState<Workspace | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -35,13 +198,14 @@ export function SettingsView() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <ScreenHeading>Settings and data</ScreenHeading>
+    <div className="mx-auto grid max-w-5xl items-start gap-5 lg:grid-cols-2">
+      <div className="lg:col-span-2">
+        <ScreenHeading>
+          Settings <span className="bot-accent">and data</span>
+        </ScreenHeading>
+      </div>
 
-      <Card className="space-y-3">
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-          Make it yours
-        </h2>
+      <Section title="Make it yours" Icon={SlidersHorizontal} tone="var(--butter)" wide>
         <p className="text-sm text-muted-foreground">
           Everything works as it is. Change these only if you’d like to.
         </p>
@@ -78,7 +242,7 @@ export function SettingsView() {
               htmlFor="home-size"
               className="mb-1 block text-sm font-medium"
             >
-              Tasks shown per list on the home page
+              Tasks shown per list on Today
             </label>
             <select
               id="home-size"
@@ -100,20 +264,99 @@ export function SettingsView() {
             </select>
           </div>
         </div>
-      </Card>
+      </Section>
 
-      <LearningCard />
+      <SuggestionsCard />
+      <RemindersCard />
 
-      <Card className="space-y-3">
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-          Your data
-        </h2>
+      <Section title="Buffers" Icon={Coffee} tone="var(--sky)" wide>
+        <p className="text-sm text-muted-foreground">
+          You place buffers yourself: drag one onto the calendar, or choose
+          Buffer when adding something. There are none unless you add them, and
+          an unused one doesn’t count as anything missed.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="buffer-minutes"
+              className="mb-1 block text-sm font-medium"
+            >
+              Default length for new buffers
+            </label>
+            <select
+              id="buffer-minutes"
+              value={state.settings.bufferMinutes}
+              onChange={(event) =>
+                dispatch({
+                  type: "settings",
+                  patch: { bufferMinutes: Number(event.target.value) },
+                })
+              }
+              className={fieldClass}
+            >
+              {[15, 30, 45, 60, 90].map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} minutes
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="buffer-gap"
+              className="mb-1 block text-sm font-medium"
+            >
+              Gap between work blocks
+            </label>
+            <select
+              id="buffer-gap"
+              value={state.settings.bufferGapMinutes}
+              onChange={(event) =>
+                dispatch({
+                  type: "settings",
+                  patch: { bufferGapMinutes: Number(event.target.value) },
+                })
+              }
+              className={fieldClass}
+            >
+              {[0, 5, 10, 15].map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes === 0 ? "No gap" : `${minutes} minutes`}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          A gap moves a newly placed block later, so it doesn’t sit right after
+          another one.
+        </p>
+      </Section>
+
+      <div className="lg:col-span-2">
+        <LearningCard />
+      </div>
+
+      <Section title="Your data" Icon={Database} tone="var(--mint)" wide>
+        <Button
+          type="button"
+          size="xl"
+          variant="outline"
+          onClick={() => downloadIcs(state, today)}
+        >
+          <CalendarDown aria-hidden />
+          Export calendar (.ics)
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          A one-time copy of upcoming planned blocks and deadlines, for another
+          calendar app. It doesn’t stay in sync.
+        </p>
         <p className="text-sm text-muted-foreground">
           Your tasks and documents are saved only in this browser. There’s no
           account, and they aren’t synced to other devices. Clearing your
           browser data deletes them, so export a backup now and then.
         </p>
-        <p className="text-sm">
+        <p className="text-sm font-semibold">
           Using about {(storageUsedBytes() / 1024 / 1024).toFixed(2)} MB of
           about {STORAGE_LIMIT_BYTES / 1024 / 1024} MB available.
         </p>
@@ -164,7 +407,7 @@ export function SettingsView() {
             {importError}
           </p>
         )}
-      </Card>
+      </Section>
 
       <ConfirmDialog
         open={Boolean(pendingImport)}

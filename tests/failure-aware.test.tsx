@@ -25,7 +25,13 @@ import { exportWorkspace, parseImport } from "@/lib/workspace/storage"
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
 vi.mock("@fullcalendar/timegrid", () => ({ default: {} }))
-vi.mock("@fullcalendar/interaction", () => ({ default: {} }))
+vi.mock("@fullcalendar/interaction", () => ({
+  default: {},
+  Draggable: class {
+    destroy() {}
+  },
+}))
+vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 // Real dates, because patterns only look at the last 60 days.
@@ -114,7 +120,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = "#/"
+  window.location.hash = "#/plan"
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => Response.json({ live: false, model: null }))
@@ -555,6 +561,7 @@ describe("in the app", () => {
       )
     )
     const user = userEvent.setup()
+    window.location.hash = "#/tasks/a"
     render(<WorkspaceApp />)
     const hint = await screen.findByRole("region", {
       name: "Something BackOnTrack noticed",
@@ -636,32 +643,32 @@ describe("in the app", () => {
     ).toBeInTheDocument()
   })
 
-  it.each([
-    ["settings", "#/settings"],
-    ["home with a hint", "#/"],
-  ])("has no accessibility violations on %s", async (_name, hash) => {
-    seed(
-      run(
-        [
-          {
-            type: "add-subtask",
-            id: "a",
-            at: AT,
-            subId: "1",
-            title: "Write it",
-          },
-        ],
-        threeStuck()
+  it.each([["settings", "#/settings"]])(
+    "has no accessibility violations on %s",
+    async (_name, hash) => {
+      seed(
+        run(
+          [
+            {
+              type: "add-subtask",
+              id: "a",
+              at: AT,
+              subId: "1",
+              title: "Write it",
+            },
+          ],
+          threeStuck()
+        )
       )
-    )
-    window.location.hash = hash
-    render(<WorkspaceApp />)
-    await screen.findByRole("heading", { level: 1 })
-    await screen.findByText(/Empty documents/)
-    await waitFor(() => expect(fetch).toHaveBeenCalled())
-    const { violations } = await axe.run(document.body, {
-      rules: { "color-contrast": { enabled: false } },
-    })
-    expect(violations.map((item) => item.id)).toEqual([])
-  })
+      window.location.hash = hash
+      render(<WorkspaceApp />)
+      await screen.findByRole("heading", { level: 1 })
+      await screen.findByText(/Empty documents/)
+      await waitFor(() => expect(fetch).toHaveBeenCalled())
+      const { violations } = await axe.run(document.body, {
+        rules: { "color-contrast": { enabled: false } },
+      })
+      expect(violations.map((item) => item.id)).toEqual([])
+    }
+  )
 })

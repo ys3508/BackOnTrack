@@ -23,7 +23,13 @@ import { EMPTY_WORKSPACE } from "@/lib/workspace/schemas"
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
 vi.mock("@fullcalendar/timegrid", () => ({ default: {} }))
-vi.mock("@fullcalendar/interaction", () => ({ default: {} }))
+vi.mock("@fullcalendar/interaction", () => ({
+  default: {},
+  Draggable: class {
+    destroy() {}
+  },
+}))
+vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 const AT = "2026-11-05T12:00:00.000Z"
@@ -43,7 +49,7 @@ async function getEditor(): Promise<Editor> {
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = ""
+  window.location.hash = "#/tasks"
   window.scrollTo = vi.fn() as typeof window.scrollTo
 })
 
@@ -62,7 +68,7 @@ describe("definition of done", () => {
       "Finish my machine learning assignment"
     )
     await user.click(screen.getByRole("button", { name: "Add" }))
-    await user.click(await button("Finish my machine learning assignment"))
+    await user.click(await button(/^Finish my machine learning assignment/))
 
     // 2. Paste task instructions.
     await user.click(await button(/^Instructions/))
@@ -134,19 +140,12 @@ describe("definition of done", () => {
       "I don't understand what they want"
     )
     await user.click(await button("Find another way in"))
-    await user.click(await button("Get a recovery plan"))
-    const first = (await screen.findByRole("heading", { level: 1 })).textContent
-    expect(first).toMatch(/Pull out what/)
-    expect(
-      (screen.getByLabelText(/Your draft/) as HTMLTextAreaElement).value
-    ).toContain("- [ ] Train a classifier")
-    await user.click(await button(/Still stuck/))
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1 }).textContent).not.toBe(
-        first
-      )
-    )
-    await user.click(await button("Add selected to my task"))
+    await screen.findByRole("heading", {
+      name: "What’s making this difficult right now?",
+    })
+    await user.click(await button("Not now"))
+    await user.click(await button("All tasks"))
+    await user.click(await button(/^Finish my machine learning assignment/))
 
     // 12. See accurate progress and history.
     await screen.findByRole("heading", {
@@ -163,10 +162,6 @@ describe("definition of done", () => {
       /Started a focus session/,
       /Completed: /,
       /Stopped focus|Interrupted attempt/,
-      /Reported being stuck/,
-      /Suggested a recovery plan/,
-      /Declined a suggested plan/,
-      /Accepted a recovery plan/,
     ]) {
       expect(within(history).getAllByText(text).length).toBeGreaterThan(0)
     }
@@ -176,12 +171,9 @@ describe("definition of done", () => {
     expect(task.completedAt).toBeNull()
 
     // 11. Return later, and resume from the saved position.
-    window.location.hash = "#/"
+    window.location.hash = `#/tasks/${task.id}/doc`
     unmount()
     render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: "Continue where you left off" })
-    expect(screen.getByText(/You completed 1 of \d+ steps/)).toBeInTheDocument()
-    await user.click(await button("Open my document"))
     const restored = await getEditor()
     await waitFor(() => expect(restored.getText()).toContain("My own sentence"))
 
@@ -233,7 +225,7 @@ describe("focus inside the task", () => {
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"))
     })
-    await screen.findByText("Did you make progress?")
+    await screen.findByLabelText("Where should you start next time?")
   }
 
   it("shows the current step beside the document, without leaving the page", async () => {
@@ -246,11 +238,11 @@ describe("focus inside the task", () => {
     vi.useRealTimers()
   })
 
-  it("answers Yes: offers the step, but never completes anything by itself", async () => {
+  it("answers that it made progress: offers the step, but never completes anything by itself", async () => {
     render(<WorkspaceApp />)
     await finishSession()
     expect(saved().tasks[0].subtasks[0].done).toBe(false)
-    fireEvent.click(await button("Yes"))
+    fireEvent.click(await button("I started / made progress"))
     expect(saved().focusSessions[0].progressReport).toBe("yes")
     expect(saved().tasks[0].status).toBe("in-progress")
     expect(saved().tasks[0].subtasks[0].done).toBe(false)
@@ -265,7 +257,8 @@ describe("focus inside the task", () => {
     fireEvent.click(await button("I got stuck"))
     expect(saved().tasks[0].status).toBe("needs-recovery")
     expect(saved().focusSessions[0].progressReport).toBe("stuck")
-    await waitFor(() => expect(window.location.hash).toBe("#/recover/a"))
+    await waitFor(() => expect(window.location.hash).toBe("#/"))
+    expect(saved().recovery).toMatchObject({ taskId: "a", reason: null })
     vi.useRealTimers()
   })
 })
@@ -309,19 +302,5 @@ describe("demo examples", () => {
     )
     expect(plan.choices).toHaveLength(3)
     expect(plan.adaptationNote).toContain("I stared at the blank page")
-  })
-
-  it("adds an example with one click on an empty workspace", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => Response.json({ live: false, model: null }))
-    )
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(await button("Homework assignment"))
-    await screen.findByRole("heading", {
-      name: "Finish my machine learning assignment",
-    })
-    expect(saved().tasks[0].instructions.text).toContain("Train a classifier")
   })
 })

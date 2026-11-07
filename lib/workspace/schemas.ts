@@ -139,6 +139,131 @@ export const StoredRecoverySchema = z.object({
 })
 export type StoredRecovery = z.infer<typeof StoredRecoverySchema>
 
+/* ---------- Recovery cases ---------- */
+
+export const BLOCKERS = [
+  "dont-know-start",
+  "cant-start",
+  "worried",
+  "behind",
+] as const
+export type Blocker = (typeof BLOCKERS)[number]
+
+/** The user's own words for what's in the way. These are never diagnoses. */
+export const BLOCKER_LABEL: Record<Blocker, string> = {
+  "dont-know-start": "I don’t know where to start.",
+  "cant-start": "I know what to do, but I can’t start.",
+  worried: "I’m worried about what might happen.",
+  behind: "I’m already behind, or my plan didn’t work.",
+}
+
+export const STUCK_REASONS = [
+  "too-big",
+  "dont-know-how",
+  "worried",
+  "low-energy",
+  "not-viable",
+  "other",
+] as const
+export type StuckReason = (typeof STUCK_REASONS)[number]
+
+export const STUCK_LABEL: Record<StuckReason, string> = {
+  "too-big": "The step feels too big.",
+  "dont-know-how": "I don’t know how to do it.",
+  worried: "I’m worried about the outcome.",
+  "low-energy": "I don’t have enough time or energy.",
+  "not-viable": "This plan won’t work anymore.",
+  other: "Something else.",
+}
+
+export const RECOVERY_PATHS = ["finish", "reduce", "release"] as const
+export type RecoveryPath = (typeof RECOVERY_PATHS)[number]
+
+export const CASE_TOOLS = ["reality-gap", "paths"] as const
+export type CaseTool = (typeof CASE_TOOLS)[number]
+
+/** Where a suggestion came from, so a template is never presented as AI. */
+export const ActionOrigin = z.enum(["live", "demo", "user"])
+export type ActionOrigin = z.infer<typeof ActionOrigin>
+
+export const CaseActionSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  why: z.string().default(""),
+  origin: ActionOrigin.default("demo"),
+  createdAt: z.string(),
+  /** When the user said they were beginning it. Starting isn't finishing. */
+  startedAt: z.string().nullable().default(null),
+})
+export type CaseAction = z.infer<typeof CaseActionSchema>
+
+export const RealityGapSchema = z.object({
+  known: z.array(z.string()).default([]),
+  worried: z.array(z.string()).default([]),
+  unknown: z.array(z.string()).default([]),
+  can: z.array(z.string()).default([]),
+})
+export type RealityGap = z.infer<typeof RealityGapSchema>
+
+export const RealityCheckSchema = z.object({
+  expected: z.string().default(""),
+  happened: z.string().default(""),
+  done: z.string().default(""),
+  opportunity: z.enum(["yes", "no", "unsure"]).nullable().default(null),
+  constraints: z.string().default(""),
+})
+export type RealityCheckAnswers = z.infer<typeof RealityCheckSchema>
+
+export const CaseFeedbackSchema = z.object({
+  kind: z.enum(["did-it", "stuck", "another"]),
+  reason: z.enum(STUCK_REASONS).nullable().default(null),
+  detail: z.string().default(""),
+  at: z.string(),
+})
+export type CaseFeedback = z.infer<typeof CaseFeedbackSchema>
+
+/**
+ * The recovery work on one responsibility. It lives on the task, so the task's
+ * status, deadline, document, timer, and history are never kept twice.
+ */
+export const RecoveryCaseSchema = z.object({
+  originalInput: z.string(),
+  blocker: z.enum(BLOCKERS).nullable().default(null),
+  suggestedBlocker: z.enum(BLOCKERS).nullable().catch(null).default(null),
+  current: CaseActionSchema.nullable().catch(null).default(null),
+  /** Later steps, kept back so that only one is ever shown. */
+  queue: z.array(z.string()).catch([]).default([]),
+  /** Other ways in for "Try another approach". */
+  alternatives: z.array(z.string()).catch([]).default([]),
+  completed: z
+    .array(z.object({ id: z.string(), text: z.string(), at: z.string() }))
+    .catch([])
+    .default([]),
+  /** Suggestions that didn't get done. They're never offered again. */
+  tried: z.array(z.string()).catch([]).default([]),
+  realityGap: RealityGapSchema.nullable().catch(null).default(null),
+  realityCheck: RealityCheckSchema.nullable().catch(null).default(null),
+  path: z.enum(RECOVERY_PATHS).nullable().catch(null).default(null),
+  messageDraft: z.string().catch("").default(""),
+  /** Tools opened by a Plan B, on top of the ones for the current blocker. */
+  openTools: z.array(z.enum(CASE_TOOLS)).catch([]).default([]),
+  /** The one detail needed for a useful suggestion, and why it's being asked. */
+  missingDetail: z.string().catch("").default(""),
+  /** What changed after the last "I'm stuck", in plain words. */
+  adaptationNote: z.string().catch("").default(""),
+  lastFeedback: CaseFeedbackSchema.nullable().catch(null).default(null),
+  lastActivity: z
+    .object({ at: z.string(), text: z.string() })
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** When the user last chose how to come back, so they're asked only once. */
+  resumedAt: z.string().nullable().catch(null).default(null),
+  /** True when the user chose to stop for now on purpose. */
+  pausedOnPurpose: z.boolean().catch(false).default(false),
+})
+export type RecoveryCase = z.infer<typeof RecoveryCaseSchema>
+
 export const TaskSchema = z.object({
   id: z.string(),
   title: z.string().min(1),
@@ -168,6 +293,31 @@ export const TaskSchema = z.object({
   recoveryAttempts: z.array(RecoveryAttemptSchema).catch([]).default([]),
   /** The user's rough guess at the whole task, in minutes. Optional. */
   estimateMinutes: z.number().positive().nullable().catch(null).default(null),
+  /** "What will you do first?" Optional, and the user's own words. */
+  firstStep: z.string().catch("").default(""),
+  /** Where to pick up next time. It comes before the first step when present. */
+  resumeNote: z.string().catch("").default(""),
+  /** A web address that opens the work directly. */
+  link: z.string().catch("").default(""),
+  /** The smaller version that still counts, which is not the whole task. */
+  minimumVersion: z.string().catch("").default(""),
+  /** Present when this responsibility is being worked on in Recovery. */
+  recoveryCase: RecoveryCaseSchema.nullable().catch(null).default(null),
+  /** A simple errand from the home page, which needs no recovery workflow. */
+  quick: z.boolean().catch(false).default(false),
+  /** The user-chosen visual theme shared by Today, Calendar, and Focus. */
+  focusTheme: z
+    .enum([
+      "coral-bloom",
+      "blue-daydream",
+      "citrus-glow",
+      "mint-garden",
+      "lavender-haze",
+      "pink-sunrise",
+    ])
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type Task = z.infer<typeof TaskSchema>
 
@@ -184,9 +334,24 @@ export const FocusSessionSchema = z.object({
   subtaskId: z.string().nullable().default(null),
   /** The user's own answer. Elapsed time alone is never treated as progress. */
   progressReport: z.enum(["yes", "a-little", "stuck"]).nullable().default(null),
+  /** The planned session this came from, if any. */
+  plannedId: z.string().nullable().catch(null).default(null),
+  /** True when the user said it happened, rather than a timer measuring it. */
+  reported: z.boolean().catch(false).default(false),
+  /** What the user said came of it, once they said. */
+  endOutcome: z
+    .enum(["progress", "minimum", "completed"])
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type FocusSession = z.infer<typeof FocusSessionSchema>
 
+/**
+ * A block as the rest of the app reads it: one-off work on a task. It's a view
+ * of a CalendarEvent, and this schema is only used to read data saved before
+ * events existed.
+ */
 export const PlannedSessionSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -196,6 +361,14 @@ export const PlannedSessionSchema = z.object({
   minutes: z.number(),
   label: z.string().default(""),
   done: z.boolean().default(false),
+  /** The user's answer once its time has gone by. "did" became focus time. */
+  outcome: z.enum(["did", "didnt"]).nullable().catch(null).default(null),
+  /** A part of the day instead of an exact time. Only when time is null. */
+  window: z
+    .enum(["morning", "afternoon", "evening"])
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type PlannedSession = z.infer<typeof PlannedSessionSchema>
 
@@ -210,6 +383,8 @@ export const TimerSchema = z.object({
   runningSince: z.number().nullable(),
   /** Milliseconds counted before the current run. */
   accumulatedMs: z.number(),
+  /** The planned session this timer is carrying out, if any. */
+  plannedId: z.string().nullable().catch(null).default(null),
 })
 export type TimerState = z.infer<typeof TimerSchema>
 
@@ -219,6 +394,23 @@ export const SettingsSchema = z.object({
     .union([z.literal(5), z.literal(10), z.literal(25)])
     .default(5),
   homeListSize: z.union([z.literal(3), z.literal(5)]).default(3),
+  /** The length last chosen on the calendar, used as the next default. */
+  lastSessionMinutes: z
+    .number()
+    .positive()
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** How long a new buffer starts out. Buffers themselves are the user's. */
+  bufferMinutes: z.number().positive().catch(30).default(30),
+  /** Space to leave after a work block when placing the next one. 0 is off. */
+  bufferGapMinutes: z.number().min(0).catch(0).default(0),
+  /** Off until the user chooses, after being told what they can and can't do. */
+  remindersEnabled: z.boolean().catch(false).default(false),
+  /** Whether the calendar's Overview strip is folded away. */
+  overviewCollapsed: z.boolean().catch(false).default(false),
+  /** The one-time note that everything is saved in this browser. */
+  storageNoticeSeen: z.boolean().catch(false).default(false),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -226,6 +418,12 @@ export const DEFAULT_SETTINGS: Settings = {
   modePreference: null,
   defaultFocusMinutes: 5,
   homeListSize: 3,
+  lastSessionMinutes: null,
+  bufferMinutes: 30,
+  bufferGapMinutes: 0,
+  remindersEnabled: false,
+  overviewCollapsed: false,
+  storageNoticeSeen: false,
 }
 
 export const ESTIMATE_OPTIONS = [5, 15, 30, 60, 120, 240]
@@ -245,6 +443,270 @@ export const DailyPlanItemSchema = z.object({
   done: z.boolean().default(false),
 })
 export type DailyPlanItem = z.infer<typeof DailyPlanItemSchema>
+
+/** Saved data from before events existed. Only migration reads this now. */
+export const RoutineSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  color: z.string(),
+  emoji: z.string().default(""),
+  /** DTSTART and RRULE in local time, with no time zone. */
+  rrule: z.string(),
+  /** Length in minutes. */
+  duration: z.number().positive(),
+  /** Dates whose occurrence was moved elsewhere. */
+  exdates: z.array(z.string()).catch([]).default([]),
+  /** Dates whose regular occurrence the user marked done. */
+  doneDates: z.array(z.string()).catch([]).default([]),
+  /** Fixed happens at a time. Flexible can happen any time on the day. */
+  kind: z.enum(["fixed", "flexible"]).catch("fixed").default("fixed"),
+  /** A smaller alternative. Doing it isn't the same as doing the full one. */
+  minimumVersion: z.string().catch("").default(""),
+  /** Dates done in the smaller version. */
+  minimumDates: z.array(z.string()).catch([]).default([]),
+  /** Dates the user chose to skip. */
+  skippedDates: z.array(z.string()).catch([]).default([]),
+  /** Earlier versions, so "All future" never rewrites past weeks. */
+  priorRules: z
+    .array(z.object({ rrule: z.string(), duration: z.number().positive() }))
+    .catch([])
+    .default([]),
+  createdAt: z.string(),
+})
+export type Routine = z.infer<typeof RoutineSchema>
+
+/** Saved data from before events existed. Only migration reads this now. */
+export const RoutinePlacementSchema = z.object({
+  id: z.string(),
+  routineId: z.string(),
+  date: DateString,
+  time: z.string(),
+  done: z.boolean().default(false),
+  /** Its own length, when this one differs from the routine. */
+  minutes: z.number().positive().nullable().catch(null).default(null),
+  /** True when this replaces a regular occurrence, or was changed by hand. */
+  adjusted: z.boolean().catch(false).default(false),
+  /** What came of it. "full" is the same as done. */
+  result: z
+    .enum(["full", "minimum", "skipped"])
+    .nullable()
+    .catch(null)
+    .default(null),
+})
+export type RoutinePlacement = z.infer<typeof RoutinePlacementSchema>
+
+export const EVENT_OUTCOMES = [
+  "full",
+  "minimum",
+  "skipped",
+  "did",
+  "didnt",
+] as const
+export type EventOutcome = (typeof EVENT_OUTCOMES)[number]
+
+/** A change to one occurrence, keyed by the date it would normally fall on. */
+export const EventOverrideSchema = z.object({
+  /** Where it moved to, when that's another day. */
+  date: DateString.optional(),
+  start: z.string().optional(),
+  end: z.string().optional(),
+  cancelled: z.boolean().optional(),
+  title: z.string().optional(),
+  color: z.string().optional(),
+})
+export type EventOverride = z.infer<typeof EventOverrideSchema>
+
+export const EventRepeatSchema = z.object({
+  /** Weekdays, 0 is Sunday. */
+  days: z.array(z.number().int().min(0).max(6)).min(1),
+  until: DateString.optional(),
+  count: z.number().int().positive().optional(),
+})
+export type EventRepeat = z.infer<typeof EventRepeatSchema>
+
+/**
+ * The one thing on the calendar. A routine is an event that repeats, and a
+ * planned block is one with a task and no repeat.
+ */
+export const CalendarEventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  taskId: z.string().nullable().catch(null).default(null),
+  kind: z.enum(["event", "buffer"]).catch("event").default("event"),
+  /** The day it happens, or the first day it can if it repeats. */
+  date: DateString,
+  /** Local HH:MM. An end before the start runs past midnight. */
+  start: z.string(),
+  end: z.string(),
+  /** Any time that day. Start and end then only say how long it is. */
+  flexible: z.boolean().catch(false).default(false),
+  /** Null follows the task's colour. */
+  color: z.string().nullable().catch(null).default(null),
+  repeat: EventRepeatSchema.nullable().catch(null).default(null),
+  overrides: z.record(z.string(), EventOverrideSchema).catch({}).default({}),
+  /** What came of each occurrence, by the same date as overrides. */
+  outcomes: z.record(z.string(), z.enum(EVENT_OUTCOMES)).catch({}).default({}),
+  minimum: z.string().catch("").default(""),
+  link: z.string().catch("").default(""),
+  notes: z.string().catch("").default(""),
+  emoji: z.string().catch("").default(""),
+  /** The step of a task this time is for. */
+  label: z.string().catch("").default(""),
+  /** A part of the day instead of an exact time. Only when flexible. */
+  window: z
+    .enum(["morning", "afternoon", "evening"])
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** Shared by the parts of a series that "This and following" split apart. */
+  seriesId: z.string().nullable().catch(null).default(null),
+  createdAt: z.string().catch("").default(""),
+})
+export type CalendarEvent = z.infer<typeof CalendarEventSchema>
+
+/**
+ * What happened, in order. It's only ever added to, and the Overview's numbers
+ * are all worked out from it.
+ */
+export type ActivityEntry = { at: string } & (
+  | {
+      type: "block_planned"
+      eventId: string
+      /** Where the block stood after this change. */
+      schedule: {
+        kind: CalendarEvent["kind"]
+        date: string
+        start: string
+        end: string
+        flexible: boolean
+        repeat: EventRepeat | null
+        overrides: Record<string, EventOverride>
+      }
+      created: boolean
+    }
+  | { type: "block_removed"; eventId: string }
+  | {
+      type: "focus_started"
+      sessionId: string
+      taskId: string | null
+      plannedId: string | null
+      /** When the block was meant to start, as it stood at the time. */
+      plannedAt: string | null
+    }
+  | { type: "focus_paused"; sessionId: string }
+  | { type: "focus_resumed"; sessionId: string }
+  | {
+      type: "focus_ended"
+      sessionId: string
+      taskId: string | null
+      plannedId: string | null
+      startedAt: string
+      seconds: number
+      interrupted: boolean
+      reported: boolean
+    }
+  | { type: "focus_undone"; sessionId: string }
+  | {
+      type: "occurrence_outcome"
+      eventId: string
+      key: string
+      outcome: EventOutcome | null
+      series: string
+      title: string
+      routine: boolean
+      minutes: number
+    }
+  | { type: "recovery_shown"; taskId: string; plannedId: string | null }
+  | { type: "recovery_option"; taskId: string; option: string }
+  | { type: "stuck_reason"; taskId: string | null; label: string }
+  | { type: "restarted"; taskId: string }
+  | { type: "minimum_met"; taskId: string }
+  | { type: "task_created"; taskId: string }
+  | { type: "task_first_started"; taskId: string }
+  | { type: "task_completed"; taskId: string }
+  | { type: "task_reduced"; taskId: string }
+  | { type: "task_released"; taskId: string }
+  | { type: "task_reopened"; taskId: string }
+  | {
+      type: "moved_to_buffer"
+      eventId: string
+      taskId: string
+      bufferId: string
+      date: string
+    }
+  | { type: "deadline_met"; taskId: string; deadline: string }
+  | { type: "deadline_missed"; taskId: string; deadline: string }
+)
+
+export const ActivityEntrySchema = z.looseObject({
+  at: z.string(),
+  type: z.string(),
+})
+
+/** A saved record that couldn't be read, kept rather than thrown away. */
+export type UnmigratedRecord = { source: string; record: unknown }
+
+export const PROGRESS_EVENT_TYPES = [
+  "started",
+  "minimum_met",
+  "completed",
+  "restarted",
+  "recovery_shown",
+  "recovery_action_taken",
+] as const
+
+/** A moment of real progress, kept apart from any task's or session's status. */
+export const ProgressEventSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  type: z.enum(PROGRESS_EVENT_TYPES),
+  at: z.string(),
+  sessionId: z.string().nullable().default(null),
+})
+export type ProgressEvent = z.infer<typeof ProgressEventSchema>
+
+export const RECOVERY_REASONS = [
+  "cant-start",
+  "dont-know-start",
+  "worried",
+  "no-time",
+] as const
+export type RecoveryReason = (typeof RECOVERY_REASONS)[number]
+
+export const RECOVERY_REASON_LABEL: Record<RecoveryReason, string> = {
+  "cant-start": "I know what to do, but I can’t start",
+  "dont-know-start": "I don’t know where to begin",
+  worried: "I’m worried about the outcome or someone’s reaction",
+  "no-time": "I don’t have enough time anymore",
+}
+
+/** Each reason opens the tools that fit, using the existing recovery engine. */
+export const REASON_BLOCKER: Record<RecoveryReason, Blocker> = {
+  "cant-start": "cant-start",
+  "dont-know-start": "dont-know-start",
+  worried: "worried",
+  "no-time": "behind",
+}
+
+/** Someone working through recovery, kept so a reload lands in the same place. */
+export const RecoverySchema = z.object({
+  /** Null while choosing what they've been avoiding. */
+  taskId: z.string().nullable(),
+  plannedId: z.string().nullable().default(null),
+  source: z.enum(["scheduled", "avoidance"]),
+  reason: z.enum(RECOVERY_REASONS).nullable().default(null),
+  enteredAt: z.string(),
+})
+export type Recovery = z.infer<typeof RecoverySchema>
+
+/** A stray thought caught during a session, so it can wait without being lost. */
+export const ParkedThoughtSchema = z.object({
+  id: z.string(),
+  text: z.string().min(1),
+  taskId: z.string().nullable().default(null),
+  at: z.string(),
+})
+export type ParkedThought = z.infer<typeof ParkedThoughtSchema>
 
 export const ENERGY_LEVELS = ["low", "okay", "good"] as const
 export type Energy = (typeof ENERGY_LEVELS)[number]
@@ -324,13 +786,18 @@ export function isFocusTime(session: FocusSession) {
   return !isInterrupted(session)
 }
 
-export const WORKSPACE_VERSION = 2
+export const WORKSPACE_VERSION = 3
 
 export type Workspace = {
-  version: 2
+  version: 3
   tasks: Task[]
   focusSessions: FocusSession[]
-  planned: PlannedSession[]
+  /** Everything on the calendar except deadlines and past focus time. */
+  events: CalendarEvent[]
+  /** What happened, added to and never rewritten. */
+  activity: ActivityEntry[]
+  /** Saved records that couldn't be read, kept so nothing is ever lost. */
+  unmigrated: UnmigratedRecord[]
   timer: TimerState | null
   /** A focus session that just ended and hasn't been acknowledged yet. */
   finishedSessionId: string | null
@@ -343,13 +810,27 @@ export type Workspace = {
   frictionLog: FrictionEvent[]
   learning: Learning
   dailyPlan: DailyPlan | null
+  /** What's typed on the home page, kept until it's submitted. */
+  intakeDraft: string
+  parkingLot: ParkedThought[]
+  progressEvents: ProgressEvent[]
+  recovery: Recovery | null
+  /** Which blocks have reminded, so a reload never repeats one. */
+  remindedBlocks: string[]
 }
 
 export const EMPTY_WORKSPACE: Workspace = {
-  version: 2,
+  intakeDraft: "",
+  parkingLot: [],
+  progressEvents: [],
+  recovery: null,
+  remindedBlocks: [],
+  version: 3,
   tasks: [],
   focusSessions: [],
-  planned: [],
+  events: [],
+  activity: [],
+  unmigrated: [],
   timer: null,
   finishedSessionId: null,
   settings: DEFAULT_SETTINGS,

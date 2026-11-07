@@ -1,3 +1,4 @@
+import { plannedSessions } from "@/lib/calendar/model"
 import { addDays, daysBetween } from "@/lib/workspace/dates"
 import { isActive, isFocusTime } from "@/lib/workspace/schemas"
 import type { Task, TaskEvent, Workspace } from "@/lib/workspace/schemas"
@@ -42,11 +43,24 @@ export function stepCounts(task: Task) {
   }
 }
 
+export type StartCue = { text: string; source: "resume" | "step" | "first" }
+
+/**
+ * Where to begin: the note left last time, then the current step, then what the
+ * user said they'd do first. Their own latest words always win.
+ */
+export function startCue(task: Task): StartCue | null {
+  if (task.resumeNote) return { text: task.resumeNote, source: "resume" }
+  if (task.nextAction) return { text: task.nextAction, source: "step" }
+  if (task.firstStep) return { text: task.firstStep, source: "first" }
+  const open = currentSubtask(task)
+  return open ? { text: open.title, source: "step" } : null
+}
+
 /** The single next action for a task. */
 export function nextActionFor(task: Task) {
-  if (task.nextAction) return task.nextAction
-  const open = currentSubtask(task)
-  if (open) return open.title
+  const cue = startCue(task)
+  if (cue) return cue.text
   if (task.status === "needs-recovery") {
     return `Get a recovery plan for “${task.title}”`
   }
@@ -77,7 +91,7 @@ export function priorityScore(task: Task, state: Workspace, today: string) {
     else if (days <= 2) value += 30
     else if (days <= 7) value += 15
   }
-  const plannedToday = state.planned.some(
+  const plannedToday = plannedSessions(state).some(
     (item) => item.taskId === task.id && item.date === today && !item.done
   )
   if (plannedToday) value += 40
@@ -151,8 +165,11 @@ export function progressSummary(task: Task, state: Workspace) {
   const all = state.focusSessions.filter(
     (session) => session.taskId === task.id
   )
-  const sessions = all.filter(isFocusTime)
-  const interrupted = all.length - sessions.length
+  // Time the user reported isn't "on the timer", so it isn't counted as such.
+  const sessions = all.filter(
+    (session) => isFocusTime(session) && !session.reported
+  )
+  const interrupted = all.filter((session) => !isFocusTime(session)).length
   const minutes = Math.round(
     sessions.reduce((sum, session) => sum + session.actualSeconds, 0) / 60
   )

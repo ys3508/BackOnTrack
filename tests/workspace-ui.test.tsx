@@ -13,7 +13,7 @@ const saved = () => JSON.parse(window.localStorage.getItem(STORAGE)!)
 
 beforeEach(() => {
   window.localStorage.clear()
-  window.location.hash = ""
+  window.location.hash = "#/tasks"
   window.scrollTo = vi.fn() as typeof window.scrollTo
   vi.stubGlobal(
     "fetch",
@@ -33,54 +33,27 @@ describe("workspace home", () => {
   it("works from empty with one quick-added task, needing no AI", async () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: /on your plate/i })
+    await screen.findByRole("heading", { name: "Tasks" })
     await addTask(user, "Finish homework")
-    await screen.findByRole("heading", { name: "Your next small step" })
-    expect(
-      screen.getByText(/Break “Finish homework” into small steps/)
-    ).toBeInTheDocument()
+    await button(/^Finish homework/)
     expect(fetch).toHaveBeenCalledTimes(1)
-  })
-
-  it("shows a small number of tasks, with an option to expand", async () => {
-    const user = userEvent.setup()
-    window.localStorage.setItem(
-      STORAGE,
-      JSON.stringify({
-        version: 1,
-        legacyMigrated: true,
-        tasks: Array.from({ length: 6 }, (_, index) => ({
-          id: `t${index}`,
-          title: `Stuck ${index}`,
-          status: "needs-recovery",
-          createdAt: "2026-01-01T00:00:00Z",
-          updatedAt: "2026-01-01T00:00:00Z",
-        })),
-      })
-    )
-    render(<WorkspaceApp />)
-    const section = (
-      await screen.findByRole("heading", { name: "Could use a look" })
-    ).parentElement!
-    expect(within(section).getAllByRole("listitem")).toHaveLength(3)
-    await user.click(
-      within(section).getByRole("button", { name: /Show 2 more/ })
-    )
-    expect(within(section).getAllByRole("listitem")).toHaveLength(5)
   })
 })
 
 describe("tasks", () => {
   it("edits, pauses, resumes, completes, and deletes a task", async () => {
     const user = userEvent.setup()
+    window.location.hash = "#/tasks"
     render(<WorkspaceApp />)
-    await user.click(await button("Tasks"))
     await addTask(user, "Pay rent")
     await user.click(await button(/^Pay rent/))
 
     const heading = await screen.findByRole("heading", { name: "Pay rent" })
     expect(heading).toBeInTheDocument()
 
+    // A task that was never started has nothing to pause.
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull()
+    await user.selectOptions(screen.getByLabelText("Status"), "in-progress")
     await user.click(await button("Pause"))
     expect(saved().tasks[0].status).toBe("paused")
     await user.click(await button("Resume"))
@@ -115,8 +88,8 @@ describe("tasks", () => {
 
   it("asks before releasing something that looks high stakes", async () => {
     const user = userEvent.setup()
+    window.location.hash = "#/tasks"
     render(<WorkspaceApp />)
-    await user.click(await button("Tasks"))
     await addTask(user, "File my tax return")
     await user.click(await button(/^File my tax return/))
     await user.selectOptions(await screen.findByLabelText("Status"), "released")
@@ -128,8 +101,8 @@ describe("tasks", () => {
 
   it("shows every status as a Kanban column, with a keyboard-friendly status control", async () => {
     const user = userEvent.setup()
+    window.location.hash = "#/tasks"
     render(<WorkspaceApp />)
-    await user.click(await button("Tasks"))
     await addTask(user, "Clean desk")
     await user.click(await button("Board"))
     for (const name of [
@@ -159,7 +132,7 @@ describe("persistence and data", () => {
   it("returns to saved tasks after a reload", async () => {
     const user = userEvent.setup()
     const { unmount } = render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: /on your plate/i })
+    await screen.findByRole("heading", { name: "Tasks" })
     await addTask(user, "Come back to this")
     unmount()
     render(<WorkspaceApp />)
@@ -188,7 +161,7 @@ describe("persistence and data", () => {
       .mockImplementation(() => {})
     render(<WorkspaceApp />)
     await addTask(user, "Private thing")
-    await user.click(await button("Settings and data"))
+    await user.click(await button("Settings"))
     await user.click(await button("Export my data"))
     expect(click).toHaveBeenCalled()
 
@@ -198,14 +171,8 @@ describe("persistence and data", () => {
         name: "Delete everything",
       })
     )
-    await screen.findByRole("heading", { name: /on your plate/i })
+    await screen.findByRole("heading", { name: "Today" })
     await act(async () => {})
     expect(JSON.stringify(saved())).not.toContain("Private thing")
-  })
-
-  it("keeps the guided wizard available", async () => {
-    window.location.hash = "#/guided"
-    render(<WorkspaceApp />)
-    await screen.findByRole("heading", { name: "What’s been weighing on you?" })
   })
 })

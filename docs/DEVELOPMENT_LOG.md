@@ -241,9 +241,165 @@ Both were found by trying a realistic scenario in a real browser, after all auto
 - A high-priority task due tomorrow, needing 4 hours, got 10 minutes because it had been missed before, while 40 minutes went to tasks that could wait. Urgent work now gets the time.
 - A 5-minute email was described as "Break it into small steps". Tasks with no steps are now named plainly.
 
+## Phase 1: Adaptive Recovery Workspace
+
+### Decisions
+
+- **A recovery case is a field on the task, not a new store.** Status, deadline, document, timer, history, and Calendar all keep working, with no migration. Older saved data restores with no case. A damaged case is dropped without losing the task.
+- **One status.** A case's status is worked out from the task, so Recovery and Tasks can't disagree. The task's next action and the case's current step are kept the same.
+- **One workspace.** Tools are chosen from the blocker, plus any a Plan B opened. Changing the blocker changes only which tools show.
+- **Rules decide what must hold.** A model can't skip the user's choice of Finish, Reduce, or Release. Claimed facts must come from the user's text, and repeats, vague steps, and invented rules get one retry, then a labeled template.
+- **A "make it smaller" choice stays out of the URL,** so a reload or the back button can't repeat it.
+- **The old dashboard moved to `#/today`** rather than being removed.
+
+### Problems found by testing
+
+The first three came from trying the flow in a real browser after the automated tests passed. The last was caught by a new test.
+
+- A Plan B step threw away the plan's later steps, so finishing the smaller step led to a dead end. Swapping a step now leaves the later ones alone.
+- "Make it smaller" from the resume prompt stayed in the URL, so reloading would have shrunk the step again.
+- "Continue" on the resume prompt was followed by the same question inside the case.
+- Finishing the last quick item removed the list holding its "Undo".
+
+## Calendar upgrade
+
+### Decisions
+
+- **`Session` is derived, not stored.** `lib/calendar/derived.ts` builds it from the existing planned sessions and focus records, so numbers and blocks can't disagree and nothing needed migrating. Only routines are new in storage.
+- **"Tasks completed" comes from tasks,** since finishing a task isn't recorded on a session. The other numbers come from sessions, and interrupted attempts aren't counted.
+- **Moving one routine occurrence** excludes that date from the series and adds a one-off, so the rest of the routine stays put.
+- **Deadlines still ask before moving.** Dragging a chip opens the existing confirmation, and scheduling from the tray never changes a deadline.
+- **Paused and undated tasks stay out of the tray.** A pause was on purpose, and a task with no date hasn't been put off from anything.
+- **Plugins are pinned to 6.1.22,** because the 7.x plugins need a different FullCalendar core.
+
+### Problems found by testing
+
+All were found in a real browser, since unit tests replace FullCalendar with a mock.
+
+- The heatmap's color on today was hidden by FullCalendar's own "today" background.
+- The selected-day outline boxed the entire column in Day view.
+- Switching from Month to Day left the grid scrolled to 12am.
+
+## Calendar duration, routines, and block prompts
+
+### Decisions
+
+- **A single click stays exactly 25 minutes.** "Last used, or the task's estimate" applies to the "Add to" button and tray drops. Only task sessions set "last used", so editing a routine doesn't change it.
+- **"Did it" is marked as reported.** It counts as focus time, but history says the user reported it, it can be taken back, and it isn't called time "on the timer".
+- **A timer started from a block answers for it,** so nothing is counted twice. An interrupted attempt doesn't answer, so the block still asks.
+- **"All future" keeps the old rule, ended the day before.** Past weeks and their done marks stay as they were.
+- **One colour per kind,** in blocks, legend, and dashboard, instead of per task. Routines keep their own colour.
+- **Popovers read their block's real position** and follow it, rather than storing where the click happened.
+
+### Problems found by testing
+
+Found in a real browser, since unit tests mock FullCalendar.
+
+- The reported popover mismatch: it was placed once and never moved, so scrolling the grid left "5:15 PM" next to 9 AM.
+- A popover starts hidden while measuring itself, and a hidden field can't take focus, so typing went nowhere.
+- The custom minutes field snapped back when cleared, so a new number couldn't be typed.
+
+## Final MVP: Start, Get Stuck, Recover, Continue
+
+### Decisions
+
+- **Recovery lives in the Now card.** A `recovery` record in the workspace says who's in recovery and why, so a reload lands in the same place. The four reasons reuse the existing recovery engine.
+- **Restarts are counted where a timer really starts.** Viewing a card, clicking a suggestion, pausing, resuming, or reloading can't add one, because none of them start a new timer.
+- **`Session` and `Block` aren't separate stores.** They're views over the existing planned and focus records, so the numbers can't disagree. The `deadline` field is the hard deadline, and rescheduling never writes to it.
+- **Minimum is not completion.** It records its own event, leaves the task open, and isn't listed as done.
+- **The clock stops when ending a session,** so answering the questions adds no focus time, and "Keep going" resumes it.
+- **Reminders are off by default,** and permission is only requested after the user reads the limits and turns them on.
+
+### Problems found by testing
+
+- Plan B opened in edit mode, hiding the suggestion, because the plan arrived just after the card appeared.
+- A popover's field couldn't take focus while the popover was hidden for measuring.
+- Today hid routines when there were no tasks.
+- "You said you made progress" appeared for minimum and completed outcomes in focus history.
+
+
+### Usability pass
+
+Task colors come from a hash of the task's ID, so nothing new is saved and no migration is needed. The cost is that two tasks can share a color. Routines keep their own chosen colors, and deadlines stay sand.
+
+Calendar quick add and the Routine form put optional fields behind a disclosure. Editing a routine opens everything, since that's why someone is there.
+
+A block still ahead is no longer closed by an early attempt. Once its time passes, an attempt keeps it from being called missed.
+
+### One recovery system
+
+The older screens (`#/plan`, `#/avoid`, `#/case/:id`, `#/recover`) and the "Want a fuller plan?" link are gone. Their addresses now open Today. `#/guided` went too, because its only link was on a removed screen.
+
+What the removed screens did that the Now card doesn't: a daily plan from your available time, a generated draft with steps and work sessions to accept, the four Reality Check questions, a free-text "What happened?" after getting stuck, marking a step done without a timer, editing later plan steps, a list of recovery cases, and example tasks on an empty workspace. The message draft already sat under the Reality Gap boxes, so it stayed.
+
+Saved data from those screens still loads. The wizard, the daily-plan logic, and the plan request code remain in the repo with nothing in the app using them.
+
+Also changed: "I'm stuck" on the Upcoming card, "Did it" on calendar blocks now asks for minutes, starting from the planned length, a scheduled block keeps its own length after "Make it smaller", and "I completed the minimum version" asks "What did you do?" when none is written.
+
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).
+
+## Visual identity: Aura
+
+The app's look follows reference images supplied by the student: grainy, soft gradient orbs on cream, with a high-contrast serif. An earlier bold "Sticker Pop" pass was rejected and replaced entirely. Task lifecycle, recovery engine, Reality Gap, obstacles, Move to Buffer, routines, and persistence keep their behavior.
+
+| Decision | Reason |
+| --- | --- |
+| Every surface sits on one still, fixed field of light | Pages feel like one place, and nothing has to repaint on scroll |
+| Orbs are radial gradients with grain, never `filter: blur`, `backdrop-filter`, or blend modes | The look is the same, and it stays light on the GPU over a long session |
+| Instrument Serif for all display type, Instrument Sans for controls | The references rely on elegant type more than on decoration |
+| Periwinkle and a pink star belong to Recovery | The feature that sets the product apart can be recognized anywhere |
+| Tokens are named by meaning (`brand`, `link`, `caution`, `recover`) | Colors can change without renaming code |
+| Task color ids stayed, with new names and values | An unknown id would fail the schema and drop a saved task |
+| Every new timer opens the whole-screen Focus room, on whichever screen it was started from | One rule, with no new route. Leaving returns to that same screen |
+| The countdown is light drawing inward, with a fine line running out around it | Time left can be felt at a glance |
+| Today's timeline is drawn by the app, and Calendar keeps FullCalendar | Both read the same `buildCalendarItems` facts, and no scheduling logic changed |
+
+## Calendar v2, Phase A: one event model
+
+Routines, routine placements, and planned blocks are now one stored record, `CalendarEvent`, in `state.events`. Everything else reads it through `lib/calendar/model.ts`, and `plannedSessions()` gives the rest of the app the block shape it already reasoned about.
+
+| Decision | Reason |
+| --- | --- |
+| Occurrences are expanded per visible range, not by FullCalendar's rrule plugin | Each one can be moved, marked, and coloured by itself, and a colour change redraws in place |
+| The spec's Event gained `outcomes`, `seriesId`, `emoji`, `label`, `window`, `createdAt`, and override `date`, `title`, `color` | Needed to keep existing behaviour: per-day results, "This and following" splits, and moving an occurrence to another day |
+| A new title makes a task unless the event repeats | Today, Focus, and Recovery all work from tasks, but a routine isn't something to finish |
+| Migration runs in `restoreWorkspace`, keeps ids, writes `backontrack.workspace.pre-events-backup` once, and sets unreadable records aside in `unmigrated` | Timers, focus sessions, and reminders keep pointing at the right thing, and nothing is dropped |
+
+The "no editor opens" bug was CSS: `.bot-card` sets `position: relative` outside any layer, which beat Tailwind's `fixed`, so every floating panel and dialog rendered in normal flow, below the page. `.bot-card.fixed` now restores it.
+
+Removed from the calendar flow on purpose: the first-step field and the Morning, Afternoon, and Evening choice when editing a block (`RescheduleForm` still offers parts of the day from recovery), and creating a task due that day by clicking in Month.
+
+## Calendar v2, Phase B: buffers the user places
+
+The automatic daily buffer, its fixed 3:00 PM start, and the count setting are gone, so a day has no buffers unless the user adds one. Buffers are events with `kind: "buffer"`, made from a draggable sidebar chip or the editor's Buffer toggle, and they repeat, move, resize, and delete like anything else. `rrule` and `@fullcalendar/rrule` had no remaining use and were removed.
+
+| Decision | Reason |
+| --- | --- |
+| A buffer with something in it is drawn as a background event | It takes no column, so the item sits inside it and stays draggable |
+| Clicking the empty part of an occupied buffer opens that buffer | A background event can't be clicked or dragged, and it still needs Edit and Delete |
+| A buffer that's too short isn't offered, and nothing is shortened | The brief's rule: today's next free buffer, or else the next free slot that fits |
+
+A buffer holding something can't be dragged or resized until it's empty, only edited from its popover.
+
+## Calendar v2, Phase C: Overview, from a log
+
+`state.activity` is an append-only log, written by `observeActivity` around the reducer from what really changed, so no screen can record something twice or forget to. Every number in the Overview strip is worked out from it in `lib/calendar/overview.ts`. The old `CalendarDashboard` and `rangeStats`, which read stored totals, are gone.
+
+| Decision | Reason |
+| --- | --- |
+| The first load builds the log from existing tasks, focus sessions, outcomes, and events | Real history keeps its real times, and no start delay is invented for older sessions |
+| Planned time is replayed from schedule snapshots | A moved block counts where it ended up, and a deleted routine still counts for the days before it was deleted |
+| A delay uses the block's planned start as it stood when focus began | Moving a block into a buffer gives it a new plan, so only lateness against that plan counts |
+| "Fewer than 3 points" applies to the Month and Year charts, and any figure with at least one point is shown | The acceptance tests ask for a 12-minute delay from one start, and a rate from two showings, so a blanket rule would contradict them |
+| Heat colours moved to a single blue ramp | The brief says no red, and the old ramp ended in red-orange |
+
+Start delay only covers one-off task blocks: repeating events don't carry an occurrence through the timer yet.
+
+## One colour language, with no dark blocks
+
+Every coloured surface now comes from the aura palette, with ink text on it. `--primary` went from dark blue to a light sky, so buttons, chips, and selected states changed together. Event swatches are the same six colours tasks and the Focus room use, and "done" is a soft glow rather than a dark fill with white text. Colours saved earlier are shown as their nearest aura colour by `colorOf`, so nothing needed migrating. Small links keep the darker blue, because light text wouldn't be readable. The week chart uses `#ee9426` and `#5f97e6`, slightly deeper than the aura colours, since the palette validator failed the lighter orange. They stay under 3:1 against the card, so the legend and each bar's label carry the values.
 
 ## Known limitations
 

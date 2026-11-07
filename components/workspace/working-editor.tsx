@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils"
 const AUTOSAVE_MS = 700
 
 const toolButton =
-  "grid size-10 shrink-0 place-items-center rounded-lg text-foreground outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-30 aria-pressed:bg-sage-soft aria-pressed:text-sage"
+  "grid size-10 shrink-0 place-items-center rounded-lg text-foreground outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-30 aria-pressed:bg-brand-soft aria-pressed:text-brand"
 
 export function downloadText(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }))
@@ -160,10 +160,10 @@ export function WorkingEditor({
   return (
     <section
       aria-label="Working document"
-      className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_oklch(0.3_0.02_85/0.05)]"
+      className="overflow-hidden rounded-2xl border border-line bg-card shadow-[var(--shadow-sm)]"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+        <h2 className="font-heading text-lg">
           Working document
         </h2>
         <p
@@ -181,7 +181,7 @@ export function WorkingEditor({
             "Saving..."
           ) : task.workDoc ? (
             <>
-              <Check className="size-3.5 text-sage" aria-hidden />
+              <Check className="size-3.5 text-brand" aria-hidden />
               Saved {formatDateTime(task.workDoc.updatedAt)}
             </>
           ) : (

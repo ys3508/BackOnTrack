@@ -1,5 +1,6 @@
 "use client"
 
+import { plannedSessions } from "@/lib/calendar/model"
 import { useMemo, useState } from "react"
 import { CalendarPlus } from "lucide-react"
 
@@ -32,6 +33,7 @@ export function PlanRemaining({ taskId }: { taskId?: string }) {
       task?.subtasks.filter((sub) => !sub.done).map((sub) => sub.title) ?? [],
     [task]
   )
+  const { events } = state
   const plan = useMemo(
     () =>
       planRemaining({
@@ -40,9 +42,11 @@ export function PlanRemaining({ taskId }: { taskId?: string }) {
         deadline: task?.deadline ?? null,
         minutesPerDay,
         skipWeekends,
-        existing: state.planned.filter((item) => item.taskId === task?.id),
+        existing: plannedSessions({ events }).filter(
+          (item) => item.taskId === task?.id
+        ),
       }),
-    [openSteps, today, task, minutesPerDay, skipWeekends, state.planned]
+    [openSteps, today, task, minutesPerDay, skipWeekends, events]
   )
 
   if (!task || !openSteps.length) {
@@ -63,7 +67,7 @@ export function PlanRemaining({ taskId }: { taskId?: string }) {
     return (
       <div className="space-y-2">
         {added > 0 && (
-          <p role="status" className="text-sm text-sage">
+          <p role="status" className="text-sm text-brand">
             Added {added} work {added === 1 ? "session" : "sessions"} to your
             calendar.
           </p>
@@ -102,7 +106,7 @@ export function PlanRemaining({ taskId }: { taskId?: string }) {
               className={cn(
                 "min-h-11 rounded-full border px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
                 minutesPerDay === minutes
-                  ? "border-primary bg-sage-soft"
+                  ? "border-transparent bg-primary font-medium text-primary-foreground"
                   : "border-border bg-card"
               )}
             >
@@ -159,7 +163,7 @@ export function PlanRemaining({ taskId }: { taskId?: string }) {
       )}
 
       {plan.unscheduled.length > 0 && (
-        <p className="rounded-lg bg-sand-soft p-3 text-sm text-sand">
+        <p className="rounded-lg bg-caution-soft p-3 text-sm text-caution">
           {plan.unscheduled.length}{" "}
           {plan.unscheduled.length === 1 ? "step doesn’t" : "steps don’t"} fit
           {task.deadline && !plan.deadlinePassed

@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog, fieldClass } from "@/components/workspace/parts"
 import { newId, nowIso, useStore } from "@/components/workspace/store"
+import { formatClockTime } from "@/lib/calendar/derived"
 import { addDays, shortDate } from "@/lib/workspace/dates"
 import { isActive } from "@/lib/workspace/schemas"
 import type { PlannedSession, Task } from "@/lib/workspace/schemas"
@@ -156,7 +157,7 @@ export function PlannedSessionRow({
   const { state, dispatch } = useStore()
   const title = state.tasks.find((task) => task.id === session.taskId)?.title
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-sage/60 bg-sage-soft/40 px-3 py-2 text-sm">
+    <li className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-brand/60 bg-brand-soft/40 px-3 py-2 text-sm">
       <label className="flex min-h-9 flex-1 cursor-pointer items-center gap-2.5">
         <input
           type="checkbox"
@@ -172,7 +173,10 @@ export function PlannedSessionRow({
           }
         >
           {showTask ? `${title}: ` : ""}
-          {session.minutes} min{session.time ? ` at ${session.time}` : ""}
+          {session.minutes} min
+          {session.time
+            ? ` at ${formatClockTime(new Date(`${session.date}T${session.time}:00`))}`
+            : ""}
           {session.label ? `: ${session.label}` : ""}
         </span>
       </label>
@@ -193,7 +197,7 @@ export function PlannedSessionRow({
               })
             }
           }}
-          className="h-10 rounded-lg border border-input bg-card px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="h-10 rounded-2xl border border-line bg-card px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         />
       </label>
       <button
@@ -273,7 +277,7 @@ export function ReplanDialog({
             className={
               "min-h-11 rounded-full border px-3.5 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 " +
               (day === choice.date
-                ? "border-primary bg-sage-soft"
+                ? "border-transparent bg-primary font-medium text-primary-foreground"
                 : "border-border bg-card")
             }
           >

@@ -20,7 +20,13 @@ import { exportWorkspace, parseImport } from "@/lib/workspace/storage"
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
 vi.mock("@fullcalendar/timegrid", () => ({ default: {} }))
-vi.mock("@fullcalendar/interaction", () => ({ default: {} }))
+vi.mock("@fullcalendar/interaction", () => ({
+  default: {},
+  Draggable: class {
+    destroy() {}
+  },
+}))
+vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 const AT = "2026-11-05T12:00:00.000Z"
@@ -201,7 +207,7 @@ describe("coming back in the app", () => {
     await waitFor(() => expect(window.location.hash).toBe("#/tasks/a/doc"))
     expect((await getEditor()).getText()).toContain("Sleep affects memory.")
 
-    await user.click(await button("Workspace"))
+    await user.click(await button("Today"))
     await waitFor(() =>
       expect(
         screen.queryByRole("heading", { name: "Pick up where you left off" })

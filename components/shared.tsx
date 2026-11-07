@@ -25,7 +25,7 @@ export function ScreenHeading({
       ref={ref}
       tabIndex={-1}
       className={cn(
-        "text-[2rem] leading-[1.15] outline-none sm:text-[2.5rem]",
+        "text-[3.25rem] leading-[0.95] outline-none sm:text-[4.5rem]",
         className
       )}
     >
@@ -36,15 +36,18 @@ export function ScreenHeading({
 
 export function Card({
   className,
+  style,
   children,
 }: {
   className?: string
+  style?: React.CSSProperties
   children: React.ReactNode
 }) {
   return (
     <div
+      style={style}
       className={cn(
-        "rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_oklch(0.3_0.02_85/0.05)] sm:p-6",
+        "bot-card p-5 sm:p-6",
         className
       )}
     >
@@ -67,7 +70,7 @@ export function SourceBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-        live ? "bg-sage-soft text-sage" : "bg-indigo-soft text-indigo",
+        live ? "bg-brand-soft text-brand" : "bg-link-soft text-link",
         className
       )}
     >
@@ -93,7 +96,7 @@ export function ErrorNotice({
   return (
     <div
       role="alert"
-      className="rounded-xl border border-destructive/30 bg-card p-4 text-sm"
+      className="rounded-2xl border border-line bg-card p-4 text-sm"
     >
       <p className="flex gap-2 text-foreground">
         <CircleAlert

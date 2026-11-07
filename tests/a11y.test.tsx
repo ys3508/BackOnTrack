@@ -13,7 +13,13 @@ import { EMPTY_WORKSPACE } from "@/lib/workspace/schemas"
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
 vi.mock("@fullcalendar/timegrid", () => ({ default: {} }))
-vi.mock("@fullcalendar/interaction", () => ({ default: {} }))
+vi.mock("@fullcalendar/interaction", () => ({
+  default: {},
+  Draggable: class {
+    destroy() {}
+  },
+}))
+vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 const AT = "2026-11-05T12:00:00.000Z"
@@ -97,15 +103,12 @@ beforeEach(() => {
 
 describe("automated accessibility scan", () => {
   it.each([
-    ["workspace home", "#/", /Your next small step/],
+    ["today", "#/", /^Today$/],
     ["tasks list", "#/tasks", /Tasks/],
     ["task detail", "#/tasks/a", /Biology homework/],
     ["calendar", "#/calendar", /Calendar/],
     ["focus", "#/focus", /Focus/],
-    ["recovery chooser", "#/recover", /Which task/],
-    ["recovery start", "#/recover/a", /find a way back/],
     ["settings", "#/settings", /Settings/],
-    ["guided check-in", "#/guided", /weighing on you/],
   ])("finds no violations on %s", async (_name, hash, heading) => {
     window.location.hash = hash
     render(<WorkspaceApp />)
@@ -130,17 +133,6 @@ describe("automated accessibility scan", () => {
       await screen.findByRole("button", { name: "5-minute Quick Start" })
     )
     await screen.findByRole("timer")
-    expect(await violations()).toEqual([])
-  })
-
-  it("finds no violations on a plan preview with its reasoning open", async () => {
-    window.location.hash = "#/recover/a"
-    const user = userEvent.setup()
-    render(<WorkspaceApp />)
-    await user.click(
-      await screen.findByRole("button", { name: "Get a recovery plan" })
-    )
-    await user.click(await screen.findByRole("button", { name: /See why/ }))
     expect(await violations()).toEqual([])
   })
 

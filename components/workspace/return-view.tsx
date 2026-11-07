@@ -23,13 +23,22 @@ export function ReturnView({ summary }: { summary: ReturnSummary }) {
 
       <Card className="space-y-3">
         <div>
-          <p className="text-sm font-medium text-sage">{task.title}</p>
+          <p className="text-sm font-medium text-brand">{task.title}</p>
           {summary.total > 0 && (
             <p className="text-sm text-muted-foreground">
               {summary.done} of {summary.total} steps done
             </p>
           )}
         </div>
+
+        {summary.resumeNote && (
+          <div className="rounded-xl bg-brand-soft p-3">
+            <h2 className="text-sm font-medium text-brand">Pick up here</h2>
+            <p className="mt-0.5 font-heading text-xl leading-snug break-words">
+              {summary.resumeNote}
+            </p>
+          </div>
+        )}
 
         <ul className="space-y-1 text-[15px]">
           {summary.lastFinished && (
@@ -50,7 +59,7 @@ export function ReturnView({ summary }: { summary: ReturnSummary }) {
 
         {summary.nextStep && (
           <div className="rounded-xl bg-secondary p-3">
-            <h2 className="text-sm font-medium text-sage">Next up</h2>
+            <h2 className="text-sm font-medium text-brand">Next up</h2>
             <p className="mt-0.5 font-heading text-xl leading-snug">
               {summary.nextStep}
             </p>
@@ -103,7 +112,7 @@ export function ReturnView({ summary }: { summary: ReturnSummary }) {
           finishReturn()
           navigate({ view: "tasks" })
         }}
-        className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+        className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
       >
         Or choose a different task
         <ChevronRight className="size-4" aria-hidden />

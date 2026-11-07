@@ -174,7 +174,7 @@ function StepCard({
   return (
     <Card className="p-6 sm:p-8">
       {(isPlanB || isChanged) && (
-        <div className="mb-5 flex gap-2.5 rounded-xl bg-indigo-soft p-3.5 text-sm leading-relaxed text-indigo">
+        <div className="mb-5 flex gap-2.5 rounded-xl bg-link-soft p-3.5 text-sm leading-relaxed text-link">
           <CornerDownRight className="mt-0.5 size-4 shrink-0" aria-hidden />
           <p>
             <strong className="font-semibold">
@@ -186,7 +186,7 @@ function StepCard({
         </div>
       )}
 
-      <p className="flex items-center gap-1.5 text-sm font-medium text-sage">
+      <p className="flex items-center gap-1.5 text-sm font-medium text-brand">
         Just this one thing
         <span className="flex items-center gap-1 font-normal text-muted-foreground">
           <span aria-hidden>·</span>
@@ -313,7 +313,7 @@ function ReasonPanel({
             onClick={() => onNote(note === reason ? "" : reason)}
             className={`rounded-full border px-3 py-1.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30 ${
               note === reason
-                ? "border-primary bg-sage-soft"
+                ? "border-transparent bg-primary font-medium text-primary-foreground"
                 : "border-border bg-card hover:border-primary/40"
             }`}
           >

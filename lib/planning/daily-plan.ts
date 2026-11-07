@@ -1,3 +1,4 @@
+import { plannedSessions } from "@/lib/calendar/model"
 import { isQuick, rankTasks, type RankedTask } from "@/lib/planning/priority"
 import { concreteStep } from "@/lib/recovery/concrete"
 import { daysBetween, shortDate } from "@/lib/workspace/dates"
@@ -37,7 +38,7 @@ export function unfinishedFromEarlier(state: Workspace, today: string) {
   if (plan && plan.date < today) {
     plan.items.filter((item) => !item.done).forEach((i) => ids.add(i.taskId))
   }
-  state.planned
+  plannedSessions(state)
     .filter((item) => item.date < today && !item.done)
     .forEach((item) => ids.add(item.taskId))
   return ids

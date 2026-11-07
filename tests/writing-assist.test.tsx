@@ -22,7 +22,13 @@ import type { Task } from "@/lib/workspace/schemas"
 vi.mock("@fullcalendar/react", () => ({ default: () => <div>Calendar</div> }))
 vi.mock("@fullcalendar/daygrid", () => ({ default: {} }))
 vi.mock("@fullcalendar/timegrid", () => ({ default: {} }))
-vi.mock("@fullcalendar/interaction", () => ({ default: {} }))
+vi.mock("@fullcalendar/interaction", () => ({
+  default: {},
+  Draggable: class {
+    destroy() {}
+  },
+}))
+vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 const AT = "2026-11-05T12:00:00.000Z"
@@ -356,10 +362,7 @@ describe("sending documents to Live AI", () => {
   }
   const ready = () =>
     waitFor(() =>
-      expect(screen.getByRole("button", { name: "Live AI" })).toHaveAttribute(
-        "aria-pressed",
-        "true"
-      )
+      expect(document.querySelector('[data-mode="live"]')).toBeTruthy()
     )
 
   it("asks first, sends nothing if cancelled, and remembers a yes for this task", async () => {

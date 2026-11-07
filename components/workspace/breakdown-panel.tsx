@@ -77,7 +77,7 @@ export function BreakdownPanel({
   return (
     <Card className="space-y-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+        <h2 className="font-heading text-lg">
           Steps
         </h2>
         {total > 0 && (
@@ -158,7 +158,7 @@ function StepList({ task }: { task: Task }) {
           type="button"
           aria-pressed={editingSteps}
           onClick={() => setEditingSteps(!editingSteps)}
-          className="min-h-11 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="min-h-11 rounded-md text-sm font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         >
           {editingSteps ? "Done editing steps" : "Edit steps"}
         </button>
@@ -233,7 +233,7 @@ function StepRow({
   }
 
   return (
-    <li className={cn("rounded-lg", isCurrent && "bg-sage-soft")}>
+    <li className={cn("rounded-lg", isCurrent && "bg-brand-soft")}>
       <div className="flex items-center gap-0.5">
         {editing ? (
           <>
@@ -424,7 +424,7 @@ function BreakdownPreview({
             {done.map((sub) => (
               <li key={sub.id} className="flex gap-1.5">
                 <Check
-                  className="mt-0.5 size-4 shrink-0 text-sage"
+                  className="mt-0.5 size-4 shrink-0 text-brand"
                   aria-hidden
                 />
                 <span className="min-w-0 break-words">{sub.title}</span>
@@ -487,7 +487,7 @@ function BreakdownPreview({
       </Button>
 
       {pending.ambiguities.length > 0 && (
-        <div className="rounded-lg bg-sand-soft p-3 text-sm text-sand">
+        <div className="rounded-lg bg-caution-soft p-3 text-sm text-caution">
           <p className="font-medium">Worth asking about</p>
           <ul className="mt-1 list-disc pl-4">
             {pending.ambiguities.map((item) => (

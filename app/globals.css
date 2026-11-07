@@ -3,14 +3,26 @@
 @import "shadcn/tailwind.css";
 
 @theme inline {
-  --font-heading: var(--font-heading-serif);
-  --font-sans: var(--font-sans);
-  --color-sage: var(--sage);
-  --color-sage-soft: var(--sage-soft);
-  --color-indigo: var(--indigo);
-  --color-indigo-soft: var(--indigo-soft);
-  --color-sand: var(--sand);
-  --color-sand-soft: var(--sand-soft);
+  --font-heading: var(--font-display);
+  --font-sans: var(--font-interface);
+  --font-accent: var(--font-display);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-link: var(--link);
+  --color-link-soft: var(--link-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-recover: var(--recover);
+  --color-recover-soft: var(--recover-soft);
+  --color-recover-ink: var(--recover-ink);
+  --color-ink: var(--ink);
+  --color-line: var(--line);
+  --color-butter: var(--butter);
+  --color-sky: var(--sky);
+  --color-mint: var(--mint);
+  --color-peach: var(--peach);
+  --color-lilac: var(--lilac);
+  --color-pink: var(--pink);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -32,39 +44,69 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.25);
+  --radius-2xl: calc(var(--radius) * 1.5);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.5);
 }
 
+/* ---------- Aura: the design tokens ----------
+   Soft grainy light on cream. Nothing has an outline; edges are made by colour
+   falling away. Periwinkle and pink belong to Recovery. */
 :root {
-  /* Warm off-white with sage and muted indigo accents. */
-  --background: oklch(0.977 0.008 85);
-  --foreground: oklch(0.27 0.018 265);
-  --card: oklch(0.995 0.003 85);
-  --card-foreground: oklch(0.27 0.018 265);
-  --popover: oklch(0.995 0.003 85);
-  --popover-foreground: oklch(0.27 0.018 265);
-  --primary: oklch(0.44 0.06 155);
-  --primary-foreground: oklch(0.985 0.005 85);
-  --secondary: oklch(0.945 0.012 85);
-  --secondary-foreground: oklch(0.27 0.018 265);
-  --muted: oklch(0.955 0.01 85);
-  --muted-foreground: oklch(0.46 0.018 265);
-  --accent: oklch(0.945 0.012 85);
-  --accent-foreground: oklch(0.27 0.018 265);
-  --destructive: oklch(0.5 0.17 27);
-  --border: oklch(0.905 0.012 85);
-  --input: oklch(0.82 0.015 85);
-  --ring: oklch(0.44 0.07 275);
-  --radius: 0.875rem;
-  --sage: oklch(0.42 0.06 155);
-  --sage-soft: oklch(0.945 0.024 150);
-  --indigo: oklch(0.42 0.085 275);
-  --indigo-soft: oklch(0.945 0.02 275);
-  --sand: oklch(0.42 0.07 70);
-  --sand-soft: oklch(0.95 0.03 85);
+  --ink: #1e2340;
+  --background: #f7f1e6;
+  --foreground: var(--ink);
+  --card: #fffdf9;
+  --card-foreground: var(--ink);
+  --popover: #fffdf9;
+  --popover-foreground: var(--ink);
+  /* Light enough to carry ink, so nothing on the page is a dark block. */
+  --primary: #a9c8f3;
+  --primary-hover: #93baf0;
+  --primary-foreground: var(--ink);
+  --secondary: #efe9dc;
+  --secondary-foreground: var(--ink);
+  --muted: #f1ebdf;
+  --muted-foreground: #565a75;
+  --accent: #efe9dc;
+  --accent-foreground: var(--ink);
+  --destructive: #b8321c;
+  --line: rgb(30 35 64 / 0.12);
+  --border: rgb(30 35 64 / 0.1);
+  --input: rgb(30 35 64 / 0.16);
+  --ring: #6fa5ec;
+  --radius: 1rem;
+
+  --brand: #0b4fb3;
+  --brand-soft: #dfeafa;
+  --link: #0b4fb3;
+  --link-soft: #dfeafa;
+  --caution: #8a4b00;
+  --caution-soft: #ffeccd;
+  --recover: #9aa5fa;
+  --recover-soft: #dfe2ff;
+  --recover-ink: #3e45b0;
+
+  --butter: #ffe3b0;
+  --sky: #cfe2f6;
+  --mint: #e4f3c4;
+  --peach: #ffd7c9;
+  --lilac: #dbdfff;
+  --pink: #ffd8e6;
+
+  --state-done: #efe9dc;
+  --state-buffer: rgb(30 35 64 / 0.1);
+
+  --glass: rgb(255 253 249 / 0.66);
+  --glass-strong: rgb(255 253 249 / 0.84);
+  --shadow-sm: 0 6px 18px -10px rgb(30 35 64 / 0.28);
+  --shadow-md: 0 18px 44px -24px rgb(30 35 64 / 0.3);
+  --shadow-lg: 0 30px 70px -34px rgb(30 35 64 / 0.36);
+  --ease-soft: cubic-bezier(0.22, 0.9, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='3 0 0 0 -.55 3 0 0 0 -.55 3 0 0 0 -.55 0 0 0 0 .6'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @layer base {
@@ -72,22 +114,33 @@
     @apply border-border outline-ring/50;
   }
   body {
-    position: relative;
     @apply bg-background text-foreground;
   }
   html {
     @apply font-sans;
   }
-}
-
-@layer base {
   h1,
   h2 {
     font-family: var(--font-heading);
-    font-weight: 500;
-    letter-spacing: -0.01em;
+    font-weight: 400;
+    letter-spacing: -0.02em;
     text-wrap: balance;
   }
+  h1 em,
+  h2 em,
+  .bot-accent {
+    font-family: var(--font-accent);
+    font-style: italic;
+    font-weight: 400;
+  }
+  select {
+    cursor: pointer;
+  }
+}
+
+.font-heading {
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -95,36 +148,884 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-/* FullCalendar, matched to the app's palette. */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--ring) !important;
+  outline-offset: 2px;
+}
+
+/* ---------- The canvas: the whole app sits on one still field of light ---------- */
+.bot-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(38vmax 38vmax at 96% -4%, rgb(150 196 238 / 0.62), transparent 70%),
+    radial-gradient(34vmax 34vmax at -6% 34%, rgb(255 150 128 / 0.34), transparent 70%),
+    radial-gradient(40vmax 40vmax at 100% 96%, rgb(255 190 120 / 0.42), transparent 70%),
+    radial-gradient(38vmax 38vmax at 6% 104%, rgb(208 236 150 / 0.55), transparent 70%),
+    var(--background);
+  will-change: transform;
+}
+
+.bot-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 240px;
+  opacity: 0.13;
+}
+
+/* ---------- An orb ---------- */
+.bot-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    var(--c1) 0%,
+    var(--c1) 26%,
+    var(--c2) 60%,
+    transparent 100%
+  );
+}
+
+/* Each orb carries its own grain, which fades out with its light. */
+.bot-orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--grain);
+  background-size: 240px;
+  opacity: 0.32;
+}
+
+/* Crisp on one side and dissolving on the other, like light through paper. */
+.bot-orb-edge {
+  background: radial-gradient(
+    circle at var(--at, 30% 72%),
+    var(--c1) 0%,
+    var(--c1) 26%,
+    var(--c2) 58%,
+    transparent 86%
+  );
+}
+
+.bot-breathe {
+  animation: bot-breathe 9s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* ---------- Things you can press ---------- */
+.bot-press {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 240ms var(--ease-soft),
+    box-shadow 240ms ease,
+    background-color 200ms ease;
+}
+
+.bot-press:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.bot-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.bot-card {
+  position: relative;
+  border: 1px solid rgb(255 255 255 / 0.7);
+  border-radius: 1.75rem;
+  background: var(--glass);
+  box-shadow: var(--shadow-md);
+}
+
+/* Not in a layer, so without this it would beat the utility on a panel or dialog. */
+.bot-card.fixed {
+  position: fixed;
+}
+
+.bot-tile {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgb(255 255 255 / 0.7);
+  border-radius: 1.375rem;
+  background: var(--tile, var(--glass-strong));
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.25;
+  box-shadow: var(--shadow-sm);
+  outline: none;
+  transition:
+    transform 280ms var(--ease-soft),
+    box-shadow 280ms ease;
+}
+
+button.bot-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+button.bot-tile:active {
+  transform: scale(0.98);
+}
+
+.bot-tile-glyph {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.8);
+  color: var(--ink);
+  transition: transform 300ms var(--ease-spring);
+}
+
+button.bot-tile:hover .bot-tile-glyph {
+  transform: scale(1.08);
+}
+
+/* ---------- The stage: the task's own light ---------- */
+.bot-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: 2.25rem;
+  background: var(--room-bg, var(--task-wash, var(--card)));
+  box-shadow: var(--shadow-lg);
+}
+
+.bot-stage::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: -30%;
+  right: -16%;
+  width: min(34rem, 110%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    var(--room-core, #f26a3d) 0%,
+    var(--room-core, #f26a3d) 22%,
+    var(--room-mid, #f9a58c) 58%,
+    transparent 100%
+  );
+}
+
+.bot-stage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 240px;
+  opacity: 0.16;
+}
+
+.bot-stage-paused {
+  background: var(--task-wash, var(--card));
+}
+
+.bot-stage-paused::before {
+  opacity: 0.4;
+}
+
+/* A plan that slipped: the light is still there, just further off. */
+.bot-stage-missed {
+  background: var(--card);
+}
+
+.bot-stage-missed::before {
+  top: auto;
+  bottom: -55%;
+  right: -22%;
+  opacity: 0.72;
+}
+
+.bot-corner {
+  display: none;
+}
+
+.bot-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.66);
+  padding: 0.1875rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.bot-stage-title {
+  font-family: var(--font-heading);
+  font-size: clamp(2.5rem, 4.8vw, 4rem);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+/* Start is a small sun: the brightest thing on the page. */
+.bot-start {
+  display: grid;
+  flex: none;
+  width: 7rem;
+  height: 7rem;
+  place-content: center;
+  justify-items: center;
+  gap: 0.125rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #fff 0%, #fff 58%, rgb(255 255 255 / 0.55) 82%, rgb(255 255 255 / 0.1) 100%) !important;
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 1.625rem;
+  font-style: italic;
+  outline: none;
+  transition: transform 420ms var(--ease-spring);
+}
+
+.bot-start:hover {
+  transform: scale(1.09);
+}
+
+.bot-start:active {
+  transform: scale(0.96);
+}
+
+/* ---------- Recovery: a star in periwinkle, and nothing else looks like it ---------- */
+.bot-door {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  width: 100%;
+  min-height: 4.25rem;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: 1.75rem;
+  background: radial-gradient(90% 180% at 8% 50%, #c9b8f8 0%, #a4adfa 50%, #bcc4fb 100%);
+  padding: 0.625rem 1.125rem;
+  text-align: left;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  outline: none;
+  transition:
+    transform 280ms var(--ease-soft),
+    box-shadow 280ms ease;
+}
+
+.bot-door::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: var(--grain);
+  background-size: 240px;
+  opacity: 0.2;
+}
+
+.bot-door:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.bot-door:active {
+  transform: scale(0.99);
+}
+
+.bot-door-tall {
+  min-height: 7.5rem;
+  border-radius: 2rem;
+  padding: 1rem 1.25rem;
+}
+
+.bot-door-tall > span > span:first-child {
+  font-size: 1.75rem;
+}
+
+.bot-door-arrow {
+  transition: transform 300ms var(--ease-spring);
+}
+
+.bot-door:hover .bot-door-arrow {
+  transform: translateX(4px);
+}
+
+.bot-door-mark {
+  transition: transform 700ms var(--ease-spring);
+}
+
+.bot-door:hover .bot-door-mark {
+  transform: rotate(36deg) scale(1.14);
+}
+
+/* ---------- The empty day ---------- */
+.bot-hero {
+  position: relative;
+  overflow-x: clip;
+  overflow-y: visible;
+  isolation: isolate;
+  min-height: min(54svh, 30rem);
+}
+
+.bot-hero-input {
+  border: 1px solid rgb(255 255 255 / 0.8);
+  border-radius: 999px;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.bot-grow {
+  transition: transform 900ms var(--ease-soft);
+}
+
+.bot-ghost-block {
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.2));
+}
+
+/* ---------- The task row ---------- */
+.bot-task {
+  border-radius: 1.25rem;
+  transition: background-color 220ms ease;
+  animation: bot-rise 500ms var(--ease-soft) backwards;
+}
+
+.bot-task:hover,
+.bot-task:focus-within {
+  background: var(--task-wash, var(--muted));
+}
+
+.bot-check {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border-radius: 999px;
+  background: radial-gradient(closest-side, var(--task-vivid, #8e9bf8) 0%, var(--task-vivid, #8e9bf8) 42%, var(--task-soft, #dfe2ff) 100%);
+  color: transparent;
+  transition:
+    transform 320ms var(--ease-spring),
+    color 200ms ease;
+}
+
+.group\/check:hover .bot-check,
+.group\/check:focus-visible .bot-check {
+  transform: scale(1.2);
+  color: var(--ink);
+}
+
+.group\/check:active .bot-check {
+  transform: scale(0.86);
+}
+
+.bot-task-actions {
+  display: flex;
+  flex: none;
+  gap: 0.125rem;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.bot-task:hover .bot-task-actions,
+.bot-task:focus-within .bot-task-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .bot-task-actions {
+    opacity: 1;
+  }
+}
+
+.bot-icon-action {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink);
+  outline: none;
+  transition:
+    transform 260ms var(--ease-spring),
+    background-color 200ms ease;
+}
+
+.bot-icon-action:hover {
+  transform: scale(1.1);
+  background: rgb(255 255 255 / 0.85);
+}
+
+.bot-outcome {
+  min-height: 2.25rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.72);
+  padding-inline: 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  outline: none;
+  transition:
+    transform 260ms var(--ease-spring),
+    background 200ms ease;
+}
+
+.bot-outcome:hover {
+  transform: translateY(-1px);
+}
+
+.bot-outcome:active {
+  transform: scale(0.95);
+}
+
+.bot-outcome[data-outcome="full"][aria-pressed="true"] {
+  background: var(--event-color, var(--primary));
+  color: var(--ink);
+}
+
+.bot-outcome[data-outcome="minimum"][aria-pressed="true"] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--event-color, var(--primary)) 38%, white) 50%, white 50%);
+}
+
+.bot-outcome[data-outcome="skipped"][aria-pressed="true"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--input);
+  color: var(--muted-foreground);
+}
+
+/* ---------- Today's timeline: time is space ---------- */
+.bot-tl-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--line);
+}
+
+.bot-tl-hour > span {
+  position: absolute;
+  top: -0.6rem;
+  left: 0;
+  width: 3.375rem;
+  padding-right: 0.25rem;
+  background: var(--card);
+  border-radius: 0.5rem;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+
+.bot-tl-buffer {
+  position: absolute;
+  left: 3.75rem;
+  right: 0;
+  border-radius: 1.25rem;
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 4px, #f6f5f2 4px 8px);
+  color: var(--muted-foreground);
+}
+
+.bot-tl-block {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 1.125rem;
+  padding: 0.3125rem 0.75rem;
+  color: var(--ink);
+  transition:
+    transform 320ms var(--ease-soft),
+    box-shadow 280ms ease;
+  animation: bot-rise 520ms var(--ease-soft) backwards;
+}
+
+.bot-tl-block:hover,
+.bot-tl-block:focus-within {
+  z-index: 4;
+  transform: translateX(3px);
+  box-shadow: var(--shadow-sm);
+}
+
+.bot-tl-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.bot-tl-open:focus-visible {
+  outline-offset: -2px !important;
+}
+
+.bot-tl-block .bot-block {
+  pointer-events: none;
+  min-height: 0;
+}
+
+.bot-tl-block .bot-block-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.bot-tl-block .bot-block-actions {
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.bot-tl-block .bot-block-actions button {
+  min-height: 1.75rem;
+  min-width: 1.75rem;
+  border-radius: 999px;
+}
+
+/* A short block still shows its answers whole, centred in its height. */
+.bot-tl-block .bot-block-tight .bot-block-actions {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.bot-tl-block .bot-block-tight .bot-block-actions button {
+  min-height: 1.5rem;
+  padding-block: 0;
+  line-height: 1;
+}
+
+.bot-tl-now {
+  position: absolute;
+  left: 3.5rem;
+  right: 0;
+  z-index: 5;
+  height: 1.5px;
+  background: var(--ink);
+  pointer-events: none;
+}
+
+.bot-tl-now::before {
+  content: "";
+  position: absolute;
+  top: -0.6875rem;
+  left: -0.6875rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #f26a3d 0%, #f26a3d 26%, rgb(255 166 61 / 0.55) 58%, transparent 100%);
+}
+
+.bot-any-chip {
+  position: relative;
+  border-radius: 999px;
+  background: var(--task-soft, var(--brand-soft));
+  padding: 0.1875rem 0.875rem;
+  transition: transform 280ms var(--ease-soft);
+}
+
+.bot-any-chip:hover {
+  transform: translateY(-1px);
+}
+
+.bot-any-chip .bot-block {
+  container-type: normal;
+  pointer-events: none;
+  max-width: 14rem;
+}
+
+.bot-any-chip .bot-block-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.bot-any-chip[data-kind="deadline"] {
+  background: var(--butter);
+}
+
+.bot-any-chip[data-kind="routine"],
+.bot-any-chip[data-kind="routine-placement"] {
+  background: color-mix(in srgb, var(--event-color) 22%, white);
+}
+
+/* ---------- Focus: nothing in the room but the light and the time ---------- */
+.bot-immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  overflow-y: auto;
+  isolation: isolate;
+  visibility: visible;
+  color: var(--ink);
+  background: var(--room-bg, var(--task-wash, var(--card)));
+  animation: bot-dawn 900ms var(--ease-soft);
+}
+
+.bot-immersive::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 240px;
+  opacity: 0.2;
+}
+
+.bot-immersive.is-paused {
+  background: var(--task-wash, var(--muted));
+}
+
+html[data-focusing] body {
+  overflow: hidden;
+}
+
+html[data-focusing] [data-app-shell] {
+  visibility: hidden;
+}
+
+.bot-focus-orb {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+/* The light draws in as the time goes. */
+.bot-focus-scale {
+  position: absolute;
+  inset: -22%;
+  z-index: -1;
+  transition: transform 1s linear;
+  will-change: transform;
+}
+
+.bot-focus-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    var(--room-core, #f26a3d) 0%,
+    var(--room-core, #f26a3d) 30%,
+    var(--room-mid, #f9a58c) 62%,
+    transparent 100%
+  );
+  transition: opacity 700ms ease;
+}
+
+.bot-focus-orb.is-paused .bot-focus-light {
+  opacity: 0.45;
+  animation-play-state: paused;
+}
+
+.bot-focus-orb svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.bot-focus-arc {
+  transition: stroke-dashoffset 1s linear;
+}
+
+.bot-focus-hand {
+  transform-origin: 100px 100px;
+  transition: transform 1s linear;
+}
+
+.bot-focus-center {
+  position: relative;
+  text-align: center;
+}
+
+.bot-paper {
+  border: 1px solid rgb(255 255 255 / 0.7);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.bot-paused-tag {
+  animation: bot-soft-pulse 2.6s ease-in-out infinite alternate;
+}
+
+/* ---------- A win, seen for a moment ---------- */
+.bot-win {
+  position: fixed;
+  z-index: 50;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 2rem;
+  box-shadow: var(--shadow-lg);
+  animation: bot-pop-in 700ms var(--ease-soft) backwards;
+}
+
+.bot-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bot-confetti i {
+  position: absolute;
+  left: var(--x);
+  top: 100%;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--c), transparent);
+  opacity: 0;
+  animation: bot-confetti 1800ms var(--ease-soft) var(--d) both;
+}
+
+.bot-rise {
+  animation: bot-rise 620ms var(--ease-soft) backwards;
+}
+
+.bot-fade {
+  animation: bot-fade 360ms ease backwards;
+}
+
+.bot-step {
+  animation: bot-step-in 520ms var(--ease-soft) backwards;
+}
+
+/* ---------- Navigation: a quiet floating pill ---------- */
+.bot-rail {
+  position: fixed;
+  z-index: 30;
+  inset: auto 0.75rem 0.75rem 0.75rem;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgb(255 255 255 / 0.8);
+  border-radius: 999px;
+  /* Translucent, so anything passing under it stays readable through the blur. */
+  background: rgb(255 253 249 / 0.62);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: var(--shadow-md);
+  padding: 0.25rem;
+}
+
+.bot-nav {
+  position: relative;
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bot-nav-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  height: 100%;
+  transform: translateX(calc(var(--at) * 100%));
+  transition: transform 520ms var(--ease-soft);
+  pointer-events: none;
+}
+
+.bot-nav-marker > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: radial-gradient(60% 110% at 50% 50%, #ffb27a 0%, #ffd2c0 55%, rgb(207 226 246 / 0.75) 100%);
+}
+
+.bot-nav-item {
+  position: relative;
+  min-height: 2.75rem;
+  min-width: 0;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  outline: none;
+  transition: color 240ms ease;
+}
+
+.bot-nav-item:hover,
+.bot-nav-item[aria-current="page"] {
+  color: var(--ink);
+}
+
+@media (min-width: 768px) {
+  .bot-rail {
+    inset: 0.875rem auto auto 50%;
+    width: 27rem;
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------- FullCalendar, in the same light ---------- */
 .fc {
-  --fc-border-color: var(--border);
-  --fc-page-bg-color: var(--card);
-  --fc-neutral-bg-color: var(--secondary);
-  --fc-today-bg-color: var(--sage-soft);
-  --fc-button-bg-color: var(--card);
-  --fc-button-border-color: var(--input);
-  --fc-button-text-color: var(--foreground);
-  --fc-button-hover-bg-color: var(--secondary);
-  --fc-button-hover-border-color: var(--input);
-  --fc-button-active-bg-color: var(--sage-soft);
-  --fc-button-active-border-color: var(--primary);
+  --fc-border-color: var(--line);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: rgb(255 255 255 / 0.4);
+  --fc-today-bg-color: transparent;
+  --fc-now-indicator-color: var(--ink);
+  --fc-button-bg-color: rgb(255 255 255 / 0.7);
+  --fc-button-border-color: transparent;
+  --fc-button-text-color: var(--ink);
+  --fc-button-hover-bg-color: #fff;
+  --fc-button-hover-border-color: transparent;
+  --fc-button-active-bg-color: var(--primary);
+  --fc-button-active-border-color: transparent;
   font-size: 0.875rem;
 }
 
 .fc .fc-button {
   min-height: 2.5rem;
-  border-radius: 0.625rem;
+  border-radius: 999px !important;
+  margin-left: 2px !important;
+  padding-inline: 0.875rem;
+  font-weight: 500;
   text-transform: none;
   box-shadow: none !important;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  color: var(--ink);
 }
 
 .fc .fc-button:focus-visible {
-  outline: 3px solid color-mix(in oklch, var(--ring) 40%, transparent);
-  outline-offset: 1px;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  z-index: 3;
+}
+
+.fc .bot-selected-day {
+  box-shadow: inset 0 0 0 2px var(--primary);
+  border-radius: 0.75rem;
 }
 
 .fc .fc-toolbar {
@@ -134,58 +1035,436 @@
 
 .fc .fc-toolbar-title {
   font-family: var(--font-heading);
-  font-size: 1.375rem;
+  font-size: 2.25rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.fc .fc-col-header-cell {
   font-weight: 500;
+}
+
+.fc .fc-col-header-cell.fc-day-today {
+  background: radial-gradient(70% 160% at 50% 50%, #ffd2a8, transparent);
+}
+
+.fc .fc-scrollgrid {
+  overflow: hidden;
+  border-radius: 1.25rem;
 }
 
 .fc .fc-event {
   cursor: pointer;
-  border-radius: 0.375rem;
-  padding: 1px 3px;
+  border-radius: 0.875rem;
+  padding: 3px 8px;
+  transition:
+    transform 300ms var(--ease-soft),
+    box-shadow 260ms ease;
+}
+
+.fc .fc-timegrid-event:hover,
+.fc .fc-event-dragging {
+  z-index: 3;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.fc .fc-event-dragging {
+  opacity: 0.95;
+  box-shadow: var(--shadow-md);
 }
 
 .fc .fc-event .fc-event-title,
 .fc .fc-event .fc-event-time {
-  color: var(--foreground);
+  color: var(--ink);
 }
 
-/* Deadlines are solid with a thick bar. Planned work is dashed and lighter. */
+.fc .fc-timegrid-now-indicator-line {
+  border-width: 1.5px 0 0;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  border-color: var(--ink);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
 .fc .bot-deadline {
-  background: var(--sand-soft);
-  border: 1px solid var(--sand);
-  border-left-width: 4px;
-  font-weight: 600;
+  background: var(--butter);
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .fc .bot-deadline-passed {
-  background: var(--sand-soft);
-  border-style: solid;
+  background: var(--peach);
 }
 
 .fc .bot-deadline-done {
-  background: var(--secondary);
-  border-color: var(--border);
+  background: var(--state-done);
   font-weight: 400;
   text-decoration: line-through;
 }
 
-.fc .bot-planned {
-  background: var(--sage-soft);
-  border: 1px dashed var(--sage);
+/*
+ * One look per status, wherever a block is drawn. --event-color is the item's
+ * own colour and never changes with status; the style says how it went.
+ */
+.fc .bot-planned,
+.fc .bot-missed,
+.bot-tl-block[data-state="planned"],
+.bot-tl-block[data-state="missed"],
+.bot-any-chip[data-state="planned"],
+.bot-legend-swatch.bot-planned {
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 14%, white);
+  border: 1.5px dashed var(--event-color, var(--primary));
 }
 
-.fc .bot-planned-done {
+.fc .bot-missed,
+.bot-tl-block[data-state="missed"] {
+  border-color: color-mix(in srgb, var(--event-color, var(--primary)) 55%, white);
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 6%, white);
+}
+
+.fc .bot-done,
+.fc .bot-focused,
+.bot-tl-block[data-state="done"],
+.bot-tl-block[data-state="focused"],
+.bot-any-chip[data-state="done"],
+.bot-legend-swatch.bot-done {
+  background: radial-gradient(
+    130% 170% at 22% 30%,
+    var(--event-color, var(--primary)),
+    color-mix(in srgb, var(--event-color, var(--primary)) 58%, white)
+  );
+  border: 1.5px solid transparent;
+}
+
+.fc .bot-minimum,
+.bot-tl-block[data-state="minimum"],
+.bot-any-chip[data-state="minimum"],
+.bot-legend-swatch.bot-minimum {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--event-color, var(--primary)) 62%, white) 50%,
+    color-mix(in srgb, var(--event-color, var(--primary)) 10%, white) 50%
+  );
+  border: 1.5px solid color-mix(in srgb, var(--event-color, var(--primary)) 70%, white);
+}
+
+.fc .bot-skipped,
+.bot-tl-block[data-state="skipped"],
+.bot-any-chip[data-state="skipped"],
+.bot-legend-swatch.bot-skipped {
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 5%, white);
+  border: 1.5px solid color-mix(in srgb, var(--event-color, var(--primary)) 18%, white);
+  opacity: 0.55;
+}
+
+.fc .bot-skipped .bot-block-title,
+.fc .bot-missed .bot-block-title,
+.fc .bot-missed .bot-block-time,
+.bot-tl-block[data-state="missed"] .bot-block,
+.bot-tl-block[data-state="skipped"] .bot-block {
+  color: var(--muted-foreground);
+}
+
+/* The bottom grip for changing a block's length. */
+.fc .fc-timegrid-event .fc-event-resizer-end {
+  display: block;
+  bottom: 0;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.fc .fc-timegrid-event .fc-event-resizer-end::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 1.25rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--event-color, var(--primary));
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 160ms ease;
+}
+
+.fc .fc-timegrid-event:hover .fc-event-resizer-end::after {
+  opacity: 0.7;
+}
+
+.bot-legend-swatch {
+  --event-color: #c4c0b8;
+  display: inline-block;
+  width: 1.25rem;
+  height: 0.875rem;
+  border-radius: 0.25rem;
+}
+
+.bot-legend-swatch.bot-buffer-block {
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 3px, #f6f5f2 3px 6px);
+  border: 1px solid #dad7d1;
+}
+
+.bot-legend-swatch.bot-deadline {
+  background: #eeece8;
+  border: 1px solid #c4c0b8;
+  border-radius: 999px;
+}
+
+.bot-buffer-chip,
+.fc .bot-buffer-block,
+.bot-tl-block[data-state="buffer"] {
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 4px, #f6f5f2 4px 8px);
+  border: 1px solid #dad7d1;
+}
+
+.fc .bot-buffer-block .bot-block-title,
+.bot-tl-block[data-state="buffer"] .bot-block {
+  color: var(--muted-foreground);
+}
+
+.fc .fc-timegrid-slot {
+  height: 2.75rem;
+}
+
+.fc .fc-timegrid {
+  background: transparent;
+}
+
+.fc .fc-timegrid-axis-cushion,
+.fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-number {
+  border-radius: 999px;
+  background: #ffd2a8;
+  font-weight: 500;
+}
+
+.bot-block {
+  position: relative;
+  container-type: inline-size;
+  min-height: 100%;
+  overflow: hidden;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.bot-block-title {
+  display: block;
+  overflow: hidden;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bot-block-time {
+  display: block;
+  font-size: 0.6875rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.bot-block-adjusted {
+  display: block;
+  font-size: 0.625rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.bot-block-tight .bot-block-time {
+  display: none;
+}
+
+.fc-dayGridMonth-view .bot-block-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.bot-block-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 2px;
+}
+
+.bot-block-actions button {
+  display: inline-flex;
+  min-height: 20px;
+  min-width: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.88);
+  padding: 0 5px;
+  color: var(--ink);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.bot-block-actions button:hover {
+  background: white;
+}
+
+.bot-block-actions button:focus-visible {
+  outline: 2px solid var(--ring);
+}
+
+.bot-block-actions .bot-block-play {
+  opacity: 0;
+}
+
+.fc-event:hover .bot-block-actions .bot-block-play,
+.bot-tl-block:hover .bot-block-actions .bot-block-play,
+.bot-block-actions .bot-block-play:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .bot-block-actions .bot-block-play {
+    opacity: 1;
+  }
+}
+
+.bot-block-icon {
+  display: none;
+}
+
+@container (max-width: 170px) {
+  .bot-block-word {
+    display: none;
+  }
+
+  .bot-block-icon {
+    display: inline;
+  }
+}
+
+.fc .fc-timegrid-event .fc-event-resizer-end {
+  display: block;
+  bottom: 0;
+  height: 9px;
+  cursor: ns-resize;
+}
+
+.fc .fc-timegrid-event .fc-event-resizer-end::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 26px;
+  height: 3px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--ink);
+  opacity: 0.35;
+}
+
+.fc .bot-buffer {
+  background: repeating-linear-gradient(135deg, #e7e5e1 0 4px, #f6f5f2 4px 8px);
+  opacity: 1;
+}
+
+.bot-buffer-label {
+  display: block;
+  padding: 1px 4px;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.fc .fc-timegrid .fc-daygrid-body .fc-daygrid-day-events {
+  min-height: 0.75rem;
+  margin-bottom: 0;
+}
+
+.fc .fc-timegrid .fc-daygrid-body-natural .fc-daygrid-day-events {
+  margin-bottom: 0;
+}
+
+.fc .fc-timegrid-divider {
+  padding: 0 0 1px;
+}
+
+.fc .bot-pending {
+  background: var(--card);
+  border: 1px dashed var(--primary);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.fc .bot-pending .bot-block-title {
+  font-style: italic;
+  color: var(--link);
+}
+
+.fc .fc-highlight {
+  background: var(--brand-soft);
+  opacity: 0.8;
+}
+
+.fc-multiMonthYear-view .fc-daygrid-day.fc-day-today {
+  background: transparent;
+}
+
+.fc .fc-multimonth-daygrid .fc-daygrid-day-frame {
+  min-height: 1.75rem;
+}
+
+.fc .fc-daygrid-day.bot-heat-1,
+.bot-heat-swatch-1 {
+  background: #e6f0fc;
+}
+
+.fc .fc-daygrid-day.bot-heat-2,
+.bot-heat-swatch-2 {
+  background: #c9def8;
+}
+
+.fc .fc-daygrid-day.bot-heat-3,
+.bot-heat-swatch-3 {
+  background: #a3c6f3;
+}
+
+.fc .fc-daygrid-day.bot-heat-4,
+.bot-heat-swatch-4 {
+  background: #6fa5ec;
+}
+
+/* ---------- Overview ---------- */
+.bot-bar-planned {
+  border: 1.5px dashed #ee9426;
+  background: color-mix(in srgb, #ee9426 18%, white);
+}
+
+.bot-bar-focus {
+  background: #5f97e6;
+}
+
+.bot-bar-planned,
+.bot-bar-focus {
+  border-radius: 4px 4px 0 0;
+}
+
+.bot-heat-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+}
+
+/* Lower priority, so a cell's level colour always wins over the empty one. */
+:where(.bot-heat-cell) {
   background: var(--secondary);
-  border: 1px dashed var(--input);
-  text-decoration: line-through;
 }
 
-.fc .bot-focused {
-  background: var(--indigo-soft);
-  border: 1px solid transparent;
-}
-
-/* The working document. */
+/* ---------- The working document ---------- */
 .bot-editor {
   min-height: 22rem;
   padding: 1rem 1.25rem;
@@ -196,7 +1475,7 @@
 }
 
 .bot-editor:focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--ring) 35%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ring);
 }
 
 .bot-editor > * + * {
@@ -214,9 +1493,9 @@
 }
 
 .bot-editor h3 {
-  font-family: var(--font-sans);
+  font-family: var(--font-heading);
   font-size: 1.05rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .bot-editor ul:not([data-type="taskList"]) {
@@ -230,7 +1509,7 @@
 }
 
 .bot-editor blockquote {
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--primary);
   padding-left: 0.875rem;
   color: var(--muted-foreground);
 }
@@ -273,7 +1552,49 @@
 
 /* Accepted suggestions stay visible, so authorship remains clear. */
 .bot-editor [data-suggested] {
-  background: var(--indigo-soft);
+  background: var(--brand-soft);
   border-radius: 0.2rem;
   box-decoration-break: clone;
+}
+
+/* ---------- Motion: slow, and only ever transform and opacity ---------- */
+@keyframes bot-breathe {
+  from { transform: scale(0.97); }
+  to { transform: scale(1.03); }
+}
+
+@keyframes bot-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bot-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bot-step-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bot-pop-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bot-dawn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bot-soft-pulse {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
+@keyframes bot-confetti {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  20%, 70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(var(--y)) scale(1.3); }
 }

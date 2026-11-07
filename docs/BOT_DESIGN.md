@@ -49,9 +49,9 @@ No images. The bot works only with text. Users can upload PDF, .txt, and .md fil
 
 ## 6. How should it start?
 
-The app opens on a workspace, with no onboarding and no registration. The AI only joins in when someone asks for help on a task, using "I'm stuck" or "Recover a Task". It then offers one optional question about what's in the way, and a button to get a plan.
+The app opens on a workspace, with no onboarding and no registration. The AI only joins in when someone asks for help on a task, using "I'm stuck" or "I've been avoiding something". It then asks what's making it difficult, and offers one small next step.
 
-The earlier guided check-in is still available. It starts with "What's been weighing on you?", and a few words are enough.
+The earlier guided check-in is no longer linked in the app. Its code remains, and a saved session from it still moves into the workspace as a task.
 
 ## 7. What steps should it follow?
 
