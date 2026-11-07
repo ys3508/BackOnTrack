@@ -46,6 +46,7 @@ export function BlockContent({
     adjusted,
     color,
     status,
+    occupied,
     window: part,
   } = event.extendedProps as {
     window?: string | null
@@ -57,6 +58,7 @@ export function BlockContent({
     adjusted?: boolean
     color?: string
     status?: BlockStatus
+    occupied?: boolean
   }
   const { start, end, title } = event
   // The calendar keeps a block's element when it's redrawn, so a new colour has
@@ -65,9 +67,8 @@ export function BlockContent({
     const block = rootRef.current?.closest<HTMLElement>(".fc-event")
     if (block && color) block.style.setProperty("--event-color", color)
   }, [color])
-  if (kind === "buffer" && refId === "buffer") {
-    return <span className="bot-buffer-label">Buffer</span>
-  }
+  // Something is in it, and that's what the block on top is about.
+  if (occupied) return <span className="bot-buffer-label">{title}</span>
   const windowName = part ? part[0].toUpperCase() + part.slice(1) : null
   const minutes =
     start && end ? (end.getTime() - start.getTime()) / 60_000 : null
@@ -97,7 +98,7 @@ export function BlockContent({
       className={
         inMonth
           ? "bot-block flex items-baseline gap-1"
-          : minutes !== null && minutes < 20
+          : minutes !== null && minutes < 30
             ? "bot-block bot-block-tight flex items-baseline gap-1.5"
             : "bot-block"
       }

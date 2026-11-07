@@ -25,6 +25,8 @@ export type CalendarItem = {
   start: string
   end?: string
   allDay: boolean
+  /** A buffer with something in it sits behind that, without taking up a column. */
+  display?: "background"
   editable: boolean
   durationEditable: boolean
   classNames: string[]
@@ -38,6 +40,8 @@ export type CalendarItem = {
     color?: string
     status?: BlockStatus
     adjusted?: boolean
+    /** A buffer with something in it. */
+    occupied?: boolean
     /** Planned work whose time has gone by, still waiting for an answer. */
     awaitingAnswer?: boolean
     timed?: boolean
@@ -207,7 +211,33 @@ export function buildCalendarItems(
       }
     })
 
-  return [...deadlines, ...planned, ...occurrences, ...focused]
+  const all = [...deadlines, ...planned, ...occurrences, ...focused]
+  const moment = (iso: string) => new Date(iso).getTime()
+  const holding = all.filter(
+    (item) =>
+      item.extendedProps.kind !== "buffer" &&
+      item.extendedProps.kind !== "deadline" &&
+      !item.allDay &&
+      item.end
+  )
+  return all.map((item) => {
+    if (item.extendedProps.kind !== "buffer" || !item.end) return item
+    const from = moment(item.start)
+    const to = moment(item.end)
+    const occupied = holding.some(
+      (other) => moment(other.start) < to && moment(other.end!) > from
+    )
+    return occupied
+      ? {
+          ...item,
+          display: "background",
+          editable: false,
+          durationEditable: false,
+          classNames: ["bot-buffer"],
+          extendedProps: { ...item.extendedProps, occupied: true },
+        }
+      : item
+  })
 }
 
 /** Reads a dropped calendar event as a local date and an optional local time. */

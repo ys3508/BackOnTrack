@@ -331,6 +331,38 @@ export function mapPlanned(
   })
 }
 
+/** Time the user set aside for catching up. Unused, it means nothing at all. */
+export function newBuffer(
+  id: string,
+  date: string,
+  start: string,
+  minutes: number,
+  createdAt = ""
+): CalendarEvent {
+  return {
+    id,
+    title: "Buffer",
+    taskId: null,
+    kind: "buffer",
+    date,
+    start,
+    end: addClock(start, Math.min(minutes, 1439)),
+    flexible: false,
+    color: null,
+    repeat: null,
+    overrides: {},
+    outcomes: {},
+    minimum: "",
+    link: "",
+    notes: "",
+    emoji: "",
+    label: "",
+    window: null,
+    seriesId: null,
+    createdAt,
+  }
+}
+
 /* ---------- Editing ---------- */
 
 export type EventScope = "one" | "following" | "all"

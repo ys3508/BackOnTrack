@@ -14,7 +14,8 @@ import { plannedSessions } from "@/lib/calendar/model"
 import { eventOf } from "./event-fixtures"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import { draftRealityGap } from "@/lib/recovery/case-engine"
-import { chooseBuffer, freeBuffersOn } from "@/lib/today/buffer"
+import { newBuffer } from "@/lib/calendar/model"
+import { chooseBuffer, freeBuffersOn, nextFreeSlot } from "@/lib/today/buffer"
 import { nowState, restartsOn } from "@/lib/today/now"
 import { addDays, localToday } from "@/lib/workspace/dates"
 import { workspaceReducer } from "@/lib/workspace/reducer"
@@ -33,7 +34,6 @@ vi.mock("@fullcalendar/interaction", () => ({
   },
 }))
 vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
-vi.mock("@fullcalendar/rrule", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 const AT = "2020-01-05T12:00:00.000Z"
@@ -625,10 +625,18 @@ describe("Test 4: a missed block, all the way through", () => {
 })
 
 describe("Test 5: moving to a buffer", () => {
-  const ending = new Date(`${TODAY}T15:00:00`).getTime() - 3_600_000
+  const ending = new Date(`${TODAY}T14:00:00`).getTime()
+  const buffer = (time = "15:00", minutes = 30): WorkspaceAction => ({
+    type: "add-event",
+    event: newBuffer("buf", TODAY, time, minutes),
+  })
+
+  it("has no buffer to offer unless one was placed", () => {
+    expect(freeBuffersOn(EMPTY_WORKSPACE, TODAY, ending)).toEqual([])
+  })
 
   it("finds the free part of the buffer, around what's already there", () => {
-    const state = run([task("a"), block("x", "a", "15:10", 10)])
+    const state = run([buffer(), task("a"), block("x", "a", "15:10", 10)])
     expect(freeBuffersOn(state, TODAY, ending)).toEqual([
       { date: TODAY, time: "15:00", minutes: 10 },
       { date: TODAY, time: "15:20", minutes: 10 },
@@ -637,6 +645,7 @@ describe("Test 5: moving to a buffer", () => {
 
   it("counts routines as taken, too", () => {
     const state = run([
+      buffer(),
       {
         type: "add-event",
         event: eventOf({
@@ -650,35 +659,45 @@ describe("Test 5: moving to a buffer", () => {
   })
 
   it("only offers what's left of it, once it has begun", () => {
-    const during = new Date(`${TODAY}T15:20:00`).getTime()
-    expect(freeBuffersOn(EMPTY_WORKSPACE, TODAY, during)).toEqual([
-      { date: TODAY, time: "15:20", minutes: 10 },
+    const state = run([buffer()])
+    const during = new Date(`${TODAY}T15:15:00`).getTime()
+    expect(freeBuffersOn(state, TODAY, during)).toEqual([
+      { date: TODAY, time: "15:15", minutes: 15 },
     ])
     const after = new Date(`${TODAY}T16:00:00`).getTime()
-    expect(freeBuffersOn(EMPTY_WORKSPACE, TODAY, after)).toEqual([])
+    expect(freeBuffersOn(state, TODAY, after)).toEqual([])
   })
 
-  it("moves it if it fits", () => {
-    const state = run([task("a"), block("m", "a", "09:00", 25)])
+  it("moves it into today's next buffer if it fits", () => {
+    const state = run([buffer(), task("a"), block("m", "a", "09:00", 25)])
     expect(chooseBuffer(state, plannedSessions(state)[0], TODAY, ending)).toEqual({
       kind: "fits",
-      slot: { date: TODAY, time: "15:00", minutes: 30 },
+      slot: { date: TODAY, time: "15:00", minutes: 25 },
     })
   })
 
-  it("never moves something too long by itself", () => {
+  it("offers the next free time when no buffer has room", () => {
+    const state = run([
+      buffer(),
+      task("a"),
+      block("m", "a", "09:00", 60),
+      block("x", "a", "14:00", 30),
+    ])
+    expect(chooseBuffer(state, plannedSessions(state)[0], TODAY, ending)).toEqual({
+      kind: "none",
+      slot: { date: TODAY, time: "14:30", minutes: 60 },
+      needed: 60,
+    })
+  })
+
+  it("looks to tomorrow morning when today is full", () => {
     const state = run([task("a"), block("m", "a", "09:00", 60)])
-    const choice = chooseBuffer(state, plannedSessions(state)[0], TODAY, ending)
-    expect(choice.kind).toBe("choose")
-    if (choice.kind === "choose") {
-      expect(choice.needed).toBe(60)
-      expect(choice.slots[0]).toEqual({
-        date: TODAY,
-        time: "15:00",
-        minutes: 30,
-      })
-      expect(choice.slots.at(-1)!.date).toBe(addDays(TODAY, 1))
-    }
+    const late = new Date(`${TODAY}T23:30:00`).getTime()
+    expect(nextFreeSlot(state, TODAY, late, 60, "m")).toEqual({
+      date: addDays(TODAY, 1),
+      time: "09:00",
+      minutes: 60,
+    })
   })
 
   it("moves the block in the app, leaving deadline and task alone", async () => {

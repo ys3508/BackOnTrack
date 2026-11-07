@@ -462,3 +462,18 @@ Automated: 758 tests pass. Run in the development server in the built-in browser
 The calendar sidebar being empty with a routine on the Routines page was not reproduced on the code before this change. Both now read `routinesOf`, and a test covers it.
 
 Not tested: touch dragging, a person dragging by hand, screen readers, real data from a long-used browser.
+
+## Calendar v2, Phase B
+
+Automated: 771 tests pass. Run in the development server in the built-in browser with real drags and clicks. Saved data was edited to make a block that had just been missed.
+
+| Check | Result |
+| --- | --- |
+| Fresh day | No buffers |
+| Drag the Buffer chip to 4:00, then its grip | Hatched grey, 30 minutes, then 45 |
+| Missed block, Move to buffer | Moved to 4:00, inside the buffer on Today and Calendar, with the rest of the buffer still visible |
+| Missed block with no buffer | Nothing moves. Offers Today, 10:15 AM, with Move it there and Make this a buffer |
+| Make this a buffer | Creates the buffer and puts the block in it |
+| Click the empty part of an occupied buffer | Opens Edit and Delete, and Delete works |
+
+Not tested: touch dragging the chip, which has no fallback other than the editor's toggle on a phone.

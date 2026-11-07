@@ -10,7 +10,6 @@ import { ReplanDialog } from "@/components/workspace/schedule"
 import { useStore } from "@/components/workspace/store"
 import { formatClockTime } from "@/lib/calendar/derived"
 import { taskColorVars } from "@/lib/calendar/task-colors"
-import { buffersFor } from "@/lib/today/buffer"
 import {
   agendaColumns,
   agendaHours,
@@ -61,7 +60,7 @@ export function TodayTimeline() {
     return () => window.clearInterval(id)
   }, [])
 
-  const { timed, untimed } = todayAgenda(state, today, now)
+  const { timed, untimed, buffers } = todayAgenda(state, today, now)
   const scheduled = hasScheduleToday(state, today, now)
 
   if (!scheduled && !expanded) {
@@ -98,19 +97,12 @@ export function TodayTimeline() {
   }
 
   const clock = new Date(now)
-  const hours = agendaHours(timed, clock)
+  const hours = agendaHours([...timed, ...buffers], clock)
   const top = (date: Date) =>
     ((date.getHours() + date.getMinutes() / 60 - hours.first) * HOUR_PX) | 0
   const height = (hours.last - hours.first) * HOUR_PX
   const columns = agendaColumns(timed)
   const nowTop = top(clock)
-  const buffers = buffersFor(state.settings).flatMap((buffer) => {
-    const start = new Date(`${today}T${buffer.time}:00`)
-    const startAt = top(start)
-    return startAt >= 0 && startAt < height
-      ? [{ time: buffer.time, top: startAt, minutes: buffer.minutes }]
-      : []
-  })
 
   const open = (item: AgendaItem, target: Element, untimedItem: boolean) =>
     setOpened({
@@ -200,21 +192,28 @@ export function TodayTimeline() {
           )
         })}
 
-        {buffers.map((buffer) => (
-          <div
-            key={buffer.time}
-            className="bot-tl-buffer px-3 py-1 text-[0.6875rem]"
-            style={{
-              top: buffer.top,
-              height: Math.min(
-                (buffer.minutes / 60) * HOUR_PX,
-                height - buffer.top
-              ),
-            }}
-          >
-            Buffer
-          </div>
-        ))}
+        {/* Drawn first and full width, so whatever is in a buffer sits inside it. */}
+        {buffers.map((buffer) => {
+          const startAt = top(buffer.start)
+          const minutes =
+            (buffer.end.getTime() - buffer.start.getTime()) / 60_000
+          return (
+            <button
+              key={buffer.key}
+              type="button"
+              aria-label={`Open ${buffer.title}`}
+              data-block-id={buffer.refId}
+              onClick={(event) => open(buffer, event.currentTarget, false)}
+              className="bot-tl-buffer px-3 py-1 text-left text-[0.6875rem] outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+              style={{
+                top: startAt,
+                height: Math.min((minutes / 60) * HOUR_PX, height - startAt),
+              }}
+            >
+              {buffer.title}
+            </button>
+          )
+        })}
 
         {timed.map((item, index) => {
           const place = columns.get(item.key)!

@@ -436,6 +436,7 @@ export function BlockPopover({
     block.kind === "focused" &&
     state.focusSessions.find((item) => item.id === block.refId)?.reported
   const isRoutine = block.kind === "routine" && Boolean(event)
+  const isBuffer = block.kind === "buffer" && Boolean(event)
   const occurrence = event ? occurrenceAt(event, key) : null
 
   const routineResult =
@@ -480,7 +481,7 @@ export function BlockPopover({
   const focusMinutes = Math.round(
     session?.minutes ?? blockMinutes ?? occurrence?.minutes ?? 25
   )
-  const canStart = block.kind !== "focused" && !done
+  const canStart = block.kind !== "focused" && !isBuffer && !done
   const canEdit = block.kind !== "focused" && !done
 
   if (editing && event) {
@@ -496,7 +497,7 @@ export function BlockPopover({
           block.end &&
           `, ${formatTimeRange(block.start, block.end)}`}
         {blockMinutes !== null && ` · ${formatDuration(blockMinutes)}`}
-        {isRoutine && occurrence?.adjusted && " · adjusted"}
+        {(isRoutine || isBuffer) && occurrence?.adjusted && " · adjusted"}
         {reported && " · you said you did this"}
       </p>
       {deleting && event?.repeat ? (
@@ -577,7 +578,7 @@ export function BlockPopover({
               </div>
             </div>
           )}
-          {block.kind !== "focused" && !isRoutine && (
+          {block.kind !== "focused" && !isRoutine && !isBuffer && (
             <Button
               type="button"
               size="lg"
@@ -652,7 +653,7 @@ export function BlockPopover({
               <Trash2 aria-hidden />I didn’t actually do this
             </Button>
           )}
-          {(session || isRoutine) && (
+          {(session || isRoutine || isBuffer) && (
             <Button
               type="button"
               size="lg"

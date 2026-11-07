@@ -271,41 +271,17 @@ export function SettingsView() {
 
       <Section title="Buffers" Icon={Coffee} tone="var(--sky)" wide>
         <p className="text-sm text-muted-foreground">
-          Time kept free for catching up. An unused buffer doesn’t count as
-          anything missed.
+          You place buffers yourself: drag one onto the calendar, or choose
+          Buffer when adding something. There are none unless you add them, and
+          an unused one doesn’t count as anything missed.
         </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <label
-              htmlFor="buffer-count"
-              className="mb-1 block text-sm font-medium"
-            >
-              Buffers each day
-            </label>
-            <select
-              id="buffer-count"
-              value={state.settings.bufferCount}
-              onChange={(event) =>
-                dispatch({
-                  type: "settings",
-                  patch: { bufferCount: Number(event.target.value) },
-                })
-              }
-              className={fieldClass}
-            >
-              {[0, 1, 2, 3, 4].map((count) => (
-                <option key={count} value={count}>
-                  {count === 0 ? "None" : count}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label
               htmlFor="buffer-minutes"
               className="mb-1 block text-sm font-medium"
             >
-              Length of each
+              Default length for new buffers
             </label>
             <select
               id="buffer-minutes"
@@ -318,7 +294,7 @@ export function SettingsView() {
               }
               className={fieldClass}
             >
-              {[15, 30, 45, 60].map((minutes) => (
+              {[15, 30, 45, 60, 90].map((minutes) => (
                 <option key={minutes} value={minutes}>
                   {minutes} minutes
                 </option>
@@ -351,16 +327,10 @@ export function SettingsView() {
             </select>
           </div>
         </div>
-        {state.settings.bufferCount > 0 && (
-          <p className="text-xs text-muted-foreground">
-            They start at{" "}
-            {["3:00 PM", "5:00 PM", "11:00 AM", "7:00 PM"]
-              .slice(0, state.settings.bufferCount)
-              .join(", ")}
-            . A gap moves a newly placed block later, so it doesn’t sit right
-            after another one.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          A gap moves a newly placed block later, so it doesn’t sit right after
+          another one.
+        </p>
       </Section>
 
       <div className="lg:col-span-2">

@@ -10,7 +10,6 @@ import type {
 import { BlockContent } from "@/components/workspace/calendar-block"
 import { useStore } from "@/components/workspace/store"
 import { buildCalendarItems } from "@/lib/calendar/events"
-import { buffersFor } from "@/lib/today/buffer"
 import { localToday } from "@/lib/workspace/dates"
 
 /** One source for what's drawn, so Calendar and Today's timeline can't disagree. */
@@ -33,24 +32,12 @@ export function useCalendarEvents(
   )
   const itemsKey = JSON.stringify(items)
 
-  const events = useMemo<EventInput[]>(() => {
-    if (hidden) return []
-    // Time set aside for catching up. Unused, it's simply unused.
-    const buffers = buffersFor(state.settings).map(
-      (buffer, index): EventInput => ({
-        id: `buffer:${index}`,
-        title: "Buffer",
-        rrule: `DTSTART:20200101T${buffer.time.replace(":", "")}00\nRRULE:FREQ=DAILY`,
-        duration: { minutes: buffer.minutes },
-        display: "background",
-        classNames: ["bot-buffer"],
-        extendedProps: { kind: "buffer", refId: "buffer", taskId: null },
-      })
-    )
-    return [...items, ...buffers]
+  const events = useMemo<EventInput[]>(
+    () => (hidden ? [] : items),
     // itemsKey stands in for items, which is new on every tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsKey, state.settings, hidden])
+    [itemsKey, hidden]
+  )
 
   const eventContent = useCallback(
     (arg: EventContentArg) => (

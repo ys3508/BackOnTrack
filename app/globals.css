@@ -1210,6 +1210,7 @@ html[data-focusing] [data-app-shell] {
   border-radius: 999px;
 }
 
+.bot-buffer-chip,
 .fc .bot-buffer-block,
 .bot-tl-block[data-state="buffer"] {
   background: repeating-linear-gradient(135deg, #e7e5e1 0 4px, #f6f5f2 4px 8px);

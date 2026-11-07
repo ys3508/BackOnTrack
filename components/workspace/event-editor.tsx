@@ -22,6 +22,7 @@ import {
   EVENT_SWATCHES,
   addClock,
   colorOf,
+  newBuffer,
   occurrenceAt,
   plannedSession,
   weekdayOf,
@@ -179,9 +180,11 @@ export function EventEditor({
   const [start, setStart] = useState(shown?.start ?? draft?.start ?? "09:00")
   const [minutes, setMinutes] = useState(shown?.minutes ?? draft?.minutes ?? 30)
   const [chosen, setChosen] = useState(Boolean(draft?.chosen))
-  const [flexible, setFlexible] = useState(
+  const [anyTime, setAnyTime] = useState(
     event?.flexible ?? draft?.flexible ?? false
   )
+  const [buffer, setBuffer] = useState(event?.kind === "buffer")
+  const flexible = anyTime && !buffer
   const [color, setColor] = useState<string | null>(
     shown?.color ?? event?.color ?? null
   )
@@ -219,7 +222,7 @@ export function EventEditor({
       }
     : null
   const ready =
-    Boolean(title.trim() && date) &&
+    Boolean((buffer || title.trim()) && date) &&
     (flexible || Boolean(start)) &&
     minutes > 0 &&
     (!repeating || days.length > 0)
@@ -252,6 +255,19 @@ export function EventEditor({
   }
 
   function create() {
+    if (buffer) {
+      dispatch({
+        type: "add-event",
+        event: {
+          ...newBuffer(newId(), date, start, minutes, nowIso()),
+          repeat,
+          link: link.trim(),
+          notes: notes.trim(),
+        },
+      })
+      onClose()
+      return
+    }
     const taskId = linkedTaskId()
     const clock = flexible ? "00:00" : start
     const at = nowIso()
@@ -391,19 +407,40 @@ export function EventEditor({
             save()
           }}
         >
-          <TaskCombobox
-            quiet
-            label="Title"
-            placeholder="Title, or find a task"
-            value={title}
-            onChange={setTitle}
-            onPick={(task) => {
-              setPicked(task)
-              if (task?.estimateMinutes && !chosen && !event) {
-                setMinutes(task.estimateMinutes)
-              }
-            }}
-          />
+          {!buffer && (
+            <TaskCombobox
+              quiet
+              label="Title"
+              placeholder="Title, or find a task"
+              value={title}
+              onChange={setTitle}
+              onPick={(task) => {
+                setPicked(task)
+                if (task?.estimateMinutes && !chosen && !event) {
+                  setMinutes(task.estimateMinutes)
+                }
+              }}
+            />
+          )}
+          {!event && (
+            <label className="flex min-h-9 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={buffer}
+                onChange={(change) => {
+                  setBuffer(change.target.checked)
+                  if (change.target.checked && !chosen) {
+                    setMinutes(state.settings.bufferMinutes)
+                  }
+                }}
+                className="size-4 accent-[var(--primary)]"
+              />
+              Buffer
+              <span className="text-xs text-muted-foreground">
+                time kept free
+              </span>
+            </label>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-xs font-medium">
@@ -448,15 +485,17 @@ export function EventEditor({
             )}
           </div>
 
-          <label className="flex min-h-9 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={flexible}
-              onChange={(change) => setFlexible(change.target.checked)}
-              className="size-4 accent-[var(--primary)]"
-            />
-            Any time that day
-          </label>
+          {!buffer && (
+            <label className="flex min-h-9 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={anyTime}
+                onChange={(change) => setAnyTime(change.target.checked)}
+                className="size-4 accent-[var(--primary)]"
+              />
+              Any time that day
+            </label>
+          )}
 
           <label className="block text-xs font-medium">
             Repeat
@@ -542,20 +581,22 @@ export function EventEditor({
                   </label>
                 )}
               </div>
-              <label className="block text-xs font-medium">
-                Minimum version (optional)
-                <Input
-                  value={minimum}
-                  maxLength={120}
-                  placeholder="Shoes on"
-                  onChange={(change) => setMinimum(change.target.value)}
-                  className="mt-0.5 h-10"
-                />
-              </label>
+              {!buffer && (
+                <label className="block text-xs font-medium">
+                  Minimum version (optional)
+                  <Input
+                    value={minimum}
+                    maxLength={120}
+                    placeholder="Shoes on"
+                    onChange={(change) => setMinimum(change.target.value)}
+                    className="mt-0.5 h-10"
+                  />
+                </label>
+              )}
             </>
           )}
 
-          <fieldset>
+          <fieldset hidden={buffer}>
             <legend className="mb-1 text-xs font-medium">Colour</legend>
             <div className="flex flex-wrap gap-1.5">
               {EVENT_SWATCHES.map((swatch) => (
@@ -604,7 +645,7 @@ export function EventEditor({
                   className="mt-0.5"
                 />
               </label>
-              {repeating && (
+              {repeating && !buffer && (
                 <div
                   role="group"
                   aria-label="Emoji"

@@ -371,6 +371,18 @@ The "no editor opens" bug was CSS: `.bot-card` sets `position: relative` outside
 
 Removed from the calendar flow on purpose: the first-step field and the Morning, Afternoon, and Evening choice when editing a block (`RescheduleForm` still offers parts of the day from recovery), and creating a task due that day by clicking in Month.
 
+## Calendar v2, Phase B: buffers the user places
+
+The automatic daily buffer, its fixed 3:00 PM start, and the count setting are gone, so a day has no buffers unless the user adds one. Buffers are events with `kind: "buffer"`, made from a draggable sidebar chip or the editor's Buffer toggle, and they repeat, move, resize, and delete like anything else. `rrule` and `@fullcalendar/rrule` had no remaining use and were removed.
+
+| Decision | Reason |
+| --- | --- |
+| A buffer with something in it is drawn as a background event | It takes no column, so the item sits inside it and stays draggable |
+| Clicking the empty part of an occupied buffer opens that buffer | A background event can't be clicked or dragged, and it still needs Edit and Delete |
+| A buffer that's too short isn't offered, and nothing is shortened | The brief's rule: today's next free buffer, or else the next free slot that fits |
+
+A buffer holding something can't be dragged or resized until it's empty, only edited from its popover.
+
 ## Known limitations
 
 - **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.

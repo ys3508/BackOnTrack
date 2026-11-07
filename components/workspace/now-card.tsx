@@ -48,6 +48,7 @@ import {
   formatMinutes,
   remainingSeconds,
 } from "@/lib/focus/timer"
+import { newBuffer } from "@/lib/calendar/model"
 import { chooseBuffer } from "@/lib/today/buffer"
 import type { BufferSlot } from "@/lib/today/buffer"
 import { shortDate } from "@/lib/workspace/dates"
@@ -673,7 +674,7 @@ function MissedCard({
   const enterRecovery = useEnterRecovery()
   const [changing, setChanging] = useState(false)
   const [choosing, setChoosing] = useState<{
-    slots: BufferSlot[]
+    slot: BufferSlot | null
     needed: number
   } | null>(null)
   const when = formatClockTime(new Date(`${session.date}T${session.time}:00`))
@@ -705,7 +706,7 @@ function MissedCard({
   function moveToBuffer() {
     const choice = chooseBuffer(state, session, today, now)
     if (choice.kind === "fits") moveTo(choice.slot, session.minutes)
-    else setChoosing({ slots: choice.slots, needed: choice.needed })
+    else setChoosing({ slot: choice.slot, needed: choice.needed })
   }
 
   return (
@@ -733,38 +734,51 @@ function MissedCard({
         />
       ) : choosing ? (
         <div className="space-y-2 bot-paper rounded-2xl p-3.5 text-sm shadow-none">
-          {choosing.slots.length ? (
+          {choosing.slot ? (
             <>
               <p>
-                This is planned for {formatDuration(choosing.needed)}, and no
-                buffer left today has that much room. Nothing has moved. You
-                could:
+                No buffer has room for {formatDuration(choosing.needed)} today.
+                Nothing has moved. The next free time is{" "}
+                <span className="font-medium">
+                  {bufferLabel(choosing.slot, today)}
+                </span>
+                .
               </p>
-              <ul className="space-y-1.5">
-                {choosing.slots.map((slot) => {
-                  const shorter = slot.minutes < choosing.needed
-                  return (
-                    <li key={`${slot.date}-${slot.time}`}>
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="outline"
-                        className="h-auto min-h-11 py-1.5 text-left whitespace-normal"
-                        onClick={() =>
-                          moveTo(slot, Math.min(slot.minutes, choosing.needed))
-                        }
-                      >
-                        {shorter
-                          ? `Use a shorter session: ${formatDuration(slot.minutes)}, ${bufferLabel(slot, today)}`
-                          : `Choose another buffer: ${bufferLabel(slot, today)}`}
-                      </Button>
-                    </li>
-                  )
-                })}
-              </ul>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="lg"
+                  className="min-h-11"
+                  onClick={() => moveTo(choosing.slot!, session.minutes)}
+                >
+                  Move it there
+                </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => {
+                    const slot = choosing.slot!
+                    dispatch({
+                      type: "add-event",
+                      event: newBuffer(
+                        newId(),
+                        slot.date,
+                        slot.time,
+                        slot.minutes,
+                        nowIso()
+                      ),
+                    })
+                    moveTo(slot, session.minutes)
+                  }}
+                >
+                  Make this a buffer
+                </Button>
+              </div>
             </>
           ) : (
-            <p>There’s no free buffer today or tomorrow. Nothing has moved.</p>
+            <p>There’s no free time left today or tomorrow. Nothing has moved.</p>
           )}
           <div className="flex flex-wrap gap-2">
             <Button

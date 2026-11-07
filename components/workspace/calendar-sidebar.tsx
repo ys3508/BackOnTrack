@@ -108,6 +108,39 @@ export function NotStartedTray({
   )
 }
 
+/** Drag it onto the calendar to keep some time free, wherever it's useful. */
+export function BufferChip() {
+  const { state } = useStore()
+  const ref = useCalendarDraggable()
+  const minutes = state.settings.bufferMinutes
+  return (
+    <section aria-label="Add a buffer">
+      <ul ref={ref}>
+        <li
+          data-cal-drag
+          data-kind="buffer"
+          data-id="buffer"
+          data-title="Buffer"
+          data-minutes={minutes}
+          className="bot-press bot-buffer-chip flex cursor-grab items-center gap-1 rounded-2xl p-2.5 text-sm font-medium"
+        >
+          <GripVertical
+            className="size-4 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          Buffer
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            {minutes} min
+          </span>
+        </li>
+      </ul>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Drag it to any time you’d like to keep free.
+      </p>
+    </section>
+  )
+}
+
 export function MyRoutines({
   editingId,
   setEditingId,

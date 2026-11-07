@@ -401,8 +401,7 @@ export const SettingsSchema = z.object({
     .nullable()
     .catch(null)
     .default(null),
-  /** Time kept free each day for catching up. */
-  bufferCount: z.number().int().min(0).max(4).catch(1).default(1),
+  /** How long a new buffer starts out. Buffers themselves are the user's. */
   bufferMinutes: z.number().positive().catch(30).default(30),
   /** Space to leave after a work block when placing the next one. 0 is off. */
   bufferGapMinutes: z.number().min(0).catch(0).default(0),
@@ -418,7 +417,6 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultFocusMinutes: 5,
   homeListSize: 3,
   lastSessionMinutes: null,
-  bufferCount: 1,
   bufferMinutes: 30,
   bufferGapMinutes: 0,
   remindersEnabled: false,

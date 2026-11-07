@@ -12,7 +12,6 @@ import type {
 } from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import FullCalendar from "@fullcalendar/react"
-import rrulePlugin from "@fullcalendar/rrule"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import type {
   DateSelectArg,
@@ -31,6 +30,7 @@ import { CalendarDashboard } from "@/components/workspace/calendar-dashboard"
 import { BlockPopover } from "@/components/workspace/calendar-overlays"
 import type { BlockRef } from "@/components/workspace/calendar-overlays"
 import {
+  BufferChip,
   MyRoutines,
   NotStartedTray,
 } from "@/components/workspace/calendar-sidebar"
@@ -55,6 +55,7 @@ import { droppedSlot } from "@/lib/calendar/events"
 import {
   addClock,
   minutesBetween,
+  newBuffer,
   nextFreeQuarter,
   occurrenceAt,
 } from "@/lib/calendar/model"
@@ -180,6 +181,40 @@ export function CalendarView() {
       calendar.current?.getApi().changeView(DAY_VIEW, date)
       return
     }
+    // A buffer with something in it has only its empty part left to click on.
+    const clicked = info.dateStr.slice(0, 16)
+    const holder = events.find(
+      (item) =>
+        item.display === "background" &&
+        typeof item.start === "string" &&
+        typeof item.end === "string" &&
+        item.start <= clicked &&
+        clicked < item.end
+    )
+    if (holder && !info.allDay) {
+      const element = [
+        ...document.querySelectorAll(
+          `.fc-bg-event[data-block-id="${holder.extendedProps?.refId}"]`
+        ),
+      ].find((item) => item.getAttribute("data-date") === date)
+      if (element) {
+        closeCreating()
+        setOpened({
+          element,
+          block: {
+            kind: "buffer",
+            refId: holder.extendedProps?.refId,
+            occurrence: holder.extendedProps?.key,
+            taskId: null,
+            title: String(holder.title),
+            date,
+            start: new Date(holder.start as string),
+            end: new Date(holder.end as string),
+          },
+        })
+        return
+      }
+    }
     const minutes = defaultSessionMinutes(settings)
     const allDay = info.allDay
     openEditor({
@@ -219,7 +254,7 @@ export function CalendarView() {
       taskId: string | null
       key?: string
     }
-    if (kind === "pending" || refId === "buffer") return
+    if (kind === "pending") return
     const { start, end } = info.event
     info.jsEvent.preventDefault()
     closeCreating()
@@ -346,6 +381,19 @@ export function CalendarView() {
           label: "",
           done: false,
         },
+      })
+    }
+    if (kind === "buffer") {
+      const length = settings.bufferMinutes
+      dispatch({
+        type: "add-event",
+        event: newBuffer(
+          newId(),
+          slot.date,
+          slot.time ?? nextFreeQuarter(state, slot.date, "09:00", length),
+          length,
+          nowIso()
+        ),
       })
     }
     if (kind === "routine") {
@@ -511,6 +559,7 @@ export function CalendarView() {
                 }
               />
             )}
+            <BufferChip />
             <MyRoutines
               editingId={editingRoutine}
               setEditingId={setEditingRoutine}
@@ -585,7 +634,6 @@ export function CalendarView() {
                 timeGridPlugin,
                 multiMonthPlugin,
                 interactionPlugin,
-                rrulePlugin,
               ]}
               initialView={DAY_VIEW}
               headerToolbar={{

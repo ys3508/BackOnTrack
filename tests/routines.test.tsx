@@ -18,12 +18,11 @@ import {
   weekStart,
 } from "@/lib/calendar/derived"
 import {
-  buffersFor,
-  chooseBuffer,
   freeBuffersOn,
   withGap,
 } from "@/lib/today/buffer"
 import { plannedSessions } from "@/lib/calendar/model"
+import { newBuffer } from "@/lib/calendar/model"
 import { addDays, localToday } from "@/lib/workspace/dates"
 import { workspaceReducer } from "@/lib/workspace/reducer"
 import type { WorkspaceAction } from "@/lib/workspace/reducer"
@@ -62,7 +61,6 @@ vi.mock("@fullcalendar/interaction", () => ({
   },
 }))
 vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
-vi.mock("@fullcalendar/rrule", () => ({ default: {} }))
 
 const props = () => calendar.props as CalendarProps
 const STORAGE = "backontrack.workspace.v1"
@@ -370,6 +368,7 @@ describe("flexible routines on the calendar", () => {
   it("don't stretch the hours or use up a buffer", () => {
     const state = run([
       { type: "add-event", event: { ...gym, start: "15:00", end: "15:30" } },
+      { type: "add-event", event: newBuffer("buf", TODAY, "15:00", 30) },
     ])
     const at = new Date(`${TODAY}T01:00:00`).getTime()
     expect(freeBuffersOn(state, TODAY, at)).toHaveLength(1)
@@ -381,86 +380,15 @@ describe("flexible routines on the calendar", () => {
   })
 })
 
-describe("buffers from Settings", () => {
-  const settings = { ...DEFAULT_SETTINGS }
-
-  it("defaults to one 30-minute afternoon buffer", () => {
-    expect(buffersFor(settings)).toEqual([{ time: "15:00", minutes: 30 }])
-  })
-
-  it("follows the number and length chosen", () => {
-    expect(
-      buffersFor({ ...settings, bufferCount: 2, bufferMinutes: 45 })
-    ).toEqual([
-      { time: "15:00", minutes: 45 },
-      { time: "17:00", minutes: 45 },
-    ])
-    expect(buffersFor({ ...settings, bufferCount: 0 })).toEqual([])
-  })
-
-  it("uses a second buffer when the first can't fit", () => {
-    const state: Workspace = {
-      ...run([
-        { type: "create-task", id: "a", at: AT, title: "A" },
-        {
-          type: "add-planned",
-          at: AT,
-          session: {
-            id: "m",
-            taskId: "a",
-            date: TODAY,
-            time: "09:00",
-            minutes: 25,
-            label: "",
-            done: false,
-          },
-        },
-        {
-          type: "add-planned",
-          at: AT,
-          session: {
-            id: "x",
-            taskId: "a",
-            date: TODAY,
-            time: "15:00",
-            minutes: 30,
-            label: "",
-            done: false,
-          },
-        },
-      ]),
-    }
-    state.settings = { ...settings, bufferCount: 2 }
-    const early = new Date(`${TODAY}T01:00:00`).getTime()
-    expect(chooseBuffer(state, plannedSessions(state)[0], TODAY, early)).toEqual({
-      kind: "fits",
-      slot: { date: TODAY, time: "17:00", minutes: 30 },
-    })
-  })
-
-  it("offers nothing when turned off, and moves nothing", () => {
-    const state = run([
-      { type: "create-task", id: "a", at: AT, title: "A" },
-      {
-        type: "add-planned",
-        at: AT,
-        session: {
-          id: "m",
-          taskId: "a",
-          date: TODAY,
-          time: "09:00",
-          minutes: 25,
-          label: "",
-          done: false,
-        },
-      },
-      { type: "settings", patch: { bufferCount: 0 } },
-    ])
-    expect(chooseBuffer(state, plannedSessions(state)[0], TODAY, Date.now())).toEqual({
-      kind: "choose",
-      slots: [],
-      needed: 25,
-    })
+describe("buffer settings", () => {
+  it("has no automatic buffers, and no count or start time to set", async () => {
+    seed(EMPTY_WORKSPACE)
+    window.location.hash = "#/settings"
+    render(<WorkspaceApp />)
+    await screen.findByLabelText("Default length for new buffers")
+    expect(screen.queryByLabelText("Buffers each day")).toBeNull()
+    expect(screen.queryByText(/3:00 PM/)).toBeNull()
+    expect(DEFAULT_SETTINGS).not.toHaveProperty("bufferCount")
   })
 
   it("saves the choices in Settings, through a reload", async () => {
@@ -469,32 +397,32 @@ describe("buffers from Settings", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await user.selectOptions(
-      await screen.findByLabelText("Buffers each day"),
-      "2"
+      await screen.findByLabelText("Default length for new buffers"),
+      "45"
     )
-    await user.selectOptions(screen.getByLabelText("Length of each"), "45")
     await user.selectOptions(
       screen.getByLabelText("Gap between work blocks"),
       "10"
     )
     cleanup()
     render(<WorkspaceApp />)
-    expect(await screen.findByLabelText("Buffers each day")).toHaveValue("2")
+    expect(
+      await screen.findByLabelText("Default length for new buffers")
+    ).toHaveValue("45")
     expect(saved().settings).toMatchObject({
-      bufferCount: 2,
       bufferMinutes: 45,
       bufferGapMinutes: 10,
     })
   })
 
-  it("draws them on the calendar from the settings", async () => {
-    seed(run([{ type: "settings", patch: { bufferCount: 2 } }]))
+  it("draws no buffers on a fresh calendar", async () => {
+    seed(EMPTY_WORKSPACE)
     window.location.hash = "#/calendar"
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
     expect(
-      props().events.filter((item) => item.display === "background")
-    ).toHaveLength(2)
+      props().events.filter((item) => item.extendedProps.kind === "buffer")
+    ).toEqual([])
   })
 })
 

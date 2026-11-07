@@ -7,20 +7,8 @@ import {
 import { addDays } from "@/lib/workspace/dates"
 import type {
   PlannedSession,
-  Settings,
   Workspace,
 } from "@/lib/workspace/schemas"
-
-/** Where buffers go, in order: the afternoon first. */
-const BUFFER_TIMES = ["15:00", "17:00", "11:00", "19:00"]
-
-/** From Settings. Unused, a buffer means nothing: it's never "missed". */
-export function buffersFor(settings: Settings) {
-  return BUFFER_TIMES.slice(0, settings.bufferCount).map((time) => ({
-    time,
-    minutes: settings.bufferMinutes,
-  }))
-}
 
 /**
  * Leaves the chosen space after a work block by moving a new block's start
@@ -89,6 +77,8 @@ function busyOn(state: Workspace, date: string, ignoreId: string) {
   return busy
 }
 
+const QUARTER_MS = 15 * 60_000
+
 /** The free stretches inside a day's buffers, from now on. */
 export function freeBuffersOn(
   state: Workspace,
@@ -98,10 +88,13 @@ export function freeBuffersOn(
 ): BufferSlot[] {
   const busy = busyOn(state, date, ignoreId).sort((a, b) => a[0] - b[0])
   const slots: BufferSlot[] = []
-  for (const buffer of buffersFor(state.settings)) {
-    const opens = new Date(`${date}T${buffer.time}:00`).getTime()
-    const closes = endOf(date, buffer.time, buffer.minutes).getTime()
-    let from = Math.max(opens, Math.ceil(now / 300_000) * 300_000)
+  const buffers = allOccurrences(state, date, addDays(date, 1))
+    .filter((item) => item.event.kind === "buffer")
+    .sort((a, b) => a.start.localeCompare(b.start))
+  for (const buffer of buffers) {
+    const opens = new Date(`${date}T${buffer.start}:00`).getTime()
+    const closes = endOf(date, buffer.start, buffer.minutes).getTime()
+    let from = Math.max(opens, Math.ceil(now / QUARTER_MS) * QUARTER_MS)
     for (const [start, end] of busy) {
       if (end <= from || start >= closes) continue
       if (start > from) {
@@ -124,10 +117,38 @@ export function freeBuffersOn(
   return slots.filter((slot) => slot.minutes >= 5)
 }
 
+/** The first open stretch that fits, today from now on and then tomorrow morning. */
+export function nextFreeSlot(
+  state: Workspace,
+  today: string,
+  now: number,
+  minutes: number,
+  ignoreId = ""
+): BufferSlot | null {
+  const search = (date: string, after: number) => {
+    const busy = busyOn(state, date, ignoreId).sort((a, b) => a[0] - b[0])
+    const midnight = new Date(`${addDays(date, 1)}T00:00:00`).getTime()
+    let from = Math.ceil(after / QUARTER_MS) * QUARTER_MS
+    for (const [start, end] of busy) {
+      if (end <= from) continue
+      if (start >= from + minutes * 60_000) break
+      from = Math.ceil(end / QUARTER_MS) * QUARTER_MS
+    }
+    return from + minutes * 60_000 <= midnight
+      ? { date, time: clockOf(new Date(from)), minutes }
+      : null
+  }
+  const tomorrow = addDays(today, 1)
+  return (
+    search(today, now) ??
+    search(tomorrow, new Date(`${tomorrow}T09:00:00`).getTime())
+  )
+}
+
 export type BufferChoice =
   | { kind: "fits"; slot: BufferSlot }
-  /** Too short, or not today. Nothing moves until the user chooses. */
-  | { kind: "choose"; slots: BufferSlot[]; needed: number }
+  /** No buffer has room today. Nothing moves until the user chooses. */
+  | { kind: "none"; slot: BufferSlot | null; needed: number }
 
 /** Never truncates, overlaps, or moves anything by itself unless it really fits. */
 export function chooseBuffer(
@@ -136,13 +157,13 @@ export function chooseBuffer(
   today: string,
   now: number
 ): BufferChoice {
-  const todays = freeBuffersOn(state, today, now, session.id)
-  const fit = todays.find((slot) => slot.minutes >= session.minutes)
-  if (fit) return { kind: "fits", slot: fit }
-  const tomorrow = freeBuffersOn(state, addDays(today, 1), now, session.id)
+  const fit = freeBuffersOn(state, today, now, session.id).find(
+    (slot) => slot.minutes >= session.minutes
+  )
+  if (fit) return { kind: "fits", slot: { ...fit, minutes: session.minutes } }
   return {
-    kind: "choose",
-    slots: [...todays, ...tomorrow],
+    kind: "none",
+    slot: nextFreeSlot(state, today, now, session.minutes, session.id),
     needed: session.minutes,
   }
 }

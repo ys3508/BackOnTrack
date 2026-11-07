@@ -48,7 +48,6 @@ vi.mock("@fullcalendar/interaction", () => ({
   },
 }))
 vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
-vi.mock("@fullcalendar/rrule", () => ({ default: {} }))
 
 const STORAGE = "backontrack.workspace.v1"
 const AT = "2026-11-05T12:00:00.000Z"

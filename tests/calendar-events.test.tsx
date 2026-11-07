@@ -78,7 +78,6 @@ vi.mock("@fullcalendar/interaction", () => ({
   },
 }))
 vi.mock("@fullcalendar/multimonth", () => ({ default: {} }))
-vi.mock("@fullcalendar/rrule", () => ({ default: {} }))
 
 const props = () => calendar.props as CalendarProps
 const STORAGE = "backontrack.workspace.v1"

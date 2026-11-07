@@ -50,6 +50,7 @@ export function todayAgenda(state: Workspace, today: string, now: number) {
   const midnight = new Date(`${today}T00:00:00`)
   const timed: AgendaItem[] = []
   const untimed: AgendaItem[] = []
+  const buffers: AgendaItem[] = []
 
   for (const item of buildCalendarItems(state, today, now)) {
     const { kind, refId, taskId, awaitingAnswer, window } = item.extendedProps
@@ -73,12 +74,13 @@ export function todayAgenda(state: Workspace, today: string, now: number) {
       adjusted,
       window,
     }
-    if (item.allDay) untimed.push(entry)
+    if (kind === "buffer") buffers.push(entry)
+    else if (item.allDay) untimed.push(entry)
     else timed.push(entry)
   }
 
   timed.sort((a, b) => a.start.getTime() - b.start.getTime())
-  return { timed, untimed }
+  return { timed, untimed, buffers }
 }
 
 /** The usual window, stretched so that nothing timed today falls outside it. */
