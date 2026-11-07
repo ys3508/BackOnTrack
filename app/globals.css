@@ -1455,6 +1455,10 @@ html[data-focusing] [data-app-shell] {
 .bot-heat-cell {
   aspect-ratio: 1;
   border-radius: 3px;
+}
+
+/* Lower priority, so a cell's level colour always wins over the empty one. */
+:where(.bot-heat-cell) {
   background: var(--secondary);
 }
 

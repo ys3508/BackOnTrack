@@ -488,6 +488,6 @@ Automated: 790 tests pass. Run in the development server in the built-in browser
 | Recovery shown for two blocks, one restarted | Comebacks 1, Recovery-to-Action 50% |
 | A range with no data (September 2026) | A dash and a reason on each figure, no errors |
 | Month with under 3 points | A dash and a reason in place of each chart |
-| Year and Month charts with enough data | Covered by automated tests only, and not looked at in a browser |
+| Year and Month charts with enough data | Seen in the browser with five days of focus. Levels show in the heatmaps and best hours. This caught a CSS order bug that tests can't see, since jsdom loads no CSS |
 
 Not tested: months of real use, or how the log grows in browser storage.
