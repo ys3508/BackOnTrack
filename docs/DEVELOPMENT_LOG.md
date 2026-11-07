@@ -397,6 +397,10 @@ A buffer holding something can't be dragged or resized until it's empty, only ed
 
 Start delay only covers one-off task blocks: repeating events don't carry an occurrence through the timer yet.
 
+## One colour language, with no dark blocks
+
+Every coloured surface now comes from the aura palette, with ink text on it. `--primary` went from dark blue to a light sky, so buttons, chips, and selected states changed together. Event swatches are the same six colours tasks and the Focus room use, and "done" is a soft glow rather than a dark fill with white text. Colours saved earlier are shown as their nearest aura colour by `colorOf`, so nothing needed migrating. Small links keep the darker blue, because light text wouldn't be readable. The week chart uses `#ee9426` and `#5f97e6`, slightly deeper than the aura colours, since the palette validator failed the lighter orange. They stay under 3:1 against the card, so the legend and each bar's label carry the values.
+
 ## Known limitations
 
 - **The real AI model has not been tested, including the new recovery engine.** See [TEST_RESULTS.md](TEST_RESULTS.md) for what was verified instead.

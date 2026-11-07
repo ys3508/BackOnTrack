@@ -158,7 +158,7 @@ describe("creating a routine", () => {
     await user.click(await button("Save"))
     // From its card there's no single day to ask about.
     expect(screen.queryByText("This one only")).toBeNull()
-    expect(saved().events[0].color).toBe("#c23a86")
+    expect(saved().events[0].color).toBe("#f77fc4")
   })
 
   it("starts as every day, with presets, and custom starts from that weekday", async () => {

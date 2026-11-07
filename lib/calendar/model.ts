@@ -170,25 +170,39 @@ export function seriesParts(
   return state.events.filter((item) => seriesKey(item) === id)
 }
 
+/** The site's aura colours, the same ones tasks and the Focus room use. */
+export const EVENT_SWATCHES = [
+  { name: "Blue", value: "#6fa5ec" },
+  { name: "Green", value: "#bfe58a" },
+  { name: "Coral", value: "#f2643a" },
+  { name: "Periwinkle", value: "#8e9bf8" },
+  { name: "Apricot", value: "#ffa63d" },
+  { name: "Rose", value: "#f77fc4" },
+] as const
+
+/** Colours saved before the palette went light, shown as their aura match. */
+const OLDER_COLORS: Record<string, string> = {
+  "#0b4fb3": "#6fa5ec",
+  "#2f7fb8": "#6fa5ec",
+  "#4a7d1e": "#bfe58a",
+  "#d9501f": "#f2643a",
+  "#5e65dc": "#8e9bf8",
+  "#c23a86": "#f77fc4",
+}
+
 /** The colour the user picked, or their task's, everywhere it's drawn. */
 export function colorOf(
   item: { color: string | null; taskId?: string | null },
   tasks: Pick<Task, "id" | "focusTheme">[]
 ) {
-  if (item.color) return item.color
+  if (item.color) {
+    const color = item.color.toLowerCase()
+    return OLDER_COLORS[color] ?? color
+  }
   if (!item.taskId) return DEFAULT_EVENT_COLOR
   const task = tasks.find((entry) => entry.id === item.taskId)
-  return taskColor(item.taskId, task?.focusTheme).strong
+  return taskColor(item.taskId, task?.focusTheme).vivid.toLowerCase()
 }
-
-export const EVENT_SWATCHES = [
-  { name: "Blue", value: "#0b4fb3" },
-  { name: "Green", value: "#4a7d1e" },
-  { name: "Coral", value: "#d9501f" },
-  { name: "Periwinkle", value: "#5e65dc" },
-  { name: "Sky", value: "#2f7fb8" },
-  { name: "Rose", value: "#c23a86" },
-] as const
 
 export const DEFAULT_EVENT_COLOR = EVENT_SWATCHES[0].value
 

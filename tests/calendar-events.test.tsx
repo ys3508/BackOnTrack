@@ -324,12 +324,12 @@ describe("editing a repeating event", () => {
       "new",
       "2026-11-09",
       "all",
-      { color: "#c23a86", title: "Run" },
+      { color: "#f77fc4", title: "Run" },
       "unused"
     )
     expect(after.map((item) => [item.title, item.color])).toEqual([
-      ["Run", "#c23a86"],
-      ["Run", "#c23a86"],
+      ["Run", "#f77fc4"],
+      ["Run", "#f77fc4"],
     ])
     expect(routinesOf({ events: after })).toHaveLength(1)
     expect(routinesOf({ events: after })[0].current.id).toBe("new")
@@ -440,7 +440,7 @@ describe("colours", () => {
   it("uses what was picked, then the task's, then the default", () => {
     const tasks = [{ id: "t", focusTheme: "mint-garden" as const }]
     expect(colorOf({ color: "#123456", taskId: "t" }, tasks)).toBe("#123456")
-    expect(colorOf({ color: null, taskId: "t" }, tasks)).toBe("#3F6B12")
+    expect(colorOf({ color: null, taskId: "t" }, tasks)).toBe("#bfe58a")
     expect(colorOf({ color: null, taskId: null }, tasks)).toBe(
       EVENT_SWATCHES[0].value
     )
@@ -482,7 +482,7 @@ describe("migrating saved data", () => {
   const routine = (fields: Record<string, unknown>) => ({
     id: "r",
     name: "Gym",
-    color: "#4a7d1e",
+    color: "#bfe58a",
     emoji: "🏋️",
     rrule: "DTSTART:20261002T180000\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR",
     duration: 45,
@@ -581,7 +581,7 @@ describe("migrating saved data", () => {
       id: "r",
       title: "Gym",
       emoji: "🏋️",
-      color: "#4a7d1e",
+      color: "#bfe58a",
       minimum: "shoes on",
       seriesId: "r",
       date: "2026-10-02",
@@ -827,7 +827,7 @@ describe("on the calendar", () => {
       date,
       start: "10:00",
       end: "10:45",
-      color: "#0b4fb3",
+      color: "#6fa5ec",
       repeat: null,
     })
     await waitFor(() =>
@@ -835,7 +835,7 @@ describe("on the calendar", () => {
         start: `${date}T10:00`,
         end: `${date}T10:45`,
         classNames: ["bot-planned"],
-        extendedProps: { color: "#0b4fb3", status: "planned" },
+        extendedProps: { color: "#6fa5ec", status: "planned" },
       })
     )
     expect(findItem("pending")).toBeUndefined()
@@ -879,7 +879,7 @@ describe("on the calendar", () => {
       title: "Gym",
       taskId: null,
       minimum: "shoes on",
-      color: "#4a7d1e",
+      color: "#bfe58a",
       repeat: { days: [1, 2, 3, 4, 5] },
     })
     expect(saved().tasks).toEqual([])
@@ -891,7 +891,7 @@ describe("on the calendar", () => {
       )
       expect(shown).toHaveLength(5)
       for (const item of shown) {
-        expect(item.extendedProps.color).toBe("#4a7d1e")
+        expect(item.extendedProps.color).toBe("#bfe58a")
         expect(item.classNames).toEqual(["bot-planned"])
       }
     })
@@ -899,14 +899,14 @@ describe("on the calendar", () => {
     const sidebar = await screen.findByRole("region", { name: "My routines" })
     expect(sidebar).toHaveTextContent("Gym")
     expect(sidebar).toHaveTextContent("Weekdays")
-    expect(cardColor()).toBe("#4a7d1e")
+    expect(cardColor()).toBe("#bfe58a")
 
     await user.click(screen.getByRole("button", { name: "Routines" }))
     await waitFor(() => expect(window.location.hash).toBe("#/routines"))
     expect(
       await screen.findByRole("region", { name: "My routines" })
     ).toHaveTextContent("Minimum: shoes on")
-    expect(cardColor()).toBe("#4a7d1e")
+    expect(cardColor()).toBe("#bfe58a")
   })
 
   describe("dragging an occurrence of something repeating", () => {
@@ -1034,26 +1034,26 @@ describe("on the calendar", () => {
     const user = userEvent.setup()
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
-    expect(cardColor()).toBe("#4a7d1e")
+    expect(cardColor()).toBe("#bfe58a")
 
     await user.click(screen.getByRole("button", { name: "Edit Gym" }))
     await user.click(await screen.findByRole("button", { name: "Rose" }))
     await user.click(screen.getByRole("button", { name: "Save" }))
 
-    expect(saved().events[0].color).toBe("#c23a86")
-    await waitFor(() => expect(cardColor()).toBe("#c23a86"))
-    expect(findItem(`routine:r:${TODAY}`)?.extendedProps.color).toBe("#c23a86")
+    expect(saved().events[0].color).toBe("#f77fc4")
+    await waitFor(() => expect(cardColor()).toBe("#f77fc4"))
+    expect(findItem(`routine:r:${TODAY}`)?.extendedProps.color).toBe("#f77fc4")
 
     await user.click(screen.getByRole("button", { name: "Routines" }))
     await screen.findByRole("heading", { name: "Routines" })
-    await waitFor(() => expect(cardColor()).toBe("#c23a86"))
+    await waitFor(() => expect(cardColor()).toBe("#f77fc4"))
 
     await user.click(screen.getByRole("button", { name: "Today" }))
     await waitFor(() => {
       const block = document.querySelector<HTMLElement>(
         '.bot-tl-block[data-block-id="r"]'
       )
-      expect(block?.style.getPropertyValue("--event-color")).toBe("#c23a86")
+      expect(block?.style.getPropertyValue("--event-color")).toBe("#f77fc4")
     })
   })
 
@@ -1107,7 +1107,7 @@ describe("on the calendar", () => {
         {
           id: "r",
           name: "Morning walk",
-          color: "#4a7d1e",
+          color: "#bfe58a",
           emoji: "🚶",
           rrule:
             "DTSTART:20200101T070000\nRRULE:FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA",
@@ -1132,5 +1132,20 @@ describe("on the calendar", () => {
     ).toHaveTextContent("Morning walk")
     expect(saved().events).toHaveLength(1)
     expect(window.localStorage.getItem(PRE_EVENTS_BACKUP_KEY)).toBe(raw)
+  })
+})
+
+describe("colours saved before the palette went light", () => {
+  it("show as their aura match, wherever they're drawn", () => {
+    expect(colorOf({ color: "#0B4FB3" }, [])).toBe("#6fa5ec")
+    expect(colorOf({ color: "#4a7d1e" }, [])).toBe("#bfe58a")
+    expect(colorOf({ color: "#123456" }, [])).toBe("#123456")
+  })
+
+  it("never fill a task's block with a dark colour", () => {
+    const color = colorOf({ color: null, taskId: "a" }, [
+      { id: "a", focusTheme: "blue-daydream" },
+    ])
+    expect(color).toBe("#6fa5ec")
   })
 })

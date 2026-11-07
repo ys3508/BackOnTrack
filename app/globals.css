@@ -61,9 +61,10 @@
   --card-foreground: var(--ink);
   --popover: #fffdf9;
   --popover-foreground: var(--ink);
-  --primary: #0b4fb3;
-  --primary-hover: #0a459c;
-  --primary-foreground: #ffffff;
+  /* Light enough to carry ink, so nothing on the page is a dark block. */
+  --primary: #a9c8f3;
+  --primary-hover: #93baf0;
+  --primary-foreground: var(--ink);
   --secondary: #efe9dc;
   --secondary-foreground: var(--ink);
   --muted: #f1ebdf;
@@ -74,7 +75,7 @@
   --line: rgb(30 35 64 / 0.12);
   --border: rgb(30 35 64 / 0.1);
   --input: rgb(30 35 64 / 0.16);
-  --ring: #0b4fb3;
+  --ring: #6fa5ec;
   --radius: 1rem;
 
   --brand: #0b4fb3;
@@ -607,7 +608,7 @@ button.bot-tile:hover .bot-tile-glyph {
 
 .bot-outcome[data-outcome="full"][aria-pressed="true"] {
   background: var(--event-color, var(--primary));
-  color: white;
+  color: var(--ink);
 }
 
 .bot-outcome[data-outcome="minimum"][aria-pressed="true"] {
@@ -702,6 +703,19 @@ button.bot-tile:hover .bot-tile-glyph {
   min-height: 1.75rem;
   min-width: 1.75rem;
   border-radius: 999px;
+}
+
+/* A short block still shows its answers whole, centred in its height. */
+.bot-tl-block .bot-block-tight .bot-block-actions {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.bot-tl-block .bot-block-tight .bot-block-actions button {
+  min-height: 1.5rem;
+  padding-block: 0;
+  line-height: 1;
 }
 
 .bot-tl-now {
@@ -1000,7 +1014,7 @@ html[data-focusing] [data-app-shell] {
 }
 
 .fc .fc-button-primary:not(:disabled).fc-button-active {
-  color: white;
+  color: var(--ink);
 }
 
 .fc .fc-button:focus-visible {
@@ -1104,14 +1118,14 @@ html[data-focusing] [data-app-shell] {
 .bot-tl-block[data-state="missed"],
 .bot-any-chip[data-state="planned"],
 .bot-legend-swatch.bot-planned {
-  background: color-mix(in srgb, var(--event-color, var(--primary)) 9%, white);
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 14%, white);
   border: 1.5px dashed var(--event-color, var(--primary));
 }
 
 .fc .bot-missed,
 .bot-tl-block[data-state="missed"] {
-  border-color: color-mix(in srgb, var(--event-color, var(--primary)) 45%, white);
-  background: color-mix(in srgb, var(--event-color, var(--primary)) 4%, white);
+  border-color: color-mix(in srgb, var(--event-color, var(--primary)) 55%, white);
+  background: color-mix(in srgb, var(--event-color, var(--primary)) 6%, white);
 }
 
 .fc .bot-done,
@@ -1120,20 +1134,12 @@ html[data-focusing] [data-app-shell] {
 .bot-tl-block[data-state="focused"],
 .bot-any-chip[data-state="done"],
 .bot-legend-swatch.bot-done {
-  background: var(--event-color, var(--primary));
-  border: 1.5px solid var(--event-color, var(--primary));
-}
-
-.fc .bot-done .bot-block,
-.fc .bot-focused .bot-block,
-.fc .bot-done .bot-block-title,
-.fc .bot-focused .bot-block-title,
-.fc .bot-done .bot-block-time,
-.fc .bot-focused .bot-block-time,
-.bot-tl-block[data-state="done"] .bot-block,
-.bot-tl-block[data-state="focused"] .bot-block,
-.bot-any-chip[data-state="done"] .bot-block {
-  color: white;
+  background: radial-gradient(
+    130% 170% at 22% 30%,
+    var(--event-color, var(--primary)),
+    color-mix(in srgb, var(--event-color, var(--primary)) 58%, white)
+  );
+  border: 1.5px solid transparent;
 }
 
 .fc .bot-minimum,
@@ -1142,10 +1148,10 @@ html[data-focusing] [data-app-shell] {
 .bot-legend-swatch.bot-minimum {
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--event-color, var(--primary)) 45%, white) 50%,
-    color-mix(in srgb, var(--event-color, var(--primary)) 7%, white) 50%
+    color-mix(in srgb, var(--event-color, var(--primary)) 62%, white) 50%,
+    color-mix(in srgb, var(--event-color, var(--primary)) 10%, white) 50%
   );
-  border: 1.5px solid var(--event-color, var(--primary));
+  border: 1.5px solid color-mix(in srgb, var(--event-color, var(--primary)) 70%, white);
 }
 
 .fc .bot-skipped,
@@ -1192,7 +1198,7 @@ html[data-focusing] [data-app-shell] {
 }
 
 .bot-legend-swatch {
-  --event-color: #8b8780;
+  --event-color: #c4c0b8;
   display: inline-block;
   width: 1.25rem;
   height: 0.875rem;
@@ -1206,7 +1212,7 @@ html[data-focusing] [data-app-shell] {
 
 .bot-legend-swatch.bot-deadline {
   background: #eeece8;
-  border: 1px solid #8b8780;
+  border: 1px solid #c4c0b8;
   border-radius: 999px;
 }
 
@@ -1397,7 +1403,7 @@ html[data-focusing] [data-app-shell] {
 
 .fc .bot-pending .bot-block-title {
   font-style: italic;
-  color: var(--primary);
+  color: var(--link);
 }
 
 .fc .fc-highlight {
@@ -1415,36 +1421,32 @@ html[data-focusing] [data-app-shell] {
 
 .fc .fc-daygrid-day.bot-heat-1,
 .bot-heat-swatch-1 {
-  background: #dbe7f7;
+  background: #e6f0fc;
 }
 
 .fc .fc-daygrid-day.bot-heat-2,
 .bot-heat-swatch-2 {
-  background: #a9c6ec;
+  background: #c9def8;
 }
 
 .fc .fc-daygrid-day.bot-heat-3,
 .bot-heat-swatch-3 {
-  background: #5f93d8;
+  background: #a3c6f3;
 }
 
 .fc .fc-daygrid-day.bot-heat-4,
 .bot-heat-swatch-4 {
-  background: #0b4fb3;
-}
-
-.fc .fc-daygrid-day.bot-heat-4 .fc-daygrid-day-number {
-  color: white;
+  background: #6fa5ec;
 }
 
 /* ---------- Overview ---------- */
 .bot-bar-planned {
-  border: 1.5px dashed #c07a12;
-  background: color-mix(in srgb, #c07a12 14%, white);
+  border: 1.5px dashed #ee9426;
+  background: color-mix(in srgb, #ee9426 18%, white);
 }
 
 .bot-bar-focus {
-  background: var(--primary);
+  background: #5f97e6;
 }
 
 .bot-bar-planned,

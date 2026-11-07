@@ -18,7 +18,7 @@ export function eventOf(
     start,
     end: addClock(start, minutes),
     flexible: false,
-    color: "#4a7d1e",
+    color: "#bfe58a",
     repeat: { days: ALL_DAYS },
     overrides: {},
     outcomes: {},
