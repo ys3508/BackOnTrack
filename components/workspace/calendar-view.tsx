@@ -474,7 +474,7 @@ export function CalendarView() {
 
   const dayContent = useCallback(
     (arg: DayCellContentArg) => {
-      if (shown.type !== YEAR_VIEW) return undefined
+      if (shown.type !== YEAR_VIEW) return arg.dayNumberText
       const minutes = heat.get(localToday(arg.date)) ?? 0
       return (
         <span
