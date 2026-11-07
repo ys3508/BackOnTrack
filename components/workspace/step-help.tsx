@@ -271,7 +271,7 @@ function HelpPreview({
       {type === "setup" && <Understood result={help.result} />}
 
       <div>
-        <h2 className="text-sm font-medium text-sage">Start with this</h2>
+        <h2 className="text-sm font-medium text-brand">Start with this</h2>
         <p className="mt-1 font-heading text-2xl leading-snug">
           {result.firstAction}
         </p>

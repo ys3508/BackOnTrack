@@ -15,7 +15,7 @@ export function SupportNotice({
     <section
       role="alert"
       aria-labelledby="support-heading"
-      className="space-y-3 rounded-2xl border border-indigo/30 bg-indigo-soft p-5 text-indigo sm:p-6"
+      className="space-y-3 rounded-2xl border border-link/30 bg-link-soft p-5 text-link sm:p-6"
     >
       <h2 id="support-heading" className="font-heading text-2xl leading-snug">
         This sounds like more than a task, and it matters more than one.

@@ -121,7 +121,7 @@ export function RescheduleForm({
             className={cn(
               "min-h-11 rounded-full border px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
               when === option.value
-                ? "border-primary bg-sage-soft font-medium"
+                ? "border-transparent bg-primary font-medium text-primary-foreground font-medium"
                 : "border-border bg-card"
             )}
           >

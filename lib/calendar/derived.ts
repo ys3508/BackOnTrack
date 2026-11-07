@@ -221,12 +221,12 @@ export function placePopover(
 
 /** All dark enough to carry white text when a routine is filled in. */
 export const PALETTE = [
-  "#3f6b52",
-  "#4a5a94",
-  "#a0603a",
-  "#7d4f7d",
-  "#2f7480",
-  "#6f7436",
+  "#0b4fb3",
+  "#4a7d1e",
+  "#d9501f",
+  "#5e65dc",
+  "#2f7fb8",
+  "#c23a86",
 ]
 
 /* ---------- Year heatmap ---------- */

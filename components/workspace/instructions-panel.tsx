@@ -98,7 +98,7 @@ export function InstructionsPanel({
         onClick={() => setOpen(!open)}
         className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
       >
-        <span className="font-sans text-[15px] font-semibold tracking-normal">
+        <span className="font-heading text-lg">
           Instructions
           {instructions ? (
             <span className="ml-2 font-normal text-muted-foreground">
@@ -140,7 +140,7 @@ export function InstructionsPanel({
               {instructions.text}
             </div>
             {instructions.truncated && (
-              <p className="text-sm text-sand">
+              <p className="text-sm text-caution">
                 This was long, so only the first{" "}
                 {MAX_STORED_CHARS.toLocaleString()} characters were kept.
                 Anything after that won’t be used.

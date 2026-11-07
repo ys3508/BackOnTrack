@@ -689,6 +689,7 @@ describe("routines", () => {
         await user.click(chip)
       }
     }
+    await user.click(screen.getByRole("button", { name: /^More options/ }))
     await user.click(screen.getByRole("button", { name: "60" }))
     await user.click(screen.getByRole("button", { name: "Add routine" }))
     const [saved0] = saved().routines
@@ -1119,6 +1120,9 @@ describe("calendar screen", () => {
     render(<WorkspaceApp />)
     await screen.findByRole("heading", { name: "Calendar" })
     clickSlot(`${TODAY}T14:00:00`)
+    await user.click(
+      await screen.findByRole("button", { name: /^Length and first step/ })
+    )
     await user.click(await screen.findByRole("button", { name: "90" }))
     expect(screen.getByTestId("session-range")).toHaveTextContent(
       "2:00 – 3:30 PM"
@@ -1157,10 +1161,32 @@ describe("calendar screen", () => {
     })
     await user.type(box, "estim")
     await user.click(screen.getByRole("option", { name: "Estimated" }))
+    await user.click(
+      screen.getByRole("button", { name: /^Length and first step/ })
+    )
     expect(screen.getByRole("button", { name: "60" })).toHaveAttribute(
       "aria-pressed",
       "true"
     )
+  })
+
+  it("needs only a title and Enter to plan a block", async () => {
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Calendar" })
+    clickSlot(`${TODAY}T14:00:00`)
+    const box = await screen.findByRole("combobox", {
+      name: "Task for this time",
+    })
+    // Length and first step are there when wanted, not in the way.
+    expect(screen.queryByLabelText(/What will you do first/)).toBeNull()
+    await user.type(box, "Report{Enter}")
+    expect(saved().tasks.at(-1).title).toBe("Report")
+    expect(saved().planned.at(-1)).toMatchObject({
+      date: TODAY,
+      time: "14:00",
+    })
+    expect(screen.queryByRole("dialog", { name: "New session" })).toBeNull()
   })
 
   it("takes an optional first step when creating a session", async () => {
@@ -1171,6 +1197,9 @@ describe("calendar screen", () => {
     await user.type(
       await screen.findByRole("combobox", { name: "Task for this time" }),
       "Report"
+    )
+    await user.click(
+      screen.getByRole("button", { name: /^Length and first step/ })
     )
     await user.type(
       screen.getByLabelText("What will you do first? (optional)"),

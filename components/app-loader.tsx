@@ -13,7 +13,7 @@ export const AppLoader = dynamic(
     // This is also what's in the page before scripts run, so it says something.
     loading: () => (
       <main className="mx-auto max-w-2xl px-6 py-16">
-        <h1 className="font-heading text-4xl">BackOnTrack</h1>
+        <h1 className="font-heading text-5xl">BackOnTrack</h1>
         <p className="mt-3 text-lg">
           When you’ve been avoiding something, it helps you find one concrete
           thing to do, start it, and recover when the plan doesn’t work.

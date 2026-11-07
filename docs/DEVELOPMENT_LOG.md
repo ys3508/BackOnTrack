@@ -318,6 +318,14 @@ Found in a real browser, since unit tests mock FullCalendar.
 - "You said you made progress" appeared for minimum and completed outcomes in focus history.
 
 
+### Usability pass
+
+Task colors come from a hash of the task's ID, so nothing new is saved and no migration is needed. The cost is that two tasks can share a color. Routines keep their own chosen colors, and deadlines stay sand.
+
+Calendar quick add and the Routine form put optional fields behind a disclosure. Editing a routine opens everything, since that's why someone is there.
+
+A block still ahead is no longer closed by an early attempt. Once its time passes, an attempt keeps it from being called missed.
+
 ### One recovery system
 
 The older screens (`#/plan`, `#/avoid`, `#/case/:id`, `#/recover`) and the "Want a fuller plan?" link are gone. Their addresses now open Today. `#/guided` went too, because its only link was on a removed screen.
@@ -331,6 +339,22 @@ Also changed: "I'm stuck" on the Upcoming card, "Did it" on calendar blocks now 
 ## Testing evidence
 
 See [TEST_RESULTS.md](TEST_RESULTS.md).
+
+## Visual identity: Aura
+
+The app's look follows reference images supplied by the student: grainy, soft gradient orbs on cream, with a high-contrast serif. An earlier bold "Sticker Pop" pass was rejected and replaced entirely. Task lifecycle, recovery engine, Reality Gap, obstacles, Move to Buffer, routines, and persistence keep their behavior.
+
+| Decision | Reason |
+| --- | --- |
+| Every surface sits on one still, fixed field of light | Pages feel like one place, and nothing has to repaint on scroll |
+| Orbs are radial gradients with grain, never `filter: blur`, `backdrop-filter`, or blend modes | The look is the same, and it stays light on the GPU over a long session |
+| Instrument Serif for all display type, Instrument Sans for controls | The references rely on elegant type more than on decoration |
+| Periwinkle and a pink star belong to Recovery | The feature that sets the product apart can be recognized anywhere |
+| Tokens are named by meaning (`brand`, `link`, `caution`, `recover`) | Colors can change without renaming code |
+| Task color ids stayed, with new names and values | An unknown id would fail the schema and drop a saved task |
+| Every new timer opens the whole-screen Focus room, on whichever screen it was started from | One rule, with no new route. Leaving returns to that same screen |
+| The countdown is light drawing inward, with a fine line running out around it | Time left can be felt at a glance |
+| Today's timeline is drawn by the app, and Calendar keeps FullCalendar | Both read the same `buildCalendarItems` facts, and no scheduling logic changed |
 
 ## Known limitations
 

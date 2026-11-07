@@ -80,6 +80,7 @@ export type WorkspaceAction =
           | "resumeNote"
           | "link"
           | "minimumVersion"
+          | "focusTheme"
         >
       >
     }
@@ -770,6 +771,7 @@ function applyAction(state: Workspace, action: WorkspaceAction): Workspace {
           resumeNote: "",
           link: "",
           minimumVersion: "",
+          focusTheme: null,
         },
         action.at,
         "created",

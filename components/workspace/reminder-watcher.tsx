@@ -55,9 +55,9 @@ export function ReminderWatcher() {
   return (
     <div
       role="status"
-      className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] items-start gap-2 rounded-2xl border border-border bg-card p-3 shadow-lg sm:max-w-sm"
+      className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] items-start gap-2 rounded-2xl border border-line bg-card p-3 shadow-lg sm:max-w-sm"
     >
-      <BellRing className="mt-0.5 size-4 shrink-0 text-sage" aria-hidden />
+      <BellRing className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
       <div className="min-w-0 flex-1 text-sm">
         <p className="font-medium break-words">{showing.title}</p>
         <p className="text-muted-foreground">{showing.body}</p>
@@ -67,7 +67,7 @@ export function ReminderWatcher() {
             setShowing(null)
             navigate({ view: "workspace" })
           }}
-          className="mt-1 min-h-9 rounded-md font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="mt-1 min-h-9 rounded-md font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         >
           Go to Today
         </button>

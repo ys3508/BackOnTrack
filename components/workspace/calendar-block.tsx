@@ -30,7 +30,8 @@ export function BlockContent({
   event,
   viewType,
 }: {
-  event: EventApi
+  /** A calendar event, or anything else drawn the same way. */
+  event: Pick<EventApi, "start" | "end" | "title" | "allDay" | "extendedProps">
   viewType: string
 }) {
   const { state, dispatch } = useStore()

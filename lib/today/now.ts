@@ -30,12 +30,16 @@ const startOf = (session: PlannedSession) =>
   new Date(`${session.date}T${session.time}:00`).getTime()
 
 /** Planned for today, with a time, and not yet answered in any way. */
-function openBlocksToday(state: Workspace, today: string) {
+function openBlocksToday(state: Workspace, today: string, now: number) {
   return state.planned.flatMap((session) => {
     if (session.date !== today || !session.time) return []
     if (session.done || session.outcome) return []
-    // An attempt, even a short one, means it was started.
-    if (state.focusSessions.some((item) => item.plannedId === session.id)) {
+    // An attempt means it was started, so it's never called missed. A block
+    // still ahead stays on the card, with wherever they said to pick up.
+    if (
+      startOf(session) <= now &&
+      state.focusSessions.some((item) => item.plannedId === session.id)
+    ) {
       return []
     }
     const task = state.tasks.find((item) => item.id === session.taskId)
@@ -75,7 +79,7 @@ export function nowState(
     }
   }
 
-  const blocks = openBlocksToday(state, today)
+  const blocks = openBlocksToday(state, today, now)
   const passed = blocks
     .filter(({ session }) => startOf(session) <= now)
     .sort((a, b) => startOf(b.session) - startOf(a.session))[0]
@@ -171,6 +175,20 @@ export function minimumMet(state: Workspace, taskId: string) {
   return state.progressEvents.some(
     (item) => item.taskId === taskId && item.type === "minimum_met"
   )
+}
+
+/** How long the moment of finishing something stays on the page. */
+export const WIN_SHOWN_MS = 30_000
+
+/** Something just finished, in whole or in its smaller version. */
+export function latestWin(state: Workspace, now: number) {
+  for (let at = state.progressEvents.length - 1; at >= 0; at -= 1) {
+    const item = state.progressEvents[at]
+    if (item.type !== "minimum_met" && item.type !== "completed") continue
+    // `now` can lag behind by up to a tick, so a brand new win looks "future".
+    return now - new Date(item.at).getTime() < WIN_SHOWN_MS ? item : null
+  }
+  return null
 }
 
 /** A sitting, not the whole task: long estimates still start with something short. */

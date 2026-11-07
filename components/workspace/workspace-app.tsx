@@ -1,11 +1,18 @@
 "use client"
 
 import { useEffect } from "react"
-import { Timer } from "lucide-react"
+import { Plus, Timer } from "lucide-react"
 
 import { CalendarView } from "@/components/workspace/calendar-view"
-import { FocusView, useNow } from "@/components/workspace/focus-view"
-import { GlobalQuickCapture } from "@/components/workspace/quick-capture"
+import {
+  ActiveTimer,
+  FocusView,
+  useNow,
+} from "@/components/workspace/focus-view"
+import {
+  GlobalQuickCapture,
+  QUICK_CAPTURE_EVENT,
+} from "@/components/workspace/quick-capture"
 import { ReminderWatcher } from "@/components/workspace/reminder-watcher"
 import { RoutinesView } from "@/components/workspace/routines-view"
 import { SettingsView } from "@/components/workspace/settings-view"
@@ -25,7 +32,11 @@ export function WorkspaceApp() {
   )
 }
 
-const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
+const NAV_ITEMS: {
+  label: string
+  route: Route
+  match: Route["view"][]
+}[] = [
   {
     label: "Today",
     route: { view: "workspace" },
@@ -37,55 +48,72 @@ const NAV_ITEMS: { label: string; route: Route; match: Route["view"][] }[] = [
 ]
 
 function Shell() {
-  const { route, navigate, mode, storageFailed } = useStore()
+  const { route, navigate, mode, storageFailed, state, focusRoomOpen } =
+    useStore()
   const routeKey = route.view === "task" ? `task-${route.id}` : route.view
+  const immersive = route.view === "focus" && Boolean(state.timer)
+
+  const at = NAV_ITEMS.findIndex((item) => item.match.includes(route.view))
 
   return (
-    <div data-mode={mode} className="flex min-h-svh flex-col">
-      <header className="border-b border-border/70">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
+    <div
+      data-app-shell
+      data-mode={mode}
+      className="flex min-h-svh flex-col"
+    >
+      <div aria-hidden className="bot-canvas" />
+      {/* Stays mounted in Focus, so the tab title keeps counting down. */}
+      <header className={cn(immersive && "hidden")}>
+        <div className="flex items-center px-5 pt-4 md:absolute md:top-3.5 md:left-5 md:z-30 md:p-0">
           <button
             type="button"
             onClick={() => navigate({ view: "workspace" })}
-            className="flex min-h-11 items-center gap-2.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+            className="flex min-h-11 items-center gap-2 rounded-full pr-2 outline-none"
           >
             <Logo />
-            <span className="font-heading text-xl">BackOnTrack</span>
+            <span className="font-heading text-2xl">BackOnTrack</span>
           </button>
-          <div className="flex items-center gap-1.5">
-            <TimerPill />
-          </div>
         </div>
-        <nav
-          aria-label="Main"
-          className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 sm:px-4"
-        >
-          {NAV_ITEMS.map((item) => {
-            const current = item.match.includes(route.view)
-            return (
+        <div className="fixed top-4 right-4 z-30">
+          <TimerPill />
+        </div>
+        <div className="bot-rail">
+          <nav aria-label="Main" className="bot-nav">
+            <div
+              aria-hidden
+              className="bot-nav-marker"
+              style={{ "--at": at } as React.CSSProperties}
+            >
+              <span />
+            </div>
+            {NAV_ITEMS.map(({ label, route: target, match }) => (
               <button
-                key={item.label}
+                key={label}
                 type="button"
-                aria-current={current ? "page" : undefined}
-                onClick={() => navigate(item.route)}
-                className={cn(
-                  "min-h-11 flex-1 rounded-t-lg border-b-2 px-3 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-ring/30 sm:flex-none",
-                  current
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
+                aria-current={match.includes(route.view) ? "page" : undefined}
+                onClick={() => navigate(target)}
+                className="bot-nav-item"
               >
-                {item.label}
+                {label}
               </button>
-            )
-          })}
-        </nav>
+            ))}
+          </nav>
+          <button
+            type="button"
+            aria-label="Quick capture"
+            title="Quick capture (⌘K)"
+            onClick={() => window.dispatchEvent(new Event(QUICK_CAPTURE_EVENT))}
+            className="ml-1 hidden size-11 shrink-0 place-items-center rounded-full bg-white/80 outline-none transition-transform duration-300 hover:scale-105 md:grid"
+          >
+            <Plus className="size-5" aria-hidden />
+          </button>
+        </div>
       </header>
 
       {storageFailed && (
         <div
           role="alert"
-          className="bg-sand-soft px-6 py-3 text-center text-sm text-sand"
+          className="bg-caution-soft px-6 py-3 text-center text-sm font-medium text-caution"
         >
           Your browser’s storage is full, so recent changes aren’t saved.{" "}
           <button
@@ -98,10 +126,15 @@ function Shell() {
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 pt-6 pb-16 sm:px-6 sm:pt-8">
+      <main
+        className={cn(
+          "mx-auto w-full max-w-[76rem] flex-1 px-4 pt-3 pb-10 sm:px-6 md:pt-24",
+          immersive && "max-w-none p-0 sm:p-0"
+        )}
+      >
         <div
           key={routeKey}
-          className="animate-in duration-300 fade-in slide-in-from-bottom-1"
+          className="bot-fade"
         >
           {route.view === "workspace" && <TodayView />}
           {route.view === "routines" && <RoutinesView />}
@@ -115,9 +148,20 @@ function Shell() {
         </div>
       </main>
 
+      {/* Today draws the room itself, in its Now card. */}
+      {state.timer &&
+        focusRoomOpen &&
+        route.view !== "workspace" &&
+        route.view !== "focus" && <ActiveTimer room timer={state.timer} />}
+
       <GlobalQuickCapture />
       <ReminderWatcher />
-      <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">
+      <footer
+        className={cn(
+          "px-6 pt-2 pb-28 text-center text-xs text-muted-foreground md:pb-5",
+          immersive && "hidden"
+        )}
+      >
         BackOnTrack offers suggestions and can be wrong. It is not medical,
         legal, or financial advice.
       </footer>
@@ -127,7 +171,7 @@ function Shell() {
 
 /** Keeps the running timer one click away from every view. */
 function TimerPill() {
-  const { state, route, navigate } = useStore()
+  const { state, route, setFocusRoomOpen } = useStore()
   const { timer } = state
   const now = useNow(Boolean(timer))
   const remaining = timer ? remainingSeconds(timer, now) : 0
@@ -147,21 +191,12 @@ function TimerPill() {
     route.view === "workspace" ||
     (route.view === "task" && route.id === timer?.taskId)
   if (!timer || shownHere) return null
-  const timerTask = state.tasks.find((task) => task.id === timer.taskId)
   return (
     <button
       type="button"
       aria-label={`Open focus timer, ${paused ? "paused at " : ""}${clock}${paused ? "" : " remaining"}`}
-      onClick={() =>
-        navigate(
-          timerTask?.recoveryCase
-            ? { view: "workspace" }
-            : timer.taskId
-              ? { view: "task", id: timer.taskId, section: "doc" }
-              : { view: "focus" }
-        )
-      }
-      className="flex min-h-10 items-center gap-1.5 rounded-lg bg-sage-soft px-2.5 text-sm font-medium text-sage tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+      onClick={() => setFocusRoomOpen(true)}
+      className="bot-press flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-white/85 px-3.5 text-sm font-medium tabular-nums outline-none"
     >
       <Timer className="size-4" aria-hidden />
       {clock}
@@ -172,13 +207,20 @@ function TimerPill() {
 
 function Logo() {
   return (
-    <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
-      <rect width="32" height="32" rx="9" className="fill-primary" />
+    <svg viewBox="0 0 32 32" className="size-9" aria-hidden>
+      <defs>
+        <radialGradient id="bot-logo" cx="35%" cy="65%" r="80%">
+          <stop offset="0%" stopColor="#f26a3d" />
+          <stop offset="55%" stopColor="#ffa63d" />
+          <stop offset="100%" stopColor="#86acea" />
+        </radialGradient>
+      </defs>
+      <circle cx="16" cy="16" r="15.500" fill="url(#bot-logo)" />
       <path
         d="M8 22c5 0 4-12 9-12 3 0 3.500 4 7 4"
         fill="none"
         stroke="white"
-        strokeWidth="2.600"
+        strokeWidth="2.200"
         strokeLinecap="round"
       />
       <circle cx="8" cy="22" r="2.300" fill="white" />

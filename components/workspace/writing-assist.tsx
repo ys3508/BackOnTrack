@@ -195,7 +195,7 @@ export function WritingAssist({
 
   return (
     <Card className="space-y-3">
-      <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+      <h2 className="font-heading text-lg">
         Help with this document
       </h2>
 

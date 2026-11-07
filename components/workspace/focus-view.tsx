@@ -1,11 +1,24 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Check, Coffee, Pause, Play, RotateCcw, Square } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  ArrowLeft,
+  Check,
+  Coffee,
+  LifeBuoy,
+  Maximize2,
+  Pause,
+  Play,
+  RotateCcw,
+  Square,
+  TrendingUp,
+} from "lucide-react"
 
-import { Card, ScreenHeading } from "@/components/shared"
+import { ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ParkingLot } from "@/components/workspace/parking-lot"
+import { FocusOrb, SunGlyph } from "@/components/workspace/aura"
 import { ExpandableList, fieldClass } from "@/components/workspace/parts"
 import {
   newId,
@@ -14,6 +27,8 @@ import {
   useStore,
 } from "@/components/workspace/store"
 import { formatClock, formatMinutes, remainingSeconds } from "@/lib/focus/timer"
+import { FOCUS_THEMES, taskColorVars, taskTheme } from "@/lib/calendar/task-colors"
+import type { FocusThemeId } from "@/lib/calendar/task-colors"
 import { formatDateTime } from "@/lib/workspace/dates"
 import { isActive, isInterrupted } from "@/lib/workspace/schemas"
 import type { FocusSession, Task, TimerState } from "@/lib/workspace/schemas"
@@ -64,15 +79,34 @@ export function useNow(active: boolean) {
   return now
 }
 
+/** While the room is open, hides what's behind it and lets Escape step out. */
+export function useFocusRoomLock(active: boolean, onEscape: () => void) {
+  useEffect(() => {
+    if (!active) return
+    const root = document.documentElement
+    root.dataset.focusing = "true"
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onEscape()
+    }
+    document.addEventListener("keydown", onKey)
+    return () => {
+      delete root.dataset.focusing
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [active, onEscape])
+}
+
 /** Starts focus from anywhere. A session already running is never overwritten. */
 export function useStartFocus({ stay = false } = {}) {
-  const { state, dispatch, navigate } = useStore()
+  const { state, dispatch, navigate, setFocusRoomOpen } = useStore()
   return (
     taskId: string | null,
     minutes: number,
     plannedId?: string,
     restart = false
   ) => {
+    // A new timer opens in the room by itself. One already going is reopened.
+    if (state.timer) setFocusRoomOpen(true)
     if (!state.timer) {
       const task = state.tasks.find((item) => item.id === taskId)
       dispatch({
@@ -131,41 +165,25 @@ export function describeSession(session: FocusSession) {
 }
 
 export function FocusView() {
-  const { state, route, navigate } = useStore()
+  const { state, route } = useStore()
   const preselected = route.view === "focus" ? route.taskId : undefined
   const finished = state.focusSessions.find(
     (session) => session.id === state.finishedSessionId
   )
 
+  if (state.timer) return <ActiveTimer timer={state.timer} />
+
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <ScreenHeading>Focus</ScreenHeading>
-      {state.timer ? (
-        <>
-          <ActiveTimer timer={state.timer} />
-          {state.timer.taskId && (
-            <Button
-              type="button"
-              size="xl"
-              className="w-full sm:w-auto"
-              onClick={() =>
-                navigate(
-                  state.tasks.find((task) => task.id === state.timer!.taskId)
-                    ?.recoveryCase
-                    ? { view: "workspace" }
-                    : {
-                        view: "task",
-                        id: state.timer!.taskId!,
-                        section: "doc",
-                      }
-                )
-              }
-            >
-              Open my work
-            </Button>
-          )}
-        </>
-      ) : finished ? (
+      <div className="text-center">
+        <ScreenHeading>
+          Focus
+        </ScreenHeading>
+        <p className="mt-1 text-muted-foreground">
+          Pick a task, choose a small window, and let the rest soften.
+        </p>
+      </div>
+      {finished ? (
         <FinishedPanel session={finished} />
       ) : (
         <StartPanel preselected={preselected} />
@@ -176,24 +194,29 @@ export function FocusView() {
 }
 
 function StartPanel({ preselected }: { preselected?: string }) {
-  const { state, today } = useStore()
+  const { state, today, dispatch } = useStore()
   const start = useStartFocus()
   const tasks = state.tasks.filter(isActive)
   const [taskId, setTaskId] = useState(
     preselected ?? recommendTask(state, today)?.id ?? ""
   )
 
+  const chosen = tasks.find((task) => task.id === taskId) ?? null
   return (
-    <Card className="space-y-4">
+    <div
+      style={taskColorVars(taskId || "focus", chosen?.focusTheme)}
+      className="bot-stage bot-rise space-y-5 p-5 sm:p-7"
+    >
+      
       <div>
-        <label htmlFor="focus-task" className="mb-1 block text-sm font-medium">
+        <label htmlFor="focus-task" className="mb-1.5 block text-sm font-medium">
           What are you working on?
         </label>
         <select
           id="focus-task"
           value={taskId}
           onChange={(event) => setTaskId(event.target.value)}
-          className={fieldClass}
+          className={`${fieldClass} h-12 px-4`}
         >
           <option value="">No specific task</option>
           {tasks.map((task) => (
@@ -203,33 +226,60 @@ function StartPanel({ preselected }: { preselected?: string }) {
           ))}
         </select>
       </div>
+      {taskId && (
+        <ThemePicker
+          task={chosen}
+          onChange={(focusTheme) =>
+            dispatch({
+              type: "edit-task",
+              id: taskId,
+              at: nowIso(),
+              patch: { focusTheme },
+            })
+          }
+        />
+      )}
       <div className="grid gap-2 sm:grid-cols-3">
         {FOCUS_OPTIONS.map((option, index) => (
-          <Button
+          <button
             key={option.minutes}
             type="button"
-            size="xl"
-            variant={index === 0 ? "default" : "outline"}
-            className="h-auto min-h-12 py-2 whitespace-normal"
+            style={{ "--tile": "white" } as React.CSSProperties}
+            className="bot-tile min-h-32 flex-col justify-center gap-1 text-center"
             onClick={() => start(taskId || null, option.minutes)}
           >
+            <span aria-hidden className="grid size-12 place-items-center">
+              <span
+                className="block rounded-full bg-[radial-gradient(closest-side,var(--task-vivid)_35%,var(--task-soft)_75%,transparent)]"
+                style={{
+                  width: `${1.5 + index * 0.9}rem`,
+                  height: `${1.5 + index * 0.9}rem`,
+                }}
+              />
+            </span>
             {option.label}
-          </Button>
+          </button>
         ))}
       </div>
-    </Card>
+    </div>
   )
 }
 
 export function ActiveTimer({
   timer,
   compact = false,
+  room = false,
 }: {
   timer: TimerState
   /** A slim version for working alongside the document. */
   compact?: boolean
+  /** Open over another screen, which it steps back to. */
+  room?: boolean
 }) {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, navigate, focusRoomOpen, setFocusRoomOpen } =
+    useStore()
+  const stepOut = useCallback(() => setFocusRoomOpen(false), [setFocusRoomOpen])
+  useFocusRoomLock(room, stepOut)
   const running = timer.runningSince !== null
   const now = useNow(true)
   const remaining = remainingSeconds(timer, now)
@@ -245,9 +295,21 @@ export function ActiveTimer({
       className={
         compact
           ? "flex flex-wrap gap-1"
-          : "flex flex-col justify-center gap-2 sm:flex-row sm:flex-wrap"
+          : "flex flex-wrap justify-center gap-2"
       }
     >
+      {compact && (
+        <Button
+          type="button"
+          size="lg"
+          variant="soft"
+          className="min-h-11"
+          onClick={() => setFocusRoomOpen(true)}
+        >
+          <Maximize2 aria-hidden />
+          Enter Focus Mode
+        </Button>
+      )}
       {running ? (
         <Button
           type="button"
@@ -274,7 +336,7 @@ export function ActiveTimer({
         type="button"
         size={compact ? "lg" : "xl"}
         className={compact ? "min-h-11" : undefined}
-        variant={compact ? "ghost" : "outline"}
+        variant={compact ? "ghost" : "soft"}
         onClick={() => dispatch({ type: "timer-reset" })}
       >
         <RotateCcw aria-hidden />
@@ -284,7 +346,7 @@ export function ActiveTimer({
         type="button"
         size={compact ? "lg" : "xl"}
         className={compact ? "min-h-11" : undefined}
-        variant="ghost"
+        variant={compact ? "ghost" : "soft"}
         onClick={() =>
           isBreak ? dispatch({ type: "timer-cancel" }) : setStopping(true)
         }
@@ -300,8 +362,13 @@ export function ActiveTimer({
     : (step?.title ?? task?.title ?? "Focus session")
 
   if (compact) {
+    // The room is showing this same timer, so it isn't drawn twice.
+    if (focusRoomOpen) return null
     return (
-      <div className="sticky top-2 z-10 rounded-2xl border border-primary/40 bg-card p-3 shadow-sm">
+      <div
+        style={taskColorVars(isBreak ? null : timer.taskId, task?.focusTheme)}
+        className="bot-task-accent sticky top-2 z-10 rounded-2xl border border-border bg-[color-mix(in_srgb,var(--task-soft,var(--brand-soft))_60%,white)] p-3 shadow-[var(--shadow-soft)]"
+      >
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <p className="flex min-w-0 items-baseline gap-2.5">
             <span
@@ -323,23 +390,155 @@ export function ActiveTimer({
   }
 
   return (
-    <Card className="text-center">
-      <p className="text-sm font-medium text-sage">
-        {label}
-        {!running && " (paused)"}
-      </p>
-      {step && task && (
-        <p className="text-xs text-muted-foreground">{task.title}</p>
+    <section
+      style={taskColorVars(
+        isBreak ? "break" : (timer.taskId ?? "focus"),
+        isBreak ? "mint-garden" : task?.focusTheme
       )}
-      <p
-        role="timer"
-        aria-label={`${formatClock(remaining)} remaining`}
-        className="my-3 font-heading text-7xl tabular-nums sm:text-8xl"
-      >
-        {formatClock(remaining)}
-      </p>
-      {controls}
-    </Card>
+      className={`bot-immersive ${running ? "is-running" : "is-paused"}`}
+      aria-labelledby="focus-title"
+    >
+      <div className="mx-auto flex min-h-svh w-full max-w-3xl flex-col items-center gap-[1.5svh] px-4 py-3 text-center sm:py-4">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          <Button
+            type="button"
+            size="lg"
+            variant="soft"
+            className="h-11"
+            onClick={() => {
+              setFocusRoomOpen(false)
+              if (!room) navigate({ view: "workspace" })
+            }}
+          >
+            <ArrowLeft aria-hidden /> {room ? "Leave Focus" : "Today"}
+          </Button>
+          {task && (
+            <ThemePicker
+              compact
+              task={task}
+              onChange={(focusTheme) =>
+                dispatch({
+                  type: "edit-task",
+                  id: task.id,
+                  at: nowIso(),
+                  patch: { focusTheme },
+                })
+              }
+            />
+          )}
+        </div>
+
+        <div className="my-auto flex w-full flex-col items-center gap-[1.5svh]">
+          <p className={`bot-eyebrow ${running ? "" : "bot-paused-tag"}`}>
+            {running
+              ? isBreak
+                ? "A quiet pause"
+                : "Focus on this"
+              : "Paused · your place is saved"}
+          </p>
+          <h1
+            id="focus-title"
+            className="font-heading text-[clamp(2.25rem,7svh,4.5rem)] leading-[1] tracking-[-0.025em] break-words"
+          >
+            {label}
+          </h1>
+          {task?.nextAction && !step && (
+            <p className="bot-paper rounded-2xl px-3 py-1.5 text-sm font-medium shadow-none">
+              Next: {task.nextAction}
+            </p>
+          )}
+          {step && task && (
+            <p className="text-sm font-semibold">Part of {task.title}</p>
+          )}
+          <FocusOrb
+            fraction={
+              timer.plannedSeconds ? remaining / timer.plannedSeconds : 0
+            }
+            running={running}
+            className={
+              stopping
+                ? "w-[min(26svh,52vw)]"
+                : "w-[min(46svh,82vw,30rem)]"
+            }
+          >
+            <p
+              role="timer"
+              aria-label={`${formatClock(remaining)} remaining`}
+              className={`font-heading leading-none tracking-[-0.04em] tabular-nums ${stopping ? "text-[clamp(2.5rem,7svh,3.5rem)]" : "text-[clamp(4rem,min(15svh,22vw),9rem)]"}`}
+            >
+              {formatClock(remaining)}
+            </p>
+          </FocusOrb>
+          <div
+            className={`w-full ${stopping ? "bot-paper max-w-2xl rounded-3xl p-4" : ""}`}
+          >
+            {controls}
+          </div>
+          {running && !isBreak && !stopping && (
+            <ParkingLot taskId={timer.taskId} />
+          )}
+          {task && !isBreak && (
+            <button
+              type="button"
+              onClick={() => {
+                dispatch({
+                  type: "enter-recovery",
+                  at: nowIso(),
+                  taskId: task.id,
+                  source: "avoidance",
+                })
+                setFocusRoomOpen(false)
+                navigate({ view: "workspace" })
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white/55 px-4 text-sm outline-none transition-colors hover:bg-white/85"
+            >
+              <LifeBuoy className="size-4" aria-hidden /> This isn’t working —
+              help me recover
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export function ThemePicker({
+  task,
+  onChange,
+  compact = false,
+}: {
+  task: Task | null
+  onChange: (theme: FocusThemeId) => void
+  compact?: boolean
+}) {
+  if (!task) return null
+  const current = taskTheme(task)
+  return (
+    <fieldset
+      className={compact ? "bot-paper rounded-full px-1 py-0.5 shadow-none" : "space-y-2"}
+    >
+      <legend className={compact ? "sr-only" : "text-sm font-medium"}>
+        Focus color
+      </legend>
+      <div className={compact ? "flex" : "flex flex-wrap gap-1"}>
+        {FOCUS_THEMES.map((theme) => (
+          <button
+            key={theme.id}
+            type="button"
+            aria-label={theme.name}
+            title={theme.name}
+            aria-pressed={current.id === theme.id}
+            onClick={() => onChange(theme.id)}
+            className="group/swatch grid size-9 place-items-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          >
+            <span
+              className="size-6 rounded-full transition-transform duration-200 group-hover/swatch:scale-125 group-aria-pressed/swatch:scale-125 group-aria-pressed/swatch:shadow-[0_0_0_2px_white]"
+              style={{ background: theme.vivid }}
+            />
+          </button>
+        ))}
+      </div>
+    </fieldset>
   )
 }
 
@@ -385,42 +584,51 @@ function WrapUpForm({
           maxLength={300}
           placeholder="Optional. For example: continue from paragraph two."
           onChange={(event) => setNote(event.target.value)}
-          className="mt-1 h-11"
+          className="mt-1 h-11 px-3.5"
         />
       </div>
       <div
         role="group"
         aria-label="What came of it"
-        className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+        className="grid gap-2 sm:grid-cols-3"
       >
-        <Button
+        <button
           type="button"
-          size="xl"
+          style={{ "--tile": "var(--sky)" } as React.CSSProperties}
+          className="bot-tile"
           onClick={() => onOutcome("progress", note)}
         >
+          <span className="bot-tile-glyph">
+            <TrendingUp className="size-4" aria-hidden />
+          </span>
           I started / made progress
-        </Button>
-        <Button
+        </button>
+        <button
           type="button"
-          size="xl"
-          variant="outline"
-          className="h-auto min-h-11 py-2 whitespace-normal"
+          style={{ "--tile": "var(--butter)" } as React.CSSProperties}
+          className="bot-tile"
           onClick={() =>
             task.minimumVersion
               ? onOutcome("minimum", note)
               : setAskingMinimum(true)
           }
         >
+          <span className="bot-tile-glyph">
+            <SunGlyph fill="half" className="size-5" />
+          </span>
           I completed the minimum version
-        </Button>
-        <Button
+        </button>
+        <button
           type="button"
-          size="xl"
-          variant="outline"
+          style={{ "--tile": "var(--mint)" } as React.CSSProperties}
+          className="bot-tile"
           onClick={() => onOutcome("completed", note)}
         >
+          <span className="bot-tile-glyph">
+            <SunGlyph fill="full" className="size-5" />
+          </span>
           I completed the original task
-        </Button>
+        </button>
       </div>
       {askingMinimum && (
         <form
@@ -635,11 +843,15 @@ export function FinishedPanel({
 
   if (task && session.progressReport === null) {
     return (
-      <Card className="space-y-3">
-        <h2 className="font-heading text-3xl">
+      <div
+        style={taskColorVars(task.id, task.focusTheme)}
+        className="bot-stage bot-rise space-y-3 p-5 sm:p-7"
+      >
+        
+        <h2 className="bot-stage-title">
           {formatMinutes(session.actualSeconds)} of focus, done.
         </h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm font-medium">
           The task stays open until you say otherwise.
         </p>
         <WrapUpForm
@@ -694,7 +906,7 @@ export function FinishedPanel({
             I got stuck
           </Button>
         </WrapUpForm>
-      </Card>
+      </div>
     )
   }
 
@@ -713,18 +925,22 @@ export function FinishedPanel({
   }
 
   return (
-    <Card className="space-y-4">
+    <div
+      style={taskColorVars(task?.id ?? "focus", task?.focusTheme)}
+      className="bot-stage bot-rise space-y-4 p-5 sm:p-7"
+    >
+      
       <div>
-        <h2 className="font-heading text-3xl">
+        <h2 className="bot-stage-title">
           {formatMinutes(session.actualSeconds)} of focus, done.
         </h2>
         {task ? (
-          <p className="mt-1 text-[15px] text-muted-foreground">
+          <p className="mt-1 text-[15px] font-medium">
             Saved to “{task.title}”. The task stays open until you say it’s
             finished.
           </p>
         ) : (
-          <p className="mt-1 text-[15px] text-muted-foreground">
+          <p className="mt-1 text-[15px] font-medium">
             Saved to your focus history.
           </p>
         )}
@@ -790,7 +1006,7 @@ export function FinishedPanel({
         <Button
           type="button"
           size="xl"
-          variant="outline"
+          variant="soft"
           onClick={() => startNext("focus", session.plannedMinutes)}
         >
           Another {session.plannedMinutes} minutes
@@ -799,7 +1015,7 @@ export function FinishedPanel({
           <Button
             type="button"
             size="xl"
-            variant="outline"
+            variant="soft"
             onClick={() => {
               dispatch({
                 type: "set-status",
@@ -840,7 +1056,7 @@ export function FinishedPanel({
           Done for now
         </Button>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -870,7 +1086,7 @@ function SessionHistory() {
     <section aria-labelledby="session-history">
       <h2
         id="session-history"
-        className="mb-2 font-sans text-[15px] font-semibold tracking-normal"
+        className="mb-2 font-heading text-lg"
       >
         Session history
       </h2>

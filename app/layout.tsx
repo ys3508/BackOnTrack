@@ -1,13 +1,18 @@
 import type { Metadata } from "next"
-import { Geist, Newsreader } from "next/font/google"
+import { Instrument_Sans, Instrument_Serif } from "next/font/google"
 
 import "./globals.css"
 import { cn } from "@/lib/utils"
 
-const fontSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
-const fontHeading = Newsreader({
+const fontInterface = Instrument_Sans({
   subsets: ["latin"],
-  variable: "--font-heading-serif",
+  variable: "--font-interface",
+})
+const fontDisplay = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-display",
 })
 
 export const metadata: Metadata = {
@@ -31,8 +36,8 @@ export default function RootLayout({
       lang="en"
       className={cn(
         "font-sans antialiased",
-        fontSans.variable,
-        fontHeading.variable
+        fontInterface.variable,
+        fontDisplay.variable
       )}
     >
       <body>{children}</body>

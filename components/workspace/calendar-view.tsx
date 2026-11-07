@@ -25,6 +25,7 @@ import type {
 
 import { Card, ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
+import { AuraStar } from "@/components/workspace/aura"
 import { CalendarDashboard } from "@/components/workspace/calendar-dashboard"
 import {
   BlockPopover,
@@ -125,7 +126,7 @@ export function CalendarView() {
       ...events,
       {
         id: "pending",
-        title: "New session",
+        title: "New · not saved yet",
         start,
         end: new Date(start.getTime() + creating.minutes * 60_000),
         editable: false,
@@ -510,7 +511,17 @@ export function CalendarView() {
 
   return (
     <div className="space-y-4">
-      <ScreenHeading className="text-xl sm:text-xl">Calendar</ScreenHeading>
+      <ScreenHeading>Calendar</ScreenHeading>
+
+      {!state.planned.length && !state.routines.length && (
+        <p className="bot-rise flex items-center gap-3 rounded-[1.5rem] bg-white/70 px-4 py-3 text-sm">
+          <AuraStar className="size-9 shrink-0" />
+          <span>
+            A wide-open day. Drag across the grid to plan a block, or click any
+            time to start small.
+          </span>
+        </p>
+      )}
 
       {isTimed && (
         <CalendarDashboard
@@ -578,14 +589,14 @@ export function CalendarView() {
                 <li className="flex items-center gap-1.5">
                   <span
                     aria-hidden
-                    className="inline-block h-3.5 w-5 rounded-full border border-sand bg-sand-soft"
+                    className="inline-block h-3.5 w-5 rounded-full border border-caution bg-caution-soft"
                   />
                   Deadline
                 </li>
                 <li className="flex items-center gap-1.5">
                   <span
                     aria-hidden
-                    className="inline-block h-3.5 w-5 rounded-sm border border-dashed border-sage bg-sage-soft"
+                    className="inline-block h-3.5 w-5 rounded-sm border border-dashed border-brand bg-brand-soft"
                   />
                   Planned
                 </li>
@@ -804,7 +815,7 @@ export function CalendarView() {
             }
             setDeadlineMove(null)
           }}
-          className="mt-3 min-h-11 rounded-md text-sm font-medium text-indigo underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="mt-3 min-h-11 rounded-md text-sm font-medium text-link underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/30"
         >
           Plan work on {deadlineMove && shortDate(deadlineMove.date)} instead
         </button>

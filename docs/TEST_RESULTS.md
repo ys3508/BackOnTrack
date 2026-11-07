@@ -410,4 +410,38 @@ Run in the production build at 375 x 812, in Demo Mode, with real clicks and typ
 | Plan B, pause, end session | Timer ran for the 5 minutes chosen in Plan B, and one restart was recorded. |
 | Minimum version with none written | Asked "What did you do?", saved the answer, and left the task open. It survived a reload. |
 
-One open question: on the first pass, the message draft looked closed in a screenshot just after opening by script. Three more attempts, one from a fresh state with the same steps, stayed open for 6 seconds each, so the cause is unknown.
+On the first pass, the message draft looked closed in a screenshot just after opening by script. Three more attempts stayed open. A later check showed the screenshot tool can capture a stale frame mid-transition, which is the likely explanation.
+
+## Usability pass: Recovery audit
+
+Run in the production build, in Demo Mode, comparing saved data after each step. The main choices used real clicks and typing.
+
+| Step | Saved result |
+| --- | --- |
+| Choose an obstacle | Recovery reason and blocker saved. The step is labelled "Built-in suggestion, not AI", and history says "Demo Mode template". |
+| Edit Plan B | Step and next action updated, and the label changed to "Your own step". Survived a reload. |
+| Start focus | Timer saved, linked to the task and block. One restart recorded. |
+| Pause, reload, resume | Clock held at 04:58 through the reload, then continued. |
+| Save next-step cue | Resume note saved, timer cleared, task stays in progress, and the session is recorded. |
+
+Bug found and fixed: a short attempt on a block still ahead closed that block, so the Now card moved to another task and the saved note wasn't shown. A block still ahead now stays on the card, showing "Pick up here".
+
+Also checked in the browser: title and Enter creates a planned block, the unsaved block looks different from saved ones, task colors on blocks, the Now card and Focus, no sideways scroll at 375 px on six screens, and the Now card ending at 606 of 812 px with a cue showing.
+
+Not tested: Live AI, touch dragging, and real users. Color contrast was calculated for the palette, not measured on screen.
+
+## Usability pass: Aura redesign
+
+Run in the development server in Demo Mode, using saved data built by the real reducer, at 1280 x 800 and 375 x 812.
+
+| Check | Result |
+| --- | --- |
+| Empty Today, scheduled, missed, active, paused, recovery, Reality Gap | Each seen in the browser, and each looks distinct |
+| Today, Calendar (Day and Week), Routines, Settings, Tasks | Seen in the browser, in one visual language |
+| Start | Opens the Focus room in place, with the address unchanged. Escape returns to that screen with the timer still running (checked before the visual swap, whose logic didn't change, and by automated tests) |
+| Moving a calendar block by stepped mouse events | Moved 20:28 to 19:28, and the new time was saved |
+| Sideways scroll at 375 px | None on Today, Calendar, Routines, Settings, or Tasks |
+
+Not tested: a person dragging by hand, reduced motion with the setting actually on (the rules are in place, but the browser here can't turn it on), touch dragging, screen readers, GPU smoothness on a real display, Live AI, and real users. Color contrast was calculated for the task palette, not measured on screen, and text over the orbs was only judged by eye.
+
+The earlier freeze report was not reproduced. The main thread ran at about 60 frames per second with no long tasks, in an earlier version.

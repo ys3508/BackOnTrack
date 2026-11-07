@@ -15,30 +15,35 @@ const GAP_SECTIONS: {
   title: string
   help: string
   add: string
+  tile: string
 }[] = [
   {
     key: "known",
     title: "Known Facts",
     help: "Facts you’ve confirmed.",
     add: "Add a fact",
+    tile: "var(--mint)",
   },
   {
     key: "worried",
     title: "Worries / Assumptions",
     help: "These are possibilities, not facts. They may not happen.",
     add: "Add a worry",
+    tile: "var(--peach)",
   },
   {
     key: "unknown",
     title: "Unknowns",
     help: "Things worth finding out.",
     add: "Add a question",
+    tile: "var(--sky)",
   },
   {
     key: "can",
     title: "Possible Actions",
     help: "Realistic options. Choose one as your next step.",
     add: "Add an option",
+    tile: "var(--butter)",
   },
 ]
 
@@ -75,13 +80,13 @@ function ItemEditor({
                   )
                 )
               }
-              className="min-h-11 flex-1 bg-card"
+              className="min-h-11 flex-1 bg-white"
             />
             <button
               type="button"
               aria-label={`Remove from ${label}: ${item}`}
               onClick={() => onChange(items.filter((_, at) => at !== index))}
-              className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30"
+              className="grid size-11 shrink-0 place-items-center rounded-full text-ink outline-none hover:bg-white/60 focus-visible:ring-3 focus-visible:ring-ring/30"
             >
               <Trash2 className="size-4" aria-hidden />
             </button>
@@ -92,7 +97,7 @@ function ItemEditor({
       <button
         type="button"
         onClick={() => onChange([...items, ""])}
-        className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+        className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-medium text-ink font-semibold outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
       >
         <Plus className="size-4" aria-hidden />
         {addLabel}
@@ -122,7 +127,7 @@ export function RealityGapTool({ task }: { task: Task }) {
     <section aria-labelledby="gap-heading">
       <Card className="space-y-5">
         <div>
-          <h2 id="gap-heading" className="font-heading text-2xl">
+          <h2 id="gap-heading" className="font-heading text-[2.5rem] leading-none">
             Reality Gap
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -131,12 +136,17 @@ export function RealityGapTool({ task }: { task: Task }) {
             actual rules or what will happen.
           </p>
         </div>
+        <div className="grid gap-3 sm:grid-cols-2">
         {GAP_SECTIONS.map((section) => (
-          <div key={section.key}>
-            <h3 className="font-sans text-[15px] font-semibold tracking-normal">
+          <div
+            key={section.key}
+            style={{ background: section.tile }}
+            className="min-w-0 rounded-[1.5rem] p-4"
+          >
+            <h3 className="font-heading text-2xl">
               {section.title}
             </h3>
-            <p className="mb-2 text-xs text-muted-foreground">{section.help}</p>
+            <p className="mb-2 text-xs font-medium">{section.help}</p>
             <ItemEditor
               label={section.title}
               items={gap[section.key]}
@@ -146,7 +156,7 @@ export function RealityGapTool({ task }: { task: Task }) {
                 section.key === "can"
                   ? (item) =>
                       recovery.current?.text === item.trim() ? (
-                        <p className="flex items-center gap-1 text-xs font-medium text-sage">
+                        <p className="flex items-center gap-1 text-xs font-medium text-brand">
                           <Check className="size-3.5" aria-hidden />
                           Your next step
                         </p>
@@ -161,7 +171,7 @@ export function RealityGapTool({ task }: { task: Task }) {
                               text: item,
                             })
                           }
-                          className="min-h-11 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                          className="min-h-11 bot-press rounded-2xl bg-white px-3 text-sm font-semibold outline-none"
                         >
                           Make this my next step
                         </button>
@@ -171,6 +181,7 @@ export function RealityGapTool({ task }: { task: Task }) {
             />
           </div>
         ))}
+        </div>
         <MessageDraft task={task} />
       </Card>
     </section>
@@ -201,7 +212,7 @@ function MessageDraft({ task }: { task: Task }) {
               write(messageDraftFor(task.title, recovery.originalInput))
             setOpen(true)
           }}
-          className="min-h-11 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="min-h-11 rounded-md text-sm font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         >
           {draft ? "See the message draft" : "Draft a message to someone"}
         </button>

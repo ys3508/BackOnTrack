@@ -2,13 +2,19 @@
 
 import { useRef, useState } from "react"
 import {
+  BellRing,
   CalendarArrowDown as CalendarDown,
+  Coffee,
+  Database,
   Download,
+  SlidersHorizontal,
+  Sparkles,
   Trash2,
   Upload,
 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
-import { Card, ScreenHeading } from "@/components/shared"
+import { ScreenHeading } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { LearningCard } from "@/components/workspace/learning-card"
 import { ConfirmDialog, fieldClass } from "@/components/workspace/parts"
@@ -24,6 +30,35 @@ import {
 } from "@/lib/workspace/storage"
 import type { Settings, Workspace } from "@/lib/workspace/schemas"
 
+/** One settings group: a coloured tab to find it by, then its controls. */
+function Section({
+  title,
+  Icon,
+  tone,
+  wide,
+  children,
+}: {
+  title: string
+  Icon: LucideIcon
+  tone: string
+  wide?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      className={`bot-card bot-rise overflow-hidden ${wide ? "lg:col-span-2" : ""}`}
+    >
+      <div className="flex items-center gap-2.5 px-5 pt-5 pb-1">
+        <span style={{ background: tone }} className="bot-tile-glyph size-8">
+          <Icon className="size-4" aria-hidden />
+        </span>
+        <h2 className="text-[2rem] leading-none">{title}</h2>
+      </div>
+      <div className="space-y-3 p-5">{children}</div>
+    </section>
+  )
+}
+
 function SuggestionsCard() {
   const { state, dispatch, mode, liveAvailable, statusChecked } = useStore()
   const options: { value: Source; label: string }[] = [
@@ -31,14 +66,11 @@ function SuggestionsCard() {
     { value: "live", label: "Live AI" },
   ]
   return (
-    <Card className="space-y-3">
-      <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-        Where suggestions come from
-      </h2>
+    <Section title="Where suggestions come from" Icon={Sparkles} tone="var(--lilac)">
       <div
         role="group"
         aria-label="Response source for suggestions"
-        className="inline-flex rounded-lg bg-secondary p-0.5 text-sm font-medium"
+        className="inline-flex rounded-full bg-white/70 p-1 text-sm font-medium"
       >
         {options.map((option) => {
           const unavailable = option.value === "live" && !liveAvailable
@@ -55,9 +87,9 @@ function SuggestionsCard() {
                 })
               }
               className={
-                "min-h-10 rounded-md px-3.5 outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                "min-h-10 rounded-full px-4 transition-colors outline-none  " +
                 (mode === option.value
-                  ? "bg-card shadow-sm"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground") +
                 (unavailable ? " cursor-not-allowed" : "")
               }
@@ -78,7 +110,7 @@ function SuggestionsCard() {
       <p className="text-sm text-muted-foreground">
         Tasks, the timer, recovery, and the calendar all work without AI.
       </p>
-    </Card>
+    </Section>
   )
 }
 
@@ -100,10 +132,7 @@ function RemindersCard() {
   }
 
   return (
-    <Card className="space-y-3">
-      <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-        Reminders
-      </h2>
+    <Section title="Reminders" Icon={BellRing} tone="var(--pink)">
       <p className="text-sm text-muted-foreground">
         A reminder about five minutes before a scheduled block. Your browser may
         ask for permission to show notifications, so they can reach you when
@@ -125,6 +154,14 @@ function RemindersCard() {
             : turnOn()
         }
       >
+        <span
+          aria-hidden
+          className={`relative h-5 w-9 rounded-full border-2 border-current transition-colors`}
+        >
+          <span
+            className={`absolute top-0.5 size-3 rounded-full bg-current transition-[left] duration-200 ${on ? "left-[1.125rem]" : "left-0.5"}`}
+          />
+        </span>
         {on ? "Turn off reminders" : "Turn on reminders"}
       </Button>
       {on && (
@@ -138,7 +175,7 @@ function RemindersCard() {
                 : "On, on screen only, unless you allow notifications."}
         </p>
       )}
-    </Card>
+    </Section>
   )
 }
 
@@ -161,13 +198,14 @@ export function SettingsView() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <ScreenHeading>Settings and data</ScreenHeading>
+    <div className="mx-auto grid max-w-5xl items-start gap-5 lg:grid-cols-2">
+      <div className="lg:col-span-2">
+        <ScreenHeading>
+          Settings <span className="bot-accent">and data</span>
+        </ScreenHeading>
+      </div>
 
-      <Card className="space-y-3">
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-          Make it yours
-        </h2>
+      <Section title="Make it yours" Icon={SlidersHorizontal} tone="var(--butter)" wide>
         <p className="text-sm text-muted-foreground">
           Everything works as it is. Change these only if you’d like to.
         </p>
@@ -226,15 +264,12 @@ export function SettingsView() {
             </select>
           </div>
         </div>
-      </Card>
+      </Section>
 
       <SuggestionsCard />
       <RemindersCard />
 
-      <Card className="space-y-3">
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-          Buffers
-        </h2>
+      <Section title="Buffers" Icon={Coffee} tone="var(--sky)" wide>
         <p className="text-sm text-muted-foreground">
           Time kept free for catching up. An unused buffer doesn’t count as
           anything missed.
@@ -326,14 +361,13 @@ export function SettingsView() {
             after another one.
           </p>
         )}
-      </Card>
+      </Section>
 
-      <LearningCard />
+      <div className="lg:col-span-2">
+        <LearningCard />
+      </div>
 
-      <Card className="space-y-3">
-        <h2 className="font-sans text-[15px] font-semibold tracking-normal">
-          Your data
-        </h2>
+      <Section title="Your data" Icon={Database} tone="var(--mint)" wide>
         <Button
           type="button"
           size="xl"
@@ -352,7 +386,7 @@ export function SettingsView() {
           account, and they aren’t synced to other devices. Clearing your
           browser data deletes them, so export a backup now and then.
         </p>
-        <p className="text-sm">
+        <p className="text-sm font-semibold">
           Using about {(storageUsedBytes() / 1024 / 1024).toFixed(2)} MB of
           about {STORAGE_LIMIT_BYTES / 1024 / 1024} MB available.
         </p>
@@ -403,7 +437,7 @@ export function SettingsView() {
             {importError}
           </p>
         )}
-      </Card>
+      </Section>
 
       <ConfirmDialog
         open={Boolean(pendingImport)}

@@ -10,6 +10,9 @@ import { newId, nowIso, useStore } from "@/components/workspace/store"
 import { SupportNotice } from "@/components/workspace/support-notice"
 import { isCrisisText } from "@/lib/guards"
 
+/** Lets the rail's button open the same capture as ⌘K. */
+export const QUICK_CAPTURE_EVENT = "backontrack:quick-capture"
+
 /** A title alone is enough. Nothing else is asked for, or guessed. */
 function useCapture(onAdded?: (title: string) => void) {
   const { dispatch } = useStore()
@@ -37,9 +40,14 @@ export function QuickCapture({
   id = "quick-capture",
   autoFocus,
   onAdded,
+  variant = "plain",
+  onText,
 }: {
   id?: string
   autoFocus?: boolean
+  variant?: "plain" | "hero"
+  /** Told as they type, for anything that reacts to it. */
+  onText?: (text: string) => void
   onAdded?: (title: string) => void
 }) {
   const capture = useCapture(onAdded)
@@ -52,7 +60,7 @@ export function QuickCapture({
     )
   }
   return (
-    <form onSubmit={capture.submit} className="flex gap-2">
+    <form onSubmit={capture.submit} className="flex items-center gap-1.5">
       <label htmlFor={id} className="sr-only">
         What do you need to do?
       </label>
@@ -62,13 +70,20 @@ export function QuickCapture({
         autoFocus={autoFocus}
         maxLength={200}
         placeholder="What have you been putting off?"
-        onChange={(event) => capture.setText(event.target.value)}
-        className="h-11 flex-1 bg-card"
+        onChange={(event) => {
+          capture.setText(event.target.value)
+          onText?.(event.target.value)
+        }}
+        className={
+          variant === "hero"
+            ? "h-12 min-w-0 flex-1 border-transparent bg-transparent px-3 text-base font-medium shadow-none placeholder:text-ink/70 focus-visible:border-transparent focus-visible:ring-0"
+            : "h-12 min-w-0 flex-1 px-4 font-medium"
+        }
       />
       <Button
         type="submit"
         size="xl"
-        variant="outline"
+        variant={variant === "hero" ? "default" : "outline"}
         disabled={!capture.text.trim()}
       >
         <Plus aria-hidden />
@@ -94,7 +109,15 @@ export function GlobalQuickCapture() {
       }
     }
     document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
+    const onOpen = () => {
+      setAdded(null)
+      setOpen(true)
+    }
+    window.addEventListener(QUICK_CAPTURE_EVENT, onOpen)
+    return () => {
+      document.removeEventListener("keydown", onKey)
+      window.removeEventListener(QUICK_CAPTURE_EVENT, onOpen)
+    }
   }, [])
 
   useEffect(() => {
@@ -107,7 +130,7 @@ export function GlobalQuickCapture() {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/20 p-4 pt-[15svh]"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-ink/25 p-4 pt-[15svh]"
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) setOpen(false)
           }}
@@ -115,7 +138,7 @@ export function GlobalQuickCapture() {
           <div
             role="dialog"
             aria-label="Quick capture"
-            className="w-full max-w-lg rounded-2xl border border-border bg-card p-3 shadow-lg"
+            className="bot-card w-full max-w-lg p-3"
           >
             <QuickCapture
               id="global-capture"
@@ -132,7 +155,7 @@ export function GlobalQuickCapture() {
         role="status"
         className={
           added
-            ? "fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-sm text-background"
+            ? "fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-butter px-4 py-2 text-sm font-semibold text-ink"
             : "sr-only"
         }
       >

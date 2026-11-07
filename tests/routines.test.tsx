@@ -115,6 +115,7 @@ describe("creating a routine", () => {
     expect(await button("Emoji")).toHaveTextContent("🏋️")
     await user.click(await button("Any time that day"))
     expect(screen.queryByLabelText("Time")).toBeNull()
+    await user.click(await button(/^More options/))
     await user.type(
       screen.getByLabelText("Minimum version (optional)"),
       "Move for 5 minutes"
@@ -129,6 +130,34 @@ describe("creating a routine", () => {
       duration: 30,
     })
     expect(routine.rrule).toContain(`BYDAY=${CODE}`)
+  })
+
+  it("asks only for the essentials, and can still add one that way", async () => {
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("New routine"))
+    expect(screen.queryByLabelText("Minimum version (optional)")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Color 1" })).toBeNull()
+    await user.type(screen.getByLabelText("Name"), "Walk")
+    await user.click(await button("Every day"))
+    await user.click(await button("Add routine"))
+    expect(saved().routines[0]).toMatchObject({
+      name: "Walk",
+      kind: "fixed",
+      duration: 30,
+      minimumVersion: "",
+    })
+  })
+
+  it("shows every option when editing", async () => {
+    seed(withGym())
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button(/^Edit /))
+    expect(screen.getByLabelText("Minimum version (optional)")).toHaveValue(
+      "Move for 5 minutes"
+    )
+    screen.getByRole("button", { name: "Color 1" })
   })
 
   it("starts with today's weekday, and offers presets", async () => {

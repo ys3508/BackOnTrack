@@ -87,6 +87,9 @@ type Store = {
   /** True after time away, until the user has chosen a way back in. */
   returning: boolean
   finishReturn: () => void
+  /** Whether the running timer is showing as the whole-screen Focus room. */
+  focusRoomOpen: boolean
+  setFocusRoomOpen: (open: boolean) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -145,6 +148,19 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     isAway(state.lastOpenedAt, Date.now())
   )
   const finishReturn = useCallback(() => setReturning(false), [])
+  // Which timer was stepped out of. Every new timer has a new id, so wherever it
+  // was started from, it opens in the room. A reload on another screen doesn't.
+  const [leftRoomOf, setLeftRoomOf] = useState<string | null>(() =>
+    state.timer && parseHash(window.location.hash).view !== "workspace"
+      ? state.timer.id
+      : null
+  )
+  const timerId = state.timer?.id ?? null
+  const focusRoomOpen = timerId !== null && leftRoomOf !== timerId
+  const setFocusRoomOpen = useCallback(
+    (open: boolean) => setLeftRoomOf(open ? null : timerId),
+    [timerId]
+  )
 
   useEffect(() => {
     latest.current = state
@@ -256,6 +272,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       storageFailed,
       returning,
       finishReturn,
+      focusRoomOpen,
+      setFocusRoomOpen,
     }),
     [
       state,
@@ -269,6 +287,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       storageFailed,
       returning,
       finishReturn,
+      focusRoomOpen,
+      setFocusRoomOpen,
     ]
   )
 

@@ -305,6 +305,19 @@ export const TaskSchema = z.object({
   recoveryCase: RecoveryCaseSchema.nullable().catch(null).default(null),
   /** A simple errand from the home page, which needs no recovery workflow. */
   quick: z.boolean().catch(false).default(false),
+  /** The user-chosen visual theme shared by Today, Calendar, and Focus. */
+  focusTheme: z
+    .enum([
+      "coral-bloom",
+      "blue-daydream",
+      "citrus-glow",
+      "mint-garden",
+      "lavender-haze",
+      "pink-sunrise",
+    ])
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type Task = z.infer<typeof TaskSchema>
 

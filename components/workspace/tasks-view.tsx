@@ -27,6 +27,7 @@ import { useStore } from "@/components/workspace/store"
 import { rankTasks } from "@/lib/planning/priority"
 import { STATUS_LABEL, TASK_STATUSES, isActive } from "@/lib/workspace/schemas"
 import type { Task, TaskStatus } from "@/lib/workspace/schemas"
+import { taskColorVars } from "@/lib/calendar/task-colors"
 import { cn } from "@/lib/utils"
 
 type Filter = "active" | "done" | "all"
@@ -69,7 +70,7 @@ export function TasksView() {
         <div
           role="group"
           aria-label="Task layout"
-          className="flex rounded-lg bg-secondary p-0.5 text-sm font-medium"
+          className="flex rounded-[1rem] border border-line bg-card p-1 text-sm font-medium"
         >
           {(
             [
@@ -84,7 +85,7 @@ export function TasksView() {
               onClick={() => setLayout(value)}
               className={cn(
                 "flex min-h-10 items-center gap-1.5 rounded-md px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                layout === value ? "bg-card shadow-sm" : "text-muted-foreground"
+                layout === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"
               )}
             >
               <Icon className="size-4" aria-hidden />
@@ -108,7 +109,7 @@ export function TasksView() {
                 className={cn(
                   "min-h-10 rounded-full border px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
                   filter === option.value
-                    ? "border-primary bg-sage-soft"
+                    ? "border-transparent bg-primary font-medium text-primary-foreground"
                     : "border-border bg-card"
                 )}
               >
@@ -137,7 +138,7 @@ export function TasksView() {
                   className={cn(
                     "min-h-10 rounded-full border px-3.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
                     ordering === option.value
-                      ? "border-primary bg-sage-soft"
+                      ? "border-transparent bg-primary font-medium text-primary-foreground"
                       : "border-border bg-card"
                   )}
                 >
@@ -190,7 +191,13 @@ function TaskListItem({
   const { navigate } = useStore()
   const done = task.status === "completed"
   return (
-    <li className="rounded-xl border border-border bg-card p-3.5">
+    <li
+      style={{
+        ...taskColorVars(task.id, task.focusTheme),
+        background: "var(--task-wash)",
+      }}
+      className="rounded-2xl border border-line p-3.5"
+    >
       <div className="flex items-start gap-3">
         <button
           type="button"
@@ -316,7 +323,7 @@ function Column({
       aria-label={`${STATUS_LABEL[status]}, ${tasks.length} tasks`}
       className={cn(
         "w-64 shrink-0 snap-start rounded-2xl bg-secondary/70 p-2.5 transition-colors xl:w-auto",
-        isOver && "bg-sage-soft"
+        isOver && "bg-brand-soft"
       )}
     >
       <h2 className="mb-2 px-1 font-sans text-sm font-semibold tracking-normal">
@@ -353,7 +360,7 @@ function BoardCard({
           : undefined
       }
       className={cn(
-        "rounded-xl border border-border bg-card p-2.5",
+        "rounded-2xl border border-line bg-card p-2.5",
         isDragging && "relative z-10 shadow-lg"
       )}
     >

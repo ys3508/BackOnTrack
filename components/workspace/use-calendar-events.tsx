@@ -11,6 +11,7 @@ import { BlockContent } from "@/components/workspace/calendar-block"
 import { useStore } from "@/components/workspace/store"
 import { blockOutcome, parseRoutineRule } from "@/lib/calendar/derived"
 import { buildCalendarItems } from "@/lib/calendar/events"
+import { taskColor } from "@/lib/calendar/task-colors"
 import type { CalendarItemKind } from "@/lib/calendar/events"
 import { buffersFor } from "@/lib/today/buffer"
 import { localToday } from "@/lib/workspace/dates"
@@ -143,16 +144,24 @@ export function useCalendarEvents(hidden = false) {
   )
 
   const eventDidMount = useCallback((arg: EventMountArg) => {
-    const { color, refId } = arg.event.extendedProps as {
+    const { color, refId, kind, taskId } = arg.event.extendedProps as {
       color?: string
       refId: string
+      kind: CalendarItemKind
+      taskId: string | null
     }
     if (color) arg.el.style.setProperty("--routine", color)
+    if ((kind === "planned" || kind === "focused") && taskId) {
+      const task = state.tasks.find((item) => item.id === taskId)
+      const { soft, strong } = taskColor(taskId, task?.focusTheme)
+      arg.el.style.setProperty("--task-soft", soft)
+      arg.el.style.setProperty("--task-strong", strong)
+    }
     arg.el.setAttribute("data-block-id", refId)
     if (arg.event.start) {
       arg.el.setAttribute("data-date", localToday(arg.event.start))
     }
-  }, [])
+  }, [state.tasks])
 
   return { events, eventClasses, eventContent, eventDidMount }
 }

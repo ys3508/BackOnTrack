@@ -17,7 +17,7 @@ const describe = (session: CalendarSession) =>
 
 /** The same two looks as the calendar: dashed for planned, solid for focus. */
 const KIND_STYLE = {
-  planned: "border border-dashed border-sage bg-sage-soft",
+  planned: "border border-dashed border-brand bg-brand-soft",
   actual: "bg-primary",
 }
 
@@ -190,7 +190,7 @@ export function CalendarDashboard({
   return (
     <section
       aria-label={week ? "This week at a glance" : "This day at a glance"}
-      className="space-y-3 rounded-2xl border border-border bg-card p-4"
+      className="bot-card space-y-3 p-4"
     >
       <dl className="grid grid-cols-3 gap-2">
         {figures.map((figure) => (

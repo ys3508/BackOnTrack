@@ -161,6 +161,7 @@ export function taskFromSession(
       resumeNote: "",
       link: "",
       minimumVersion: "",
+      focusTheme: null,
     },
     at,
     "created",

@@ -144,7 +144,7 @@ export function Floating({
         top: place?.top ?? 0,
         visibility: place ? "visible" : "hidden",
       }}
-      className="fixed z-40 max-h-[calc(100svh-1rem)] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl border border-border bg-card p-3 text-foreground shadow-lg"
+      className="fixed z-40 max-h-[calc(100svh-1rem)] w-72 max-w-[calc(100vw-1rem)] overflow-x-hidden overflow-y-auto bot-card p-3 text-foreground [&_[data-slot=button]]:h-auto [&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:px-4 [&_[data-slot=button]]:whitespace-normal"
     >
       {children}
     </div>,
@@ -167,10 +167,10 @@ export function DurationChips({
   const [typed, setTyped] = useState(String(value))
   const chip = (active: boolean) =>
     cn(
-      "min-h-9 rounded-full border px-2.5 text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+      "min-h-9 min-w-9 rounded-full border border-line px-2.5 text-xs font-medium transition-colors outline-none ",
       active
-        ? "border-primary bg-sage-soft font-medium"
-        : "border-border bg-card"
+        ? "bg-primary text-primary-foreground"
+        : "bg-card hover:bg-brand-soft"
     )
   return (
     <div>
@@ -346,7 +346,7 @@ export function TaskCombobox({
           id="calendar-task-options"
           role="listbox"
           aria-label="Tasks"
-          className="mt-1 rounded-xl border border-border bg-card py-1"
+          className="mt-1 rounded-2xl border border-line bg-card py-1"
         >
           {options.map((option, index) => (
             <li
@@ -359,7 +359,7 @@ export function TaskCombobox({
               onClick={() => choose(option)}
               className={cn(
                 "flex min-h-9 cursor-pointer items-center gap-1.5 px-2.5 py-1 text-sm break-words",
-                index === active && "bg-sage-soft"
+                index === active && "bg-brand-soft"
               )}
             >
               {!option.task && (
@@ -441,6 +441,7 @@ export function CreateSession({
 }) {
   const [title, setTitle] = useState("")
   const [firstStep, setFirstStep] = useState("")
+  const [more, setMore] = useState(false)
   return (
     <Floating anchor={anchor} label="New session" onClose={onClose}>
       <form
@@ -465,16 +466,32 @@ export function CreateSession({
           )}
         </p>
         <TaskCombobox value={title} onChange={setTitle} onPick={onPickTask} />
-        <DurationChips value={minutes} onChange={onMinutes} />
-        <label className="block text-xs font-medium">
-          What will you do first? (optional)
-          <Input
-            value={firstStep}
-            maxLength={300}
-            onChange={(event) => setFirstStep(event.target.value)}
-            className="mt-0.5 h-10"
-          />
-        </label>
+        <button
+          type="button"
+          aria-expanded={more}
+          onClick={() => setMore(!more)}
+          className="min-h-9 rounded-md text-xs font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+        >
+          Length and first step
+          <span className="font-normal text-muted-foreground">
+            {" "}
+            · {formatDuration(minutes)}
+          </span>
+        </button>
+        {more && (
+          <div className="space-y-2">
+            <DurationChips value={minutes} onChange={onMinutes} />
+            <label className="block text-xs font-medium">
+              What will you do first? (optional)
+              <Input
+                value={firstStep}
+                maxLength={300}
+                onChange={(event) => setFirstStep(event.target.value)}
+                className="mt-0.5 h-10"
+              />
+            </label>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
             Enter to add, Esc to cancel.

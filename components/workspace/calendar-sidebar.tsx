@@ -18,6 +18,8 @@ import {
   WEEKDAYS,
   buildRoutineRule,
   formatClockTime,
+  occurrenceOutcome,
+  routineOccursOn,
   parseRoutineRule,
   routineTime,
   routineWeek,
@@ -73,7 +75,7 @@ export function NotStartedTray({
       {!hideHeading && (
         <h2
           id="tray-heading"
-          className="mb-2 font-sans text-[15px] font-semibold tracking-normal"
+          className="mb-2 font-heading text-lg"
         >
           Not started yet ({items.length})
         </h2>
@@ -87,7 +89,7 @@ export function NotStartedTray({
             data-id={task.id}
             data-title={task.title}
             data-minutes={25}
-            className="flex cursor-grab items-start gap-1 rounded-xl border border-border bg-card p-2"
+            className="bot-press flex cursor-grab items-start gap-1 rounded-2xl bg-card p-2.5"
           >
             <GripVertical
               className="mt-0.5 size-4 shrink-0 text-muted-foreground"
@@ -106,7 +108,7 @@ export function NotStartedTray({
                 type="button"
                 aria-label={`Schedule ${task.title}`}
                 onClick={() => onSchedule(task.id)}
-                className="min-h-8 rounded-md text-xs font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                className="min-h-8 rounded-md text-xs font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
               >
                 Schedule
               </button>
@@ -146,6 +148,8 @@ function RoutineForm({
   const [time, setTime] = useState(parsed?.time ?? "07:00")
   const [duration, setDuration] = useState(routine?.duration ?? 30)
   const [minimum, setMinimum] = useState(routine?.minimumVersion ?? "")
+  // Editing shows everything. Adding one asks only for what it needs.
+  const [more, setMore] = useState(Boolean(routine))
 
   const missing = [
     !name.trim() && "a name",
@@ -155,13 +159,13 @@ function RoutineForm({
   const ready = !missing.length && duration > 0
   const chip = (active: boolean) =>
     cn(
-      "min-h-9 rounded-full border px-2 text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
-      active ? "border-primary bg-sage-soft" : "border-border bg-card"
+      "min-h-9 rounded-full border border-line px-3 text-xs font-semibold transition-colors outline-none ",
+      active ? "border-transparent bg-primary font-medium text-primary-foreground" : "border-border bg-card"
     )
 
   return (
     <form
-      className="space-y-2 rounded-xl border border-border bg-card p-3 text-sm"
+      className="bot-card bot-rise space-y-3 p-4 text-sm"
       onSubmit={(event) => {
         event.preventDefault()
         if (!ready) return
@@ -218,7 +222,7 @@ function RoutineForm({
     >
       <div className="flex items-end gap-2">
         <div>
-          <span className="mb-0.5 block text-xs font-medium" id="emoji-label">
+          <span className="mb-1 block text-xs font-medium" id="emoji-label">
             Emoji
           </span>
           <button
@@ -226,13 +230,13 @@ function RoutineForm({
             aria-labelledby="emoji-label"
             aria-expanded={pickerOpen}
             onClick={() => setPickerOpen(!pickerOpen)}
-            className="grid h-10 w-12 place-items-center rounded-lg border border-input bg-card text-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+            className="grid h-10 w-12 place-items-center rounded-2xl border border-line bg-card text-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
           >
             {emoji || "＋"}
           </button>
         </div>
         <label className="min-w-0 flex-1">
-          <span className="mb-0.5 block text-xs font-medium">Name</span>
+          <span className="mb-1 block text-xs font-medium">Name</span>
           <Input
             value={name}
             autoFocus
@@ -260,7 +264,7 @@ function RoutineForm({
               }}
               className={cn(
                 "grid size-9 place-items-center rounded-lg text-lg outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30",
-                emoji === choice && "bg-sage-soft"
+                emoji === choice && "bg-brand-soft"
               )}
             >
               {choice}
@@ -269,7 +273,7 @@ function RoutineForm({
         </div>
       )}
       <fieldset>
-        <legend className="mb-0.5 text-xs font-medium">Days</legend>
+        <legend className="mb-1 text-xs font-medium">Days</legend>
         <div className="mb-1 flex flex-wrap gap-1">
           {DAY_PRESETS.map((preset) => (
             <button
@@ -308,7 +312,7 @@ function RoutineForm({
         </div>
       </fieldset>
       <fieldset>
-        <legend className="mb-0.5 text-xs font-medium">When</legend>
+        <legend className="mb-1 text-xs font-medium">When</legend>
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
@@ -329,7 +333,7 @@ function RoutineForm({
         </div>
         {kind === "fixed" && (
           <label className="mt-1 block">
-            <span className="mb-0.5 block text-xs font-medium">Time</span>
+            <span className="mb-1 block text-xs font-medium">Time</span>
             <Input
               type="time"
               value={time}
@@ -339,43 +343,58 @@ function RoutineForm({
           </label>
         )}
       </fieldset>
-      <DurationChips
-        value={duration}
-        onChange={setDuration}
-        options={ROUTINE_MINUTES}
-      />
-      <label className="block">
-        <span className="mb-0.5 block text-xs font-medium">
-          Minimum version (optional)
+      <button
+        type="button"
+        aria-expanded={more}
+        onClick={() => setMore(!more)}
+        className="min-h-9 rounded-md text-xs font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+      >
+        More options
+        <span className="font-normal text-muted-foreground">
+          {" "}
+          · {duration} min{minimum.trim() ? " · has a minimum" : ""}
         </span>
-        <Input
-          value={minimum}
-          maxLength={120}
-          placeholder="Move for 5 minutes"
-          onChange={(event) => setMinimum(event.target.value)}
-          className="h-10"
-        />
-      </label>
-      <fieldset>
-        <legend className="mb-0.5 text-xs font-medium">Color</legend>
-        <div className="flex flex-wrap gap-1.5">
-          {PALETTE.map((option, index) => (
-            <button
-              key={option}
-              type="button"
-              aria-label={`Color ${index + 1}`}
-              aria-pressed={color === option}
-              onClick={() => setColor(option)}
-              style={{ backgroundColor: option }}
-              className={cn(
-                "size-8 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
-                color === option &&
-                  "ring-2 ring-foreground ring-offset-2 ring-offset-card"
-              )}
+      </button>
+      {more && (
+        <div className="space-y-2">
+          <DurationChips
+            value={duration}
+            onChange={setDuration}
+            options={ROUTINE_MINUTES}
+          />
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium">
+              Minimum version (optional)
+            </span>
+            <Input
+              value={minimum}
+              maxLength={120}
+              placeholder="Move for 5 minutes"
+              onChange={(event) => setMinimum(event.target.value)}
+              className="h-10"
             />
-          ))}
+          </label>
+          <fieldset>
+            <legend className="mb-1 text-xs font-medium">Color</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {PALETTE.map((option, index) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-label={`Color ${index + 1}`}
+                  aria-pressed={color === option}
+                  onClick={() => setColor(option)}
+                  style={{ backgroundColor: option }}
+                  className={cn(
+                    "size-8 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+                    color === option && "ring-2 ring-ink ring-offset-2"
+                  )}
+                />
+              ))}
+            </div>
+          </fieldset>
         </div>
-      </fieldset>
+      )}
       {!ready && missing.length > 0 && (
         <p id="routine-missing" className="text-xs text-muted-foreground">
           To add this, it needs {missing.join(" and ")}.
@@ -409,10 +428,13 @@ export function MyRoutines({
   editingId,
   setEditingId,
   selected,
+  page = false,
 }: {
   editingId: string | null
   setEditingId: (id: string | null) => void
   selected: string
+  /** On the Routines screen, with room for today's answer on each card. */
+  page?: boolean
 }) {
   const { state, dispatch, today } = useStore()
   const [adding, setAdding] = useState(false)
@@ -422,16 +444,34 @@ export function MyRoutines({
     <section aria-labelledby="routines-heading">
       <h2
         id="routines-heading"
-        className="mb-2 font-sans text-[15px] font-semibold tracking-normal"
+        className="mb-2 font-heading text-lg"
       >
         My routines
       </h2>
-      <ul ref={ref} className="space-y-1.5">
+      {page && !state.routines.length && !adding && (
+        <p className="bot-card mb-3 p-5 font-medium">
+          Nothing here yet. Add something small you’d like to come back to, like
+          a walk or a tidy desk. It can have a smaller version for hard days.
+        </p>
+      )}
+      <ul
+        ref={ref}
+        className={page ? "grid gap-4 sm:grid-cols-2" : "space-y-1.5"}
+      >
         {state.routines.map((routine) => {
+          const outcome = occurrenceOutcome(routine, today)
+          const setOutcome = (next: "full" | "minimum" | "skipped") =>
+            dispatch({
+              type: "routine-outcome",
+              routineId: routine.id,
+              date: today,
+              placementId: null,
+              outcome: outcome === next ? null : next,
+            })
           const week = routineWeek(state, routine, today)
           if (editingId === routine.id) {
             return (
-              <li key={routine.id}>
+              <li key={routine.id} className={page ? "sm:col-span-2" : undefined}>
                 <RoutineForm
                   routine={routine}
                   onDone={() => setEditingId(null)}
@@ -447,13 +487,35 @@ export function MyRoutines({
               data-id={routine.id}
               data-title={`${routine.emoji} ${routine.name}`.trim()}
               data-minutes={routine.duration}
-              style={{ borderLeftColor: routine.color }}
-              className="cursor-grab rounded-xl border border-l-4 border-border bg-card p-2"
+              style={
+                {
+                  "--routine": routine.color,
+                  background: `radial-gradient(120% 140% at 8% 0%, color-mix(in srgb, ${routine.color} 30%, white), color-mix(in srgb, ${routine.color} 6%, white))`,
+                } as React.CSSProperties
+              }
+              className={cn(
+                "bot-press cursor-grab rounded-2xl",
+                page ? "cursor-default p-4" : "p-3"
+              )}
             >
               <div className="flex items-start gap-1">
+                {page && (
+                  <span
+                    aria-hidden
+                    className="mr-2 grid size-12 shrink-0 place-items-center rounded-full bg-white/80 text-2xl"
+                  >
+                    {routine.emoji || "✦"}
+                  </span>
+                )}
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium break-words">
-                    {routine.emoji} {routine.name}
+                  <span
+                    className={cn(
+                      "block font-medium break-words",
+                      page ? "font-heading text-[1.75rem] leading-none font-normal" : "text-sm"
+                    )}
+                  >
+                    {!page && `${routine.emoji} `}
+                    {routine.name}
                   </span>
                   <span className="block text-xs text-muted-foreground">
                     {parseRoutineRule(routine.rrule)
@@ -487,7 +549,7 @@ export function MyRoutines({
                   type="button"
                   aria-label={`Edit ${routine.name}`}
                   onClick={() => setEditingId(routine.id)}
-                  className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30"
+                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink outline-none hover:bg-white focus-visible:ring-3 focus-visible:ring-ring/30"
                 >
                   <Pencil className="size-3.5" aria-hidden />
                 </button>
@@ -495,11 +557,51 @@ export function MyRoutines({
                   type="button"
                   aria-label={`Delete ${routine.name}`}
                   onClick={() => setDeleting(routine)}
-                  className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/30"
+                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink outline-none hover:bg-white focus-visible:ring-3 focus-visible:ring-ring/30"
                 >
                   <Trash2 className="size-3.5" aria-hidden />
                 </button>
               </div>
+              {page && routine.minimumVersion && (
+                <p className="mt-2 text-xs font-medium">
+                  ◐ Minimum: {routine.minimumVersion}
+                </p>
+              )}
+              {page && routineOccursOn(routine, today) && (
+                <div
+                  role="group"
+                  aria-label={`Today: ${routine.name}`}
+                  className="mt-3 flex flex-wrap gap-1.5"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={outcome === "full"}
+                    data-outcome="full"
+                    className="bot-outcome"
+                    onClick={() => setOutcome("full")}
+                  >
+                    ● Full
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={outcome === "minimum"}
+                    data-outcome="minimum"
+                    className="bot-outcome"
+                    onClick={() => setOutcome("minimum")}
+                  >
+                    ◐ Minimum
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={outcome === "skipped"}
+                    data-outcome="skipped"
+                    className="bot-outcome"
+                    onClick={() => setOutcome("skipped")}
+                  >
+                    Skip
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 aria-label={`Add ${routine.name} to ${shortDate(selected)}`}
@@ -516,7 +618,7 @@ export function MyRoutines({
                     },
                   })
                 }
-                className="min-h-8 rounded-md text-xs font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                className="mt-2 min-h-8 rounded-full text-xs font-semibold underline underline-offset-2 outline-none "
               >
                 Add to {shortDate(selected)}
               </button>
@@ -532,7 +634,7 @@ export function MyRoutines({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="mt-1 inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="bot-press mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white/80 px-5 text-sm font-medium outline-none"
         >
           <Plus className="size-4" aria-hidden />
           New routine

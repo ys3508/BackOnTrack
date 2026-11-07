@@ -87,7 +87,7 @@ import type {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="font-sans text-[15px] font-semibold tracking-normal">
+    <h2 className="font-heading text-lg">
       {children}
     </h2>
   )
@@ -280,7 +280,7 @@ function TaskBody({ task, section }: { task: Task; section?: TaskSection }) {
         </div>
       </div>
 
-      <details className="group rounded-2xl border border-border bg-card">
+      <details className="group rounded-2xl border border-line bg-card">
         <summary className="flex min-h-12 cursor-pointer items-center px-5 font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
           More about this task
         </summary>
@@ -339,7 +339,7 @@ function CurrentStepCard({
   return (
     <Card className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <h2 className="text-sm font-medium text-sage">Right now</h2>
+        <h2 className="text-sm font-medium text-brand">Right now</h2>
         <DeadlineChip task={task} />
       </div>
       <p className="font-heading text-[1.5rem] leading-snug">
@@ -506,7 +506,7 @@ function ScheduleCard({ task }: { task: Task }) {
     <Card className="space-y-3">
       <SectionTitle>Planned work</SectionTitle>
       {deadlinePassed(task, today) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sand-soft p-3 text-sm text-sand">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-caution-soft p-3 text-sm text-caution">
           <span>
             The deadline was {task.deadline && shortDate(task.deadline)}. What
             now is up to you.
@@ -984,10 +984,10 @@ const KIND_LABEL: Partial<Record<TaskEvent["kind"], string>> = {
 }
 
 const KIND_STYLE: Partial<Record<TaskEvent["kind"], string>> = {
-  suggested: "bg-indigo-soft text-indigo",
+  suggested: "bg-link-soft text-link",
   accepted: "bg-secondary text-foreground",
-  attempted: "bg-sand-soft text-sand",
-  completed: "bg-sage-soft text-sage",
+  attempted: "bg-caution-soft text-caution",
+  completed: "bg-brand-soft text-brand",
 }
 
 function HistoryCard({ task }: { task: Task }) {
@@ -1024,7 +1024,7 @@ function HistoryCard({ task }: { task: Task }) {
           type="button"
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
-          className="mt-2 min-h-11 rounded-md text-sm font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="mt-2 min-h-11 rounded-md text-sm font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         >
           {expanded ? "Show less" : `Show all ${events.length}`}
         </button>

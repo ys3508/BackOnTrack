@@ -11,13 +11,20 @@ import {
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { timelineWindow } from "@/lib/today/timeline"
+import {
+  agendaColumns,
+  agendaHours,
+  timelineWindow,
+  todayAgenda,
+} from "@/lib/today/timeline"
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
 import {
   firstStepOf,
   nowState,
   pickAnother,
   sessionMinutes,
+  latestWin,
+  WIN_SHOWN_MS,
 } from "@/lib/today/now"
 import { addDays, localToday } from "@/lib/workspace/dates"
 import { workspaceReducer } from "@/lib/workspace/reducer"
@@ -340,6 +347,75 @@ describe("Test 1 and Test 10: the card shows only what's relevant", () => {
     expect(within(card).queryByRole("button", { name: "Pause" })).toBeNull()
   })
 
+  it("keeps a block still ahead on the card after an early attempt, with its note", async () => {
+    const start = (id: string): WorkspaceAction => ({
+      type: "timer-start",
+      id,
+      kind: "focus",
+      taskId: "a",
+      plannedId: "u",
+      minutes: 5,
+      now: Date.now(),
+      at: AT,
+    })
+    seed(
+      run([
+        task("a", "Essay"),
+        task("b", "Rent"),
+        block("u", "a", clock(offset(40)), 45),
+        block("v", "b", clock(offset(90)), 30),
+        start("s"),
+        {
+          type: "timer-stop",
+          now: Date.now() + 4000,
+          at: AT,
+          outcome: "continue-later",
+          note: "",
+        },
+        {
+          type: "session-wrap-up",
+          sessionId: "s",
+          at: AT,
+          outcome: "progress",
+          resumeNote: "Continue from paragraph two",
+        },
+      ])
+    )
+    render(<WorkspaceApp />)
+    await screen.findByRole("heading", { name: "Today" })
+    const card = nowCard()
+    expect(within(card).getByText("Essay")).toBeTruthy()
+    expect(within(card).getByText(/Continue from paragraph two/)).toBeTruthy()
+    expect(within(card).getByText(/45 min/)).toBeTruthy()
+  })
+
+  it("doesn't call a block missed once it was attempted", () => {
+    const state = run([
+      task("a", "Essay"),
+      block("m", "a", clock(offset(-30))),
+      {
+        type: "timer-start",
+        id: "s",
+        kind: "focus",
+        taskId: "a",
+        plannedId: "m",
+        minutes: 5,
+        now: Date.now(),
+        at: AT,
+      },
+      {
+        type: "timer-stop",
+        now: Date.now() + 4000,
+        at: AT,
+        outcome: "continue-later",
+        note: "",
+      },
+    ])
+    expect(
+      nowState({ ...state, finishedSessionId: null }, TODAY, Date.now()).kind
+    ).not.toBe("missed")
+  })
+
   it("offers I'm stuck on an upcoming block, as a small link", async () => {
     seed(run([task("a", "Essay"), block("u", "a", clock(offset(40)), 45)]))
     const user = userEvent.setup()
@@ -590,6 +666,17 @@ describe("working from the card", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(5)
   })
 
+  it("marks the task that's in the Now card, in place of its details", async () => {
+    seed(run([task("a", "Essay", TODAY), task("b", "Rent", TODAY)]))
+    render(<WorkspaceApp />)
+    const list = (await screen.findByRole("heading", { name: "Today’s tasks" }))
+      .parentElement!
+    const marked = within(list).getAllByText("In Now, above")
+    expect(marked).toHaveLength(1)
+    const inCard = within(nowCard()).getByText(/Essay|Rent/).textContent!
+    expect(marked[0].closest("li")).toHaveTextContent(inCard)
+  })
+
   it("counts Not started yet, and hides it when empty", async () => {
     seed(run([task("a", "Essay")]))
     const first = render(<WorkspaceApp />)
@@ -832,5 +919,124 @@ describe("the timeline's window", () => {
   it("stays inside the day", () => {
     expect(timelineWindow(at(23))).toEqual({ first: 19, last: 24 })
     expect(timelineWindow(at(0))).toEqual({ first: 0, last: 5 })
+  })
+})
+
+describe("the visual timeline", () => {
+  const stateWith = (...actions: WorkspaceAction[]) =>
+    run([task("a", "Essay", TODAY), task("b", "Rent", addDays(TODAY, 3)), ...actions])
+
+  it("keeps another day's deadline off today", () => {
+    const { untimed } = todayAgenda(stateWith(), TODAY, Date.now())
+    expect(untimed.map((item) => item.title)).toEqual(["Due: Essay"])
+  })
+
+  it("marks a block whose time has gone by as missed, not failed", () => {
+    const earlier = new Date(`${TODAY}T00:00:00`)
+    const now = earlier.getTime() + 3 * 3600_000
+    const { timed } = todayAgenda(
+      stateWith(block("m", "a", "00:30", 30)),
+      TODAY,
+      now
+    )
+    expect(timed[0]).toMatchObject({ refId: "m", state: "missed" })
+  })
+
+  it("stretches its hours so nothing timed falls outside", () => {
+    const state = stateWith(
+      block("e", "a", "07:00", 30),
+      block("l", "a", "21:15", 45)
+    )
+    const clock = new Date(`${TODAY}T13:00:00`)
+    const { timed } = todayAgenda(state, TODAY, clock.getTime())
+    expect(agendaHours(timed, clock)).toEqual({ first: 7, last: 22 })
+  })
+
+  it("puts overlapping blocks side by side, and others full width", () => {
+    const state = stateWith(
+      block("x", "a", "09:00", 60),
+      block("y", "b", "09:30", 60),
+      block("z", "b", "12:00", 30)
+    )
+    const clock = new Date(`${TODAY}T08:00:00`)
+    const { timed } = todayAgenda(state, TODAY, clock.getTime())
+    const columns = agendaColumns(timed)
+    const at = (id: string) =>
+      columns.get(timed.find((item) => item.refId === id)!.key)
+    expect(at("x")).toEqual({ column: 0, columns: 2 })
+    expect(at("y")).toEqual({ column: 1, columns: 2 })
+    expect(at("z")).toEqual({ column: 0, columns: 1 })
+  })
+
+  it("opens a block's details from the timeline", async () => {
+    seed(run([task("a", "Essay"), block("u", "a", clock(offset(40)), 45)]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Open Essay"))
+    expect(await screen.findByRole("dialog", { name: /Essay/ })).toBeTruthy()
+  })
+})
+
+describe("the states around finishing", () => {
+  it("shows a win only for a little while", () => {
+    const now = Date.now()
+    const state = run([
+      task("a", "Essay"),
+      {
+        type: "set-status",
+        id: "a",
+        at: new Date(now).toISOString(),
+        status: "completed",
+      },
+    ])
+    expect(latestWin(state, now)?.type).toBe("completed")
+    expect(latestWin(state, now + WIN_SHOWN_MS)).toBeNull()
+  })
+
+  it("celebrates finishing a task from the list, wherever that was", async () => {
+    seed(run([task("a", "Essay"), task("b", "Rent")]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Mark Essay complete"))
+    expect(
+      await screen.findByRole("status", { name: "Task finished" })
+    ).toHaveTextContent("All of it. Done.")
+    await user.click(await button("Dismiss this note"))
+    expect(screen.queryByRole("status", { name: "Task finished" })).toBeNull()
+  })
+
+  it("opens Focus in place on Start, and steps back without touching the timer", async () => {
+    seed(run([task("a", "Essay")]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Start"))
+    const hash = window.location.hash
+    expect(document.documentElement.dataset.focusing).toBe("true")
+    expect(await screen.findByRole("group", { name: "Focus" })).toBeTruthy()
+    expect(screen.getByRole("timer")).toBeTruthy()
+    await user.click(await button("Back to Today"))
+    expect(document.documentElement.dataset.focusing).toBeUndefined()
+    expect(window.location.hash).toBe(hash)
+    expect(screen.getByRole("timer")).toBeTruthy()
+    expect(saved().timer.taskId).toBe("a")
+    await user.click(await button("Enter Focus Mode"))
+    expect(document.documentElement.dataset.focusing).toBe("true")
+  })
+
+  it("does everything from a task's row, without leaving it", async () => {
+    seed(run([task("a", "Essay", TODAY), task("b", "Rent", TODAY)]))
+    const user = userEvent.setup()
+    render(<WorkspaceApp />)
+    await user.click(await button("Rename Rent"))
+    await user.clear(screen.getByLabelText("Task title"))
+    await user.type(screen.getByLabelText("Task title"), "Pay rent{Enter}")
+    expect(saved().tasks.find((t: { id: string }) => t.id === "b").title).toBe(
+      "Pay rent"
+    )
+    await user.click(await button("Shrink Pay rent"))
+    expect(saved().tasks.find((t: { id: string }) => t.id === "b").nextAction)
+      .toBeTruthy()
+    await user.click(await button("Stuck on Pay rent"))
+    expect(saved().recovery.taskId).toBe("b")
   })
 })

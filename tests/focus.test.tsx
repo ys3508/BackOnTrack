@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react"
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { WorkspaceApp } from "@/components/workspace/workspace-app"
@@ -230,12 +236,44 @@ describe("focus screen", () => {
     render(<WorkspaceApp />)
     click("5-minute Quick Start")
     await advance(MIN)
-    click("Pause timer")
+    // The task page behind the room has a status button with the same name.
+    const room = () => within(screen.getByRole("timer").closest("section")!)
+    fireEvent.click(room().getByRole("button", { name: "Pause" }))
     await advance(10 * MIN)
     expect(screen.getByRole("timer")).toHaveTextContent("04:00")
-    click("Resume timer")
+    fireEvent.click(room().getByRole("button", { name: "Resume" }))
     await advance(MIN)
     expect(screen.getByRole("timer")).toHaveTextContent("03:00")
+  })
+
+  it("opens in the room, and steps out to the work with the timer unchanged", async () => {
+    render(<WorkspaceApp />)
+    click("5-minute Quick Start")
+    await advance(MIN)
+    const hash = window.location.hash
+    expect(document.documentElement.dataset.focusing).toBe("true")
+    click("Leave Focus")
+    expect(document.documentElement.dataset.focusing).toBeUndefined()
+    expect(window.location.hash).toBe(hash)
+    expect(screen.getAllByRole("timer")).toHaveLength(1)
+    click("Pause timer")
+    await advance(MIN)
+    expect(screen.getByRole("timer")).toHaveTextContent("04:00")
+    click("Enter Focus Mode")
+    expect(document.documentElement.dataset.focusing).toBe("true")
+    expect(screen.getAllByRole("timer")).toHaveLength(1)
+  })
+
+  it("reopens the room from the timer pill, without changing screen", async () => {
+    render(<WorkspaceApp />)
+    click("5-minute Quick Start")
+    await advance(MIN)
+    click("Leave Focus")
+    click("Routines")
+    click(/Open focus timer/)
+    expect(window.location.hash).toBe("#/routines")
+    expect(document.documentElement.dataset.focusing).toBe("true")
+    expect(screen.getAllByRole("timer")).toHaveLength(1)
   })
 
   it("finishes, saves the session, and leaves the task open with a break offered", async () => {

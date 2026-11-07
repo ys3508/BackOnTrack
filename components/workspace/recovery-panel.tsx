@@ -4,17 +4,23 @@ import { useState } from "react"
 import {
   ArrowLeft,
   Calendar,
+  CloudRain,
+  Compass,
   FlaskConical,
+  Hourglass,
   Pencil,
   Play,
   Shuffle,
   Sparkles,
   UserRound,
+  Zap,
 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
-import { Card, LoadingNotice } from "@/components/shared"
+import { LoadingNotice } from "@/components/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { AuraStar } from "@/components/workspace/aura"
 import {
   DurationChips,
   TaskCombobox,
@@ -36,6 +42,7 @@ import {
   pathLabel,
   suggestBlocker,
 } from "@/lib/recovery/case-engine"
+import { taskColorVars } from "@/lib/calendar/task-colors"
 import { shortDate } from "@/lib/workspace/dates"
 import {
   RECOVERY_REASONS,
@@ -50,8 +57,42 @@ import type {
 } from "@/lib/workspace/schemas"
 import { cn } from "@/lib/utils"
 
-const quiet = "min-h-11 justify-start text-muted-foreground"
+const quiet = "min-h-11 justify-start"
 const PLAN_MINUTES = [2, 5, 10, 15]
+
+/** Each obstacle has its own colour and mark, so it's found by looking. */
+const REASON_LOOK: Record<RecoveryReason, { tile: string; Icon: LucideIcon }> = {
+  "cant-start": { tile: "var(--butter)", Icon: Zap },
+  "dont-know-start": { tile: "var(--sky)", Icon: Compass },
+  worried: { tile: "var(--peach)", Icon: CloudRain },
+  "no-time": { tile: "var(--mint)", Icon: Hourglass },
+}
+
+/** Recovery always looks the same, whichever task brought someone here. */
+function RecoveryStage({
+  className,
+  children,
+}: {
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      style={
+        {
+          ...taskColorVars("recovery", "lavender-haze"),
+          "--room-bg": "#b6bdfa",
+          "--room-core": "#f78cc8",
+          "--room-mid": "#efc6ee",
+        } as React.CSSProperties
+      }
+      className={cn("bot-stage bot-step p-5 sm:p-7", className)}
+    >
+      <AuraStar className="absolute top-5 right-5 size-16 sm:size-20" />
+      {children}
+    </div>
+  )
+}
 
 function Back({
   onClick,
@@ -64,7 +105,7 @@ function Back({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium font-medium outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
     >
       <ArrowLeft className="size-4" aria-hidden />
       {children}
@@ -135,11 +176,11 @@ function ChooseResponsibility() {
     )
   }
   return (
-    <Card className="space-y-3 p-6 sm:p-8">
-      <h2 className="font-heading text-[1.625rem] leading-tight">
+    <RecoveryStage className="space-y-3">
+      <h2 className="bot-stage-title max-w-[85%]">
         What have you been avoiding?
       </h2>
-      <p className="text-[15px] text-muted-foreground">
+      <p className="text-[15px] font-medium">
         Messy is fine. It doesn’t need a date or a plan.
       </p>
       <form
@@ -175,7 +216,7 @@ function ChooseResponsibility() {
           </Button>
         </div>
       </form>
-    </Card>
+    </RecoveryStage>
   )
 }
 
@@ -217,17 +258,15 @@ function ReasonList({
 
   const suggested = recoveryCase?.suggestedBlocker
   return (
-    <Card className="space-y-4 p-6 sm:p-8">
+    <RecoveryStage className="space-y-4">
       <div>
-        <p className="text-sm font-medium break-words text-sage">
-          {task.title}
-        </p>
+        <p className="bot-eyebrow max-w-[85%] break-words">{task.title}</p>
         <div className="mt-0.5">
           <DeadlineChip task={task} />
         </div>
         <h2
           id="reason-question"
-          className="mt-2 font-heading text-[1.625rem] leading-tight"
+          className="bot-stage-title mt-3 max-w-[85%]"
         >
           What’s making this difficult right now?
         </h2>
@@ -244,25 +283,34 @@ function ReasonList({
           <div
             role="group"
             aria-labelledby="reason-question"
-            className="grid gap-2"
+            className="grid gap-2 sm:grid-cols-2"
           >
-            {RECOVERY_REASONS.map((reason) => (
-              <button
-                key={reason}
-                type="button"
-                onClick={() => choose(reason)}
-                className="flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-border bg-card px-4 py-3 text-left text-[15px] transition-colors outline-none hover:border-primary/50 hover:bg-sage-soft focus-visible:ring-3 focus-visible:ring-ring/30"
-              >
-                <span className="min-w-0">{RECOVERY_REASON_LABEL[reason]}</span>
-                {suggested === REASON_BLOCKER[reason] && (
-                  <span className="text-xs text-muted-foreground">
-                    Closest to what you wrote
+            {RECOVERY_REASONS.map((reason) => {
+              const { tile, Icon } = REASON_LOOK[reason]
+              return (
+                <button
+                  key={reason}
+                  type="button"
+                  onClick={() => choose(reason)}
+                  style={{ "--tile": tile } as React.CSSProperties}
+                  className="bot-tile"
+                >
+                  <span className="bot-tile-glyph">
+                    <Icon className="size-4" aria-hidden />
                   </span>
-                )}
-              </button>
-            ))}
+                  <span className="min-w-0">
+                    {RECOVERY_REASON_LABEL[reason]}
+                    {suggested === REASON_BLOCKER[reason] && (
+                      <span className="block text-xs font-normal font-medium">
+                        Closest to what you wrote
+                      </span>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs font-medium">
             This only decides what to offer next. It isn’t a diagnosis.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -294,7 +342,7 @@ function ReasonList({
           </div>
         </>
       )}
-    </Card>
+    </RecoveryStage>
   )
 }
 
@@ -342,23 +390,20 @@ function PlanB({
   return (
     <section aria-labelledby="plan-b-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3">
-        <h3
-          id="plan-b-heading"
-          className="font-sans text-sm font-medium tracking-normal text-sage"
-        >
+        <h3 id="plan-b-heading" className="bot-eyebrow">
           Plan B
         </h3>
         {current && <OriginNote origin={current.origin} />}
       </div>
       {recoveryCase.adaptationNote && (
-        <p className="rounded-xl bg-indigo-soft p-3 text-sm text-indigo">
+        <p className="bot-paper rounded-2xl p-3 text-sm font-medium shadow-none">
           {recoveryCase.adaptationNote}
         </p>
       )}
       {assist.fellBack && (
         <p
           role="status"
-          className="rounded-xl bg-sand-soft p-3 text-sm text-sand"
+          className="bot-paper rounded-2xl bg-white/85 p-3 text-sm font-medium shadow-none"
         >
           Live AI couldn’t answer, so this is a built-in suggestion instead.
         </p>
@@ -403,7 +448,7 @@ function PlanB({
           <div className="flex items-start gap-1">
             <p
               data-testid="plan-b-action"
-              className="min-w-0 flex-1 font-heading text-[1.5rem] leading-snug break-words"
+              className="min-w-0 flex-1 font-heading text-[1.75rem] leading-[1.15] tracking-[-0.01em] break-words sm:text-[2.125rem]"
             >
               {current.text}
             </p>
@@ -421,7 +466,7 @@ function PlanB({
             </button>
           </div>
           {current.why && (
-            <p className="mt-1 text-sm text-muted-foreground">{current.why}</p>
+            <p className="mt-1 text-sm font-medium">{current.why}</p>
           )}
         </div>
       )}
@@ -440,7 +485,7 @@ function PlanB({
             <button
               type="button"
               onClick={() => setRevealed(revealed + 1)}
-              className="min-h-11 rounded-md font-medium text-indigo outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+              className="min-h-11 rounded-md font-medium text-link outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
             >
               Show the next step
             </button>
@@ -550,7 +595,7 @@ function NoTimeChoices({ task, assist }: { task: Task; assist: Assist }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-heading text-xl">
+        <h3 className="font-heading text-2xl">
           How do you want to handle this?
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -564,15 +609,18 @@ function NoTimeChoices({ task, assist }: { task: Task; assist: Assist }) {
             type="button"
             aria-pressed={recoveryCase.path === path}
             onClick={() => choose(path)}
+            style={
+              {
+                "--tile": path === "finish" ? "var(--sky)" : "var(--butter)",
+              } as React.CSSProperties
+            }
             className={cn(
-              "min-h-12 rounded-xl border bg-card px-4 py-3 text-left transition-colors outline-none hover:border-primary/50 focus-visible:ring-3 focus-visible:ring-ring/30",
-              recoveryCase.path === path
-                ? "border-primary bg-sage-soft"
-                : "border-border"
+              "bot-tile block w-full",
+              recoveryCase.path === path && "ring-2 ring-primary"
             )}
           >
             <span className="block font-medium">{pathLabel(path)}</span>
-            <span className="block text-sm text-muted-foreground">
+            <span className="block text-sm font-normal font-medium">
               {PATH_TEXT[path]}
             </span>
           </button>
@@ -581,10 +629,11 @@ function NoTimeChoices({ task, assist }: { task: Task; assist: Assist }) {
           type="button"
           aria-expanded={releasing}
           onClick={() => setReleasing(!releasing)}
-          className="min-h-12 rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors outline-none hover:border-primary/50 focus-visible:ring-3 focus-visible:ring-ring/30"
+          style={{ "--tile": "white" } as React.CSSProperties}
+          className="bot-tile block w-full"
         >
           <span className="block font-medium">Release</span>
-          <span className="block text-sm text-muted-foreground">
+          <span className="block text-sm font-normal font-medium">
             Consciously defer or let go of this, here in BackOnTrack.
           </span>
         </button>
@@ -592,7 +641,7 @@ function NoTimeChoices({ task, assist }: { task: Task; assist: Assist }) {
       {releasing && (
         <div
           role="alert"
-          className="space-y-2 rounded-xl bg-sand-soft p-3.5 text-sm text-sand"
+          className="bot-paper space-y-2 rounded-2xl bg-white/85 p-3.5 text-sm font-medium shadow-none"
         >
           <p>
             This only changes BackOnTrack. It doesn’t cancel anything outside
@@ -676,13 +725,11 @@ function ReasonWork({
   )
   const header = (
     <div>
-      <h2 className="font-sans text-sm font-medium tracking-normal break-words text-sage">
-        {task.title}
-      </h2>
+      <h2 className="bot-eyebrow max-w-[85%] break-words">{task.title}</h2>
       <div className="mt-0.5">
         <DeadlineChip task={task} />
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="mt-2 max-w-[85%] text-sm font-medium">
         {RECOVERY_REASON_LABEL[reason]}
       </p>
     </div>
@@ -691,11 +738,11 @@ function ReasonWork({
   if (reason === "worried") {
     return (
       <div className="space-y-4">
-        <Card className="space-y-4 p-6 sm:p-8">
+        <RecoveryStage className="space-y-4">
           {header}
           <PlanB task={task} recovery={recovery} assist={assist} />
           {changeReason}
-        </Card>
+        </RecoveryStage>
         <RealityGapTool task={task} />
       </div>
     )
@@ -703,7 +750,7 @@ function ReasonWork({
 
   if (reason === "no-time") {
     return (
-      <Card className="space-y-5 p-6 sm:p-8">
+      <RecoveryStage className="space-y-5">
         {header}
         <NoTimeChoices task={task} assist={assist} />
         {recoveryCase.path && (
@@ -723,16 +770,16 @@ function ReasonWork({
           />
         )}
         {changeReason}
-      </Card>
+      </RecoveryStage>
     )
   }
 
   return (
-    <Card className="space-y-4 p-6 sm:p-8">
+    <RecoveryStage className="space-y-4">
       {header}
       <PlanB task={task} recovery={recovery} assist={assist} />
       {changeReason}
-    </Card>
+    </RecoveryStage>
   )
 }
 
